@@ -7,16 +7,20 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f5f5f0;color:#1a1a1a;padding:0 0 2rem}
-a{color:inherit;text-decoration:none}
 .topbar{background:#fff;border-bottom:1px solid #e0e0d8;padding:0.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
-.topbar-title{font-size:16px;font-weight:600;color:#1a1a1a}
+.topbar-title{font-size:16px;font-weight:600}
 .topbar-sub{font-size:12px;color:#888;margin-top:1px}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;margin-right:5px;transition:background 0.3s}
+.sync-dot.ok{background:#1D9E75}
+.sync-dot.err{background:#E24B4A}
+.sync-dot.loading{background:#FAC775;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .container{max-width:960px;margin:0 auto;padding:1rem 1rem 0}
-.header{display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;margin-bottom:0.75rem}
+.header{display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;margin-bottom:0.75rem;flex-wrap:wrap;gap:8px}
 .nav-btns{display:flex;gap:6px;align-items:center}
 .nav-btn{background:#fff;border:1px solid #ddd;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;color:#333}
-.nav-btn:hover{background:#f5f5f0;border-color:#bbb}
-.month-title{font-size:20px;font-weight:600;color:#1a1a1a}
+.nav-btn:hover{background:#f5f5f0}
+.month-title{font-size:20px;font-weight:600}
 .view-tabs{display:flex;gap:6px}
 .tab{padding:6px 14px;border-radius:8px;border:1px solid #ddd;cursor:pointer;font-size:12px;color:#666;background:#fff}
 .tab.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
@@ -55,7 +59,7 @@ a{color:inherit;text-decoration:none}
 .list-assign.missing{background:#fde8e8;color:#a32d2d}
 .settings-wrap{display:flex;flex-direction:column;gap:1rem;margin-bottom:1rem}
 .settings-card{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:1rem 1.25rem}
-.settings-card h4{font-size:13px;font-weight:600;margin-bottom:0.875rem;color:#1a1a1a}
+.settings-card h4{font-size:13px;font-weight:600;margin-bottom:0.875rem}
 .settings-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
 .settings-row label{font-size:12px;color:#888;width:72px;flex-shrink:0}
 .settings-row input[type=text]{flex:1;min-width:200px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
@@ -72,7 +76,6 @@ a{color:inherit;text-decoration:none}
 .modal-field{margin-bottom:0.875rem}
 .modal-field label{font-size:12px;color:#888;display:block;margin-bottom:4px;font-weight:500}
 .modal-field select,.modal-field input[type=text]{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
-.modal-field select:focus,.modal-field input[type=text]:focus{outline:none;border-color:#378ADD}
 .modal-btns{display:flex;gap:8px;margin-top:1.25rem;justify-content:flex-end}
 .modal-meta{background:#f5f5f0;border-radius:8px;padding:0.75rem;margin-bottom:1rem;font-size:12px;color:#555;line-height:1.6}
 .modal-meta strong{color:#1a1a1a;font-weight:600}
@@ -80,7 +83,8 @@ a{color:inherit;text-decoration:none}
 .cleaner-item input{flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a}
 .error-banner{background:#fde8e8;color:#a32d2d;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:0.75rem}
 .empty-state{text-align:center;padding:3rem 1rem;color:#999;font-size:13px}
-.cleaner-color{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-right:4px}
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
 @media(max-width:600px){
   .calendar-grid{gap:2px}
   .day-cell{min-height:52px;padding:2px}
@@ -98,7 +102,10 @@ a{color:inherit;text-decoration:none}
     <div class="topbar-title">Planning Ménage</div>
     <div class="topbar-sub" id="topbar-sub">Studios</div>
   </div>
-  <div style="font-size:11px;color:#aaa" id="topbar-date"></div>
+  <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#aaa">
+    <span class="sync-dot loading" id="sync-dot"></span>
+    <span id="sync-label">Connexion...</span>
+  </div>
 </div>
 
 <div class="container">
@@ -166,22 +173,38 @@ a{color:inherit;text-decoration:none}
           <button class="btn-primary" onclick="addCleaner()">Ajouter</button>
         </div>
       </div>
-      <div class="settings-card" style="font-size:12px;color:#999;line-height:1.7">
-        <h4 style="margin-bottom:6px">Aide</h4>
-        Pour trouver vos URLs iCal Airbnb : connectez-vous sur Airbnb &rarr; Calendrier &rarr; Paramètres &rarr; Export du calendrier.<br>
-        Les assignations sont sauvegardées localement sur cet appareil. Pour partager, donnez l'URL de cette page à vos intervenantes.
+      <div class="settings-card" style="font-size:12px;color:#999;line-height:1.8">
+        <h4 style="margin-bottom:6px;color:#1a1a1a">Synchronisation Firebase</h4>
+        Toutes les modifications sont synchronisées en temps réel sur tous les appareils.<br>
+        Les réservations Airbnb sont rechargées à chaque ouverture de la page.<br><br>
+        <strong style="color:#555">URLs iCal :</strong> Airbnb → Calendrier → Paramètres → Export du calendrier.
       </div>
     </div>
   </div>
 </div>
 
 <div id="modal-container"></div>
+<div class="toast" id="toast"></div>
 
-<script>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
+  authDomain: "planning-menage-18b09.firebaseapp.com",
+  databaseURL: "https://planning-menage-18b09-default-rtdb.firebaseio.com",
+  projectId: "planning-menage-18b09",
+  storageBucket: "planning-menage-18b09.firebasestorage.app",
+  messagingSenderId: "685094108459",
+  appId: "1:685094108459:web:b90ec9f136de34d699996e"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
 const PROXY = 'https://api.allorigins.win/raw?url=';
-const LS_KEY = 'menage_planning_v3';
-
-const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A6E','#D44'];
+const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A6E','#c0392b'];
 
 let S = {
   cleaners: ['Steffie','Emmy','Valérie','Myrtille','Pikpik'],
@@ -198,201 +221,181 @@ let S = {
   reservations: [[],[]]
 };
 
-function loadLocal() {
-  try {
-    const d = localStorage.getItem(LS_KEY);
-    if(d) {
-      const p = JSON.parse(d);
-      S.cleaners = p.cleaners || S.cleaners;
-      S.studioNames = p.studioNames || S.studioNames;
-      S.icalUrls = p.icalUrls || S.icalUrls;
-      S.assignments = p.assignments || {};
-    }
-  } catch(e){}
+let fbReady = false;
+
+function setSyncStatus(s) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  dot.className = 'sync-dot ' + s;
+  lbl.textContent = s==='ok' ? 'Synchronisé' : s==='err' ? 'Hors ligne' : 'Connexion...';
 }
 
-function saveLocal() {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify({
-      cleaners: S.cleaners,
-      studioNames: S.studioNames,
-      icalUrls: S.icalUrls,
-      assignments: S.assignments
-    }));
-  } catch(e){}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
 }
+
+function fbSet(path, data) {
+  set(ref(db, path), data)
+    .then(() => setSyncStatus('ok'))
+    .catch(() => setSyncStatus('err'));
+}
+
+onValue(ref(db, 'config'), snap => {
+  const d = snap.val();
+  if(d) {
+    S.cleaners = d.cleaners || S.cleaners;
+    S.studioNames = d.studioNames || S.studioNames;
+    S.icalUrls = d.icalUrls || S.icalUrls;
+  } else {
+    fbSet('config', { cleaners: S.cleaners, studioNames: S.studioNames, icalUrls: S.icalUrls });
+  }
+  setSyncStatus('ok');
+  if(!fbReady) { fbReady = true; loadReservations(); }
+  else render();
+}, () => { setSyncStatus('err'); if(!fbReady){ fbReady=true; loadReservations(); } });
+
+onValue(ref(db, 'assignments'), snap => {
+  S.assignments = snap.val() || {};
+  if(fbReady) render();
+});
+
+function saveConfig() { fbSet('config', { cleaners: S.cleaners, studioNames: S.studioNames, icalUrls: S.icalUrls }); }
+function saveAssignments() { fbSet('assignments', Object.keys(S.assignments).length ? S.assignments : null); }
 
 function parseIcal(text, si) {
   const resas = [];
-  const parts = text.split('BEGIN:VEVENT').slice(1);
-  const parseD = s => {
-    const c = s.replace(/\D/g,'');
-    return new Date(+c.slice(0,4), +c.slice(4,6)-1, +c.slice(6,8));
-  };
-  for(const ev of parts) {
-    const uid = (ev.match(/UID:([^\r\n]+)/)||[])[1]||('uid_'+Math.random());
-    let sum = (ev.match(/SUMMARY:([^\r\n]+)/)||[])[1]||'Réservation';
+  for(const ev of text.split('BEGIN:VEVENT').slice(1)) {
+    const uid = ((ev.match(/UID:([^\r\n]+)/)||[])[1]||'uid_'+Math.random()).trim();
+    let sum = ((ev.match(/SUMMARY:([^\r\n]+)/)||[])[1]||'Réservation').trim();
     const low = sum.toLowerCase();
     if(low.includes('not available')||low.includes('airbnb')||low.includes('unavailable')) continue;
-    const dtstart = (ev.match(/DTSTART(?:;[^:]*)?:([^\r\n]+)/)||[])[1]||'';
-    const dtend = (ev.match(/DTEND(?:;[^:]*)?:([^\r\n]+)/)||[])[1]||'';
-    if(!dtstart||!dtend) continue;
-    const start = parseD(dtstart), end = parseD(dtend);
+    const ds = ((ev.match(/DTSTART(?:;[^:]*)?:([^\r\n]+)/)||[])[1]||'').trim();
+    const de = ((ev.match(/DTEND(?:;[^:]*)?:([^\r\n]+)/)||[])[1]||'').trim();
+    if(!ds||!de) continue;
+    const pd = s => { const c=s.replace(/\D/g,''); return new Date(+c.slice(0,4),+c.slice(4,6)-1,+c.slice(6,8)); };
+    const start=pd(ds), end=pd(de);
     if(isNaN(start)||isNaN(end)||end<=start) continue;
-    sum = sum.replace(/reserved/i,'Réservé').replace(/Reserved/,'Réservé');
-    resas.push({uid: uid.trim(), summary: sum.trim(), start, end, studio: si});
+    resas.push({ uid, summary:sum, start, end, studio:si });
   }
   return resas;
 }
 
 function setStatus(msg, loading=false) {
-  const el = document.getElementById('status-bar');
-  el.innerHTML = loading
+  document.getElementById('status-bar').innerHTML = loading
     ? `<span class="spinner"></span><span>${msg}</span>`
     : `<span>${msg}</span>`;
 }
 
 function showError(msg) {
   const el = document.getElementById('error-banner');
-  if(msg) { el.textContent = msg; el.style.display=''; }
-  else { el.style.display='none'; }
+  el.textContent = msg; el.style.display = msg ? '' : 'none';
 }
 
 async function fetchIcal(url, si) {
   try {
-    const r = await fetch(PROXY + encodeURIComponent(url), {signal: AbortSignal.timeout(10000)});
-    if(!r.ok) throw new Error('HTTP '+r.status);
+    const r = await fetch(PROXY + encodeURIComponent(url), {signal: AbortSignal.timeout(12000)});
+    if(!r.ok) throw 0;
     const t = await r.text();
-    if(!t.includes('BEGIN:VCALENDAR')) throw new Error('Format iCal invalide');
+    if(!t.includes('BEGIN:VCALENDAR')) throw 0;
     return parseIcal(t, si);
-  } catch(e) {
-    return null;
-  }
+  } catch(e) { return null; }
 }
 
 async function loadReservations() {
   setStatus('Chargement des calendriers Airbnb...', true);
   showError('');
-  const [r1, r2] = await Promise.all([
-    fetchIcal(S.icalUrls[0], 0),
-    fetchIcal(S.icalUrls[1], 1)
-  ]);
-  let errors = [];
-  S.reservations[0] = r1 || [];
-  S.reservations[1] = r2 || [];
-  if(r1===null) errors.push(S.studioNames[0]);
-  if(r2===null) errors.push(S.studioNames[1]);
-  if(errors.length) showError('Impossible de charger : '+errors.join(', ')+'. Vérifiez les URLs dans ⚙ Config, ou consultez l\'aide.');
+  const [r1,r2] = await Promise.all([fetchIcal(S.icalUrls[0],0), fetchIcal(S.icalUrls[1],1)]);
+  S.reservations[0] = r1||[]; S.reservations[1] = r2||[];
+  const errs = [r1===null&&S.studioNames[0], r2===null&&S.studioNames[1]].filter(Boolean);
+  if(errs.length) showError('Impossible de charger : '+errs.join(', ')+'. Vérifiez les URLs dans ⚙');
   const total = S.reservations[0].length + S.reservations[1].length;
-  setStatus(total > 0
-    ? `${total} réservation(s) chargée(s) · Cliquez sur un bloc pour assigner une intervenante`
-    : errors.length ? '' : 'Aucune réservation trouvée. Vérifiez les URLs iCal dans ⚙ Config.');
+  setStatus(total > 0 ? `${total} réservation(s) chargée(s) · Cliquez sur un bloc pour assigner` : errs.length ? '' : 'Aucune réservation. Vérifiez les URLs iCal dans ⚙');
   render();
 }
 
-function getKey(r) { return r.uid; }
-function getAssigned(r) { return S.assignments[getKey(r)] || null; }
-function getNote(r) { return S.assignments[getKey(r)+'_note'] || ''; }
-function cleanerColor(name) {
-  const i = S.cleaners.indexOf(name);
-  return i>=0 ? CLEANER_COLORS[i % CLEANER_COLORS.length] : '#aaa';
-}
+const getKey = r => r.uid.replace(/[.#$/\[\]]/g,'_');
+const getAssigned = r => (S.assignments[getKey(r)]||{}).cleaner || null;
+const getNote = r => (S.assignments[getKey(r)]||{}).note || '';
+const cleanerColor = n => { const i=S.cleaners.indexOf(n); return i>=0 ? CLEANER_COLORS[i%CLEANER_COLORS.length] : '#aaa'; };
 
 function getResasForDay(d, si) {
   const t = new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();
   return S.reservations[si].filter(r => {
-    const s = new Date(r.start.getFullYear(),r.start.getMonth(),r.start.getDate()).getTime();
-    const e = new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate()).getTime();
+    const s=new Date(r.start.getFullYear(),r.start.getMonth(),r.start.getDate()).getTime();
+    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate()).getTime();
     return t>=s && t<e;
   });
 }
-
 function getCheckouts(d, si) {
-  const t = new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();
-  return S.reservations[si].filter(r => {
-    const e = new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate()).getTime();
-    return t===e;
-  });
+  const t=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();
+  return S.reservations[si].filter(r => new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate()).getTime()===t);
 }
 
 function renderCalendar() {
   const yr=S.currentYear, mo=S.currentMonth;
   const first=new Date(yr,mo,1), last=new Date(yr,mo+1,0);
-  let startDay=first.getDay(); if(startDay===0)startDay=7;
+  let sd=first.getDay(); if(sd===0)sd=7;
   const today=new Date(); today.setHours(0,0,0,0);
   const DAYS=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
   let html=DAYS.map(d=>`<div class="day-header">${d}</div>`).join('');
-  const renderCell=(d,other)=>{
+  const cell=(d,other)=>{
     const isToday=d.getTime()===today.getTime();
-    let cls='day-cell'+(other?' other-month':'')+(isToday?' today':'');
     let inner=`<div class="day-num">${d.getDate()}</div>`;
     for(let si=0;si<2;si++){
-      const outs=getCheckouts(d,si);
-      for(const r of outs){
-        const assigned=getAssigned(r);
-        if(S.filterCleaner && assigned!==S.filterCleaner) continue;
-        const key=getKey(r);
-        inner+=`<div class="resa-block checkout" onclick="openAssign('${key}')" title="Départ — ${S.studioNames[si]}">Départ ${S.studioNames[si].replace('Studio','S')}</div>`;
-        if(assigned) inner+=`<div class="assign-badge" style="color:${cleanerColor(assigned)}">${assigned}</div>`;
+      for(const r of getCheckouts(d,si)){
+        const a=getAssigned(r);
+        if(S.filterCleaner&&a!==S.filterCleaner) continue;
+        inner+=`<div class="resa-block checkout" onclick="window._oa('${getKey(r)}')" title="Départ — ${S.studioNames[si]}">Départ S${si+1}</div>`;
+        if(a) inner+=`<div class="assign-badge" style="color:${cleanerColor(a)}">${a}</div>`;
       }
-      const resas=getResasForDay(d,si);
-      for(const r of resas){
-        const assigned=getAssigned(r);
-        if(S.filterCleaner && assigned!==S.filterCleaner) continue;
-        const key=getKey(r);
+      for(const r of getResasForDay(d,si)){
+        const a=getAssigned(r);
+        if(S.filterCleaner&&a!==S.filterCleaner) continue;
         const isStart=d.getTime()===new Date(r.start.getFullYear(),r.start.getMonth(),r.start.getDate()).getTime();
         if(isStart){
-          inner+=`<div class="resa-block s${si+1}" onclick="openAssign('${key}')" title="${r.summary}">${S.studioNames[si].replace('Studio','S')}</div>`;
+          inner+=`<div class="resa-block s${si+1}" onclick="window._oa('${getKey(r)}')" title="${r.summary}">S${si+1}</div>`;
+          if(a) inner+=`<div class="assign-badge" style="color:${cleanerColor(a)}">${a}</div>`;
         }
       }
     }
-    return `<div class="${cls}">${inner}</div>`;
+    return `<div class="day-cell${other?' other-month':''}${isToday?' today':''}">${inner}</div>`;
   };
-  for(let i=1;i<startDay;i++) html+=renderCell(new Date(yr,mo,1-startDay+i),true);
-  for(let i=1;i<=last.getDate();i++) html+=renderCell(new Date(yr,mo,i),false);
-  const rem=7-((startDay-1+last.getDate())%7);
-  if(rem<7) for(let i=1;i<=rem;i++) html+=renderCell(new Date(yr,mo+1,i),true);
+  for(let i=1;i<sd;i++) html+=cell(new Date(yr,mo,1-sd+i),true);
+  for(let i=1;i<=last.getDate();i++) html+=cell(new Date(yr,mo,i),false);
+  const rem=7-((sd-1+last.getDate())%7);
+  if(rem<7) for(let i=1;i<=rem;i++) html+=cell(new Date(yr,mo+1,i),true);
   document.getElementById('calendar-view').innerHTML=`<div class="calendar-grid">${html}</div>`;
 }
 
 function renderList() {
   const now=new Date(); now.setHours(0,0,0,0);
   const all=[...S.reservations[0],...S.reservations[1]]
-    .filter(r=>new Date(r.end)>=now)
-    .filter(r=>!S.filterCleaner||getAssigned(r)===S.filterCleaner)
+    .filter(r=>new Date(r.end)>=now&&(!S.filterCleaner||getAssigned(r)===S.filterCleaner))
     .sort((a,b)=>a.start-b.start);
-  if(!all.length){
-    document.getElementById('list-view').innerHTML='<div class="empty-state">Aucune réservation à venir</div>';
-    return;
-  }
+  if(!all.length){ document.getElementById('list-view').innerHTML='<div class="empty-state">Aucune réservation à venir</div>'; return; }
   const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'});
-  const nights=r=>Math.round((r.end-r.start)/(86400000));
   const COLS=['#378ADD','#1D9E75'];
-  let html='<div class="list-view-wrap">';
-  for(const r of all){
-    const assigned=getAssigned(r);
-    const si=r.studio;
-    const key=getKey(r);
-    html+=`<div class="list-item" onclick="openAssign('${key}')">
-      <div class="list-dot" style="background:${COLS[si]}"></div>
+  document.getElementById('list-view').innerHTML='<div class="list-view-wrap">'+all.map(r=>{
+    const a=getAssigned(r);
+    return `<div class="list-item" onclick="window._oa('${getKey(r)}')">
+      <div class="list-dot" style="background:${COLS[r.studio]}"></div>
       <div class="list-info">
-        <div class="list-name">${S.studioNames[si]}</div>
-        <div class="list-dates">${fmt(r.start)} &rarr; ${fmt(r.end)} &nbsp;·&nbsp; ${nights(r)} nuit(s)</div>
+        <div class="list-name">${S.studioNames[r.studio]}</div>
+        <div class="list-dates">${fmt(r.start)} → ${fmt(r.end)} · ${Math.round((r.end-r.start)/86400000)} nuit(s)</div>
       </div>
-      <div class="list-assign${assigned?'':' missing'}">${assigned||'Non assigné'}</div>
+      <div class="list-assign${a?'':' missing'}">${a||'Non assigné'}</div>
     </div>`;
-  }
-  html+='</div>';
-  document.getElementById('list-view').innerHTML=html;
+  }).join('')+'</div>';
 }
 
 function renderFilterBar() {
-  let html=`<span class="filter-label">Filtrer :</span>
-    <button class="filter-chip${!S.filterCleaner?' active':''}" onclick="setFilter(null)">Toutes</button>`;
-  for(const c of S.cleaners){
-    html+=`<button class="filter-chip${S.filterCleaner===c?' active':''}" onclick="setFilter('${c}')">${c}</button>`;
-  }
-  document.getElementById('filter-bar').innerHTML=html;
+  document.getElementById('filter-bar').innerHTML=
+    `<span class="filter-label">Filtrer :</span>
+    <button class="filter-chip${!S.filterCleaner?' active':''}" onclick="window._sf(null)">Toutes</button>`+
+    S.cleaners.map(c=>`<button class="filter-chip${S.filterCleaner===c?' active':''}" onclick="window._sf('${c}')">${c}</button>`).join('');
 }
 
 function renderLegend() {
@@ -407,154 +410,79 @@ function renderSettings() {
   document.getElementById('ical2').value=S.icalUrls[1];
   document.getElementById('name-s1').value=S.studioNames[0];
   document.getElementById('name-s2').value=S.studioNames[1];
-  let html='';
-  for(let i=0;i<S.cleaners.length;i++){
-    const col=CLEANER_COLORS[i%CLEANER_COLORS.length];
-    html+=`<div class="cleaner-item">
-      <div style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0"></div>
-      <input type="text" value="${S.cleaners[i]}" onchange="S.cleaners[${i}]=this.value;saveLocal()">
-      <button class="btn-danger" onclick="removeCleaner(${i})">Suppr.</button>
-    </div>`;
-  }
-  document.getElementById('cleaners-list').innerHTML=html;
+  document.getElementById('cleaners-list').innerHTML=S.cleaners.map((c,i)=>`
+    <div class="cleaner-item">
+      <div style="width:10px;height:10px;border-radius:50%;background:${CLEANER_COLORS[i%CLEANER_COLORS.length]};flex-shrink:0"></div>
+      <input type="text" value="${c}" onchange="S.cleaners[${i}]=this.value">
+      <button class="btn-danger" onclick="window._rc(${i})">Suppr.</button>
+    </div>`).join('');
 }
 
 function render() {
-  const MONTHS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-  document.getElementById('month-title').textContent=MONTHS[S.currentMonth]+' '+S.currentYear;
+  const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  document.getElementById('month-title').textContent=MO[S.currentMonth]+' '+S.currentYear;
   document.getElementById('topbar-sub').textContent=S.studioNames.join(' · ');
-  document.getElementById('topbar-date').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
-  if(S.view!=='settings'){
-    renderFilterBar();
-    renderLegend();
-    if(S.view==='cal') renderCalendar();
-    else renderList();
-  } else {
-    renderSettings();
-  }
-}
-
-function setView(v) {
-  S.view=v;
-  ['cal','list','settings'].forEach(t=>{
-    document.getElementById('tab-'+t).classList.toggle('active',t===v);
-  });
-  document.getElementById('view-content').style.display=v!=='settings'?'':'none';
-  document.getElementById('view-settings').style.display=v==='settings'?'':'none';
-  render();
-}
-
-function changeMonth(dir) {
-  if(dir===0){ S.currentMonth=new Date().getMonth(); S.currentYear=new Date().getFullYear(); }
-  else {
-    S.currentMonth+=dir;
-    if(S.currentMonth>11){S.currentMonth=0;S.currentYear++;}
-    if(S.currentMonth<0){S.currentMonth=11;S.currentYear--;}
-  }
-  render();
-}
-
-function setFilter(name) {
-  S.filterCleaner=name;
-  render();
+  if(S.view!=='settings'){ renderFilterBar(); renderLegend(); S.view==='cal'?renderCalendar():renderList(); }
+  else renderSettings();
 }
 
 function findResa(key) {
-  for(const arr of S.reservations) {
-    const r=arr.find(r=>r.uid===key);
-    if(r) return r;
-  }
+  for(const arr of S.reservations){ const r=arr.find(r=>getKey(r)===key); if(r) return r; }
   return null;
 }
 
-function openAssign(key) {
-  const r=findResa(key);
-  if(!r) return;
-  const assigned=getAssigned(r)||'';
-  const note=getNote(r);
-  const si=r.studio;
+window._oa = function(key) {
+  const r=findResa(key); if(!r) return;
+  const a=getAssigned(r)||'', note=getNote(r);
   const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
-  const nights=Math.round((r.end-r.start)/86400000);
-  const opts=S.cleaners.map(c=>`<option value="${c}"${assigned===c?' selected':''}>${c}</option>`).join('');
+  const n=Math.round((r.end-r.start)/86400000);
+  const opts=S.cleaners.map(c=>`<option value="${c}"${a===c?' selected':''}>${c}</option>`).join('');
   document.getElementById('modal-container').innerHTML=`
-    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-overlay" onclick="if(event.target===this)window._cm()">
       <div class="modal">
         <h3>Assigner une intervenante</h3>
         <div class="modal-meta">
-          <strong>${S.studioNames[si]}</strong><br>
+          <strong>${S.studioNames[r.studio]}</strong><br>
           Arrivée : ${fmt(r.start)}<br>
-          Départ : ${fmt(r.end)} (${nights} nuit${nights>1?'s':''})<br>
-          ${r.summary!=='Réservation'?'Voyageur : '+r.summary:''}
+          Départ : ${fmt(r.end)} (${n} nuit${n>1?'s':''})<br>
+          ${r.summary&&r.summary!=='Réservation'?'Voyageur : '+r.summary:''}
         </div>
         <div class="modal-field">
           <label>Femme de ménage</label>
-          <select id="modal-cleaner">
-            <option value="">— Aucune —</option>
-            ${opts}
-          </select>
+          <select id="mc"><option value="">— Aucune —</option>${opts}</select>
         </div>
         <div class="modal-field">
           <label>Note (optionnel)</label>
-          <input type="text" id="modal-note" placeholder="Ex: clé boîte, code entrée..." value="${note}">
+          <input type="text" id="mn" placeholder="Ex: clé boîte, code..." value="${note}">
         </div>
         <div class="modal-btns">
-          <button class="btn-cancel" onclick="closeModal()">Annuler</button>
-          <button class="btn-primary" onclick="saveAssign('${key}')">Enregistrer</button>
+          <button class="btn-cancel" onclick="window._cm()">Annuler</button>
+          <button class="btn-primary" onclick="window._sa('${key}')">Enregistrer</button>
         </div>
       </div>
     </div>`;
-}
+};
 
-function saveAssign(key) {
-  const cleaner=document.getElementById('modal-cleaner').value;
-  const note=document.getElementById('modal-note').value;
-  if(cleaner) S.assignments[key]=cleaner; else delete S.assignments[key];
-  if(note) S.assignments[key+'_note']=note; else delete S.assignments[key+'_note'];
-  saveLocal();
-  closeModal();
-  render();
-}
+window._sa = function(key) {
+  const c=document.getElementById('mc').value;
+  const n=document.getElementById('mn').value;
+  if(c) S.assignments[key]={cleaner:c,note:n};
+  else delete S.assignments[key];
+  saveAssignments();
+  showToast(c?`Assigné à ${c} ✓`:'Assignation supprimée');
+  window._cm(); render();
+};
 
-function closeModal() {
-  document.getElementById('modal-container').innerHTML='';
-}
+window._cm = () => document.getElementById('modal-container').innerHTML='';
+window._sf = n => { S.filterCleaner=n; render(); };
+window._rc = i => { if(!confirm('Supprimer '+S.cleaners[i]+' ?')) return; S.cleaners.splice(i,1); saveConfig(); renderSettings(); };
+window.addCleaner = () => { const inp=document.getElementById('new-cleaner'),n=inp.value.trim(); if(!n||S.cleaners.includes(n)) return; S.cleaners.push(n); saveConfig(); renderSettings(); inp.value=''; showToast(n+' ajouté ✓'); };
+window.saveNames = () => { S.studioNames[0]=document.getElementById('name-s1').value||'Studio 1'; S.studioNames[1]=document.getElementById('name-s2').value||'Studio 2'; saveConfig(); showToast('Noms enregistrés ✓'); render(); };
+window.saveAndReload = () => { S.icalUrls[0]=document.getElementById('ical1').value.trim(); S.icalUrls[1]=document.getElementById('ical2').value.trim(); saveConfig(); setView('cal'); loadReservations(); };
+window.changeMonth = d => { if(d===0){S.currentMonth=new Date().getMonth();S.currentYear=new Date().getFullYear();}else{S.currentMonth+=d;if(S.currentMonth>11){S.currentMonth=0;S.currentYear++;}if(S.currentMonth<0){S.currentMonth=11;S.currentYear--;}} render(); };
+window.setView = v => { S.view=v; ['cal','list','settings'].forEach(t=>{document.getElementById('tab-'+t).classList.toggle('active',t===v);}); document.getElementById('view-content').style.display=v!=='settings'?'':'none'; document.getElementById('view-settings').style.display=v==='settings'?'':'none'; render(); };
 
-function addCleaner() {
-  const inp=document.getElementById('new-cleaner');
-  const n=inp.value.trim();
-  if(!n||S.cleaners.includes(n)) return;
-  S.cleaners.push(n);
-  saveLocal();
-  renderSettings();
-  inp.value='';
-}
-
-function removeCleaner(i) {
-  if(!confirm('Supprimer '+S.cleaners[i]+' ?')) return;
-  S.cleaners.splice(i,1);
-  saveLocal();
-  renderSettings();
-}
-
-function saveNames() {
-  S.studioNames[0]=document.getElementById('name-s1').value||'Studio 1';
-  S.studioNames[1]=document.getElementById('name-s2').value||'Studio 2';
-  saveLocal();
-  alert('Noms enregistrés !');
-  render();
-}
-
-function saveAndReload() {
-  S.icalUrls[0]=document.getElementById('ical1').value.trim();
-  S.icalUrls[1]=document.getElementById('ical2').value.trim();
-  saveLocal();
-  setView('cal');
-  loadReservations();
-}
-
-loadLocal();
 render();
-loadReservations();
 </script>
 </body>
 </html>
