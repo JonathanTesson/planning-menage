@@ -21,9 +21,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .nav-btn{background:#fff;border:1px solid #ddd;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;color:#333}
 .nav-btn:hover{background:#f5f5f0}
 .month-title{font-size:20px;font-weight:600}
-.view-tabs{display:flex;gap:6px}
-.tab{padding:6px 14px;border-radius:8px;border:1px solid #ddd;cursor:pointer;font-size:12px;color:#666;background:#fff}
-.tab.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.settings-btn{background:#fff;border:1px solid #ddd;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:16px;color:#555;transition:all 0.15s;line-height:1}
+.settings-btn:hover{background:#f5f5f0}
+.settings-btn.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
 
 .controls-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:0.5rem}
 .chip-group{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
@@ -33,7 +33,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .chip.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
 .chip.arr.active{background:#1047a0;border-color:#1047a0;color:#fff}
 .chip.dep.active{background:#7a4a00;border-color:#7a4a00;color:#fff}
-.divider{width:1px;height:20px;background:#e0e0d8;margin:0 4px}
+.divider{width:1px;height:20px;background:#e0e0d8;margin:0 4px;flex-shrink:0}
 
 .legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:0.75rem;align-items:center}
 .legend-item{display:flex;align-items:center;gap:4px;font-size:11px;color:#666}
@@ -49,34 +49,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .day-cell:hover{border-color:#bbb}
 .day-cell.other-month{opacity:0.3;background:#fafaf8}
 .day-cell.today{border-color:#378ADD;border-width:2px}
-.day-num{font-size:11px;color:#999;margin-bottom:2px;line-height:1}
+
+.day-num-row{display:flex;align-items:center;gap:3px;margin-bottom:2px}
+.day-num{font-size:11px;color:#999;line-height:1}
 .day-cell.today .day-num{color:#185FA5;font-weight:700}
+.status-pip{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block}
+.status-pip.red{background:#E24B4A}
+.status-pip.orange{background:#F59E0B}
 
 .resa-block{border-radius:4px;font-size:10px;padding:2px 5px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;user-select:none;line-height:1.3}
 .resa-block:active{opacity:0.75}
 .resa-block.s1{background:#daeafe;color:#1047a0}
 .resa-block.s2{background:#c6f0df;color:#075c3a}
 .resa-block.checkout{background:#fde8b0;color:#7a4a00}
-.resa-block.hidden-block{display:none}
 
 .assign-wrap{margin-top:1px;margin-bottom:2px}
 .assign-badge{display:inline-block;font-size:9px;background:#f0f0eb;border-radius:3px;padding:1px 4px;color:#555;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
-.assign-badge.c1{background:#e8f2ff;color:#1047a0}
-.assign-badge.c2{background:#e6f7f0;color:#075c3a}
-
-.list-view-wrap{display:flex;flex-direction:column;gap:8px;margin-bottom:1rem}
-.list-item{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:0.875rem 1rem;display:flex;align-items:flex-start;gap:12px;cursor:pointer;transition:border-color 0.1s}
-.list-item:hover{border-color:#bbb}
-.list-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:3px}
-.list-info{flex:1;min-width:0}
-.list-name{font-size:13px;font-weight:600}
-.list-dates{font-size:11px;color:#888;margin-top:2px}
-.list-assign-row{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap}
-.list-assign{font-size:11px;padding:3px 10px;border-radius:8px;background:#f0f0eb;color:#555;white-space:nowrap}
-.list-assign.missing{background:#fde8e8;color:#a32d2d}
-.list-type{font-size:10px;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0}
-.list-type.arr{background:#daeafe;color:#1047a0}
-.list-type.dep{background:#fde8b0;color:#7a4a00}
 
 .settings-wrap{display:flex;flex-direction:column;gap:1rem;margin-bottom:1rem}
 .settings-card{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:1rem 1.25rem}
@@ -98,26 +86,28 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .modal-field{margin-bottom:0.875rem}
 .modal-field label{font-size:12px;color:#888;display:block;margin-bottom:4px;font-weight:500}
 .modal-field select,.modal-field input[type=text]{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
-.modal-field select:focus,.modal-field input[type=text]:focus{outline:none;border-color:#378ADD}
 .modal-btns{display:flex;gap:8px;margin-top:1.25rem;justify-content:flex-end}
 .modal-meta{background:#f5f5f0;border-radius:8px;padding:0.75rem;margin-bottom:1rem;font-size:12px;color:#555;line-height:1.6}
 .modal-meta strong{color:#1a1a1a;font-weight:600}
 .modal-section-title{font-size:11px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin:1rem 0 0.5rem}
 .cleaner-item{display:flex;gap:8px;align-items:center;margin-bottom:6px}
 .cleaner-item input{flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a}
-.error-banner{background:#fde8e8;color:#a32d2d;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:0.75rem}
+
 .empty-state{text-align:center;padding:3rem 1rem;color:#999;font-size:13px}
 .toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
 
+.legend-pip{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0}
+
 @media(max-width:600px){
   .calendar-grid{gap:2px}
-  .day-cell{min-height:60px;padding:3px}
+  .day-cell{min-height:62px;padding:3px}
   .day-num{font-size:10px}
   .resa-block{font-size:9px;padding:1px 3px}
   .assign-badge{font-size:8px;padding:1px 3px}
   .month-title{font-size:16px}
   .chip{font-size:10px;padding:3px 8px}
+  .status-pip{width:5px;height:5px}
 }
 </style>
 </head>
@@ -144,21 +134,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
         <button class="nav-btn" onclick="changeMonth(1)">&#8594;</button>
       </div>
     </div>
-    <div class="view-tabs">
-      <button class="tab active" id="tab-cal" onclick="setView('cal')">Mois</button>
-      <button class="tab" id="tab-list" onclick="setView('list')">Liste</button>
-      <button class="tab" id="tab-settings" onclick="setView('settings')">&#9881;</button>
-    </div>
+    <button class="settings-btn" id="settings-btn" onclick="toggleSettings()" title="Paramètres">&#9881;</button>
   </div>
 
   <div id="status-bar" class="status-bar"></div>
-  <div id="error-banner" style="display:none" class="error-banner"></div>
 
-  <div id="view-content">
+  <div id="view-calendar">
     <div class="controls-row" id="controls-row"></div>
     <div class="legend" id="legend-bar"></div>
     <div id="calendar-view"></div>
-    <div id="list-view" style="display:none"></div>
   </div>
 
   <div id="view-settings" style="display:none">
@@ -178,9 +162,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
         </div>
       </div>
       <div class="settings-card" style="font-size:12px;color:#999;line-height:1.8">
+        <h4 style="margin-bottom:8px;color:#1a1a1a">Légende des points</h4>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:1rem">
+          <div style="display:flex;align-items:center;gap:8px"><span class="legend-pip" style="background:#E24B4A"></span><span>Rouge — aucune intervenante assignée</span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span class="legend-pip" style="background:#F59E0B"></span><span>Orange — assignation partielle (2 départs, 1 seul assigné)</span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span class="legend-pip" style="background:#e0e0d8"></span><span>Aucun point — tous les départs sont assignés</span></div>
+        </div>
         <h4 style="margin-bottom:6px;color:#1a1a1a">Synchronisation</h4>
         Les réservations Airbnb sont mises à jour <strong style="color:#555">toutes les heures</strong> via GitHub Actions.<br>
-        Les assignations et paramètres sont synchronisés en temps réel via Firebase.<br><br>
+        Les assignations sont synchronisées en temps réel via Firebase.<br><br>
         <span id="last-sync-info" style="color:#aaa"></span>
       </div>
     </div>
@@ -215,9 +205,9 @@ let S = {
   assignments: {},
   currentMonth: new Date().getMonth(),
   currentYear: new Date().getFullYear(),
-  view: 'cal',
+  showSettings: false,
   filterCleaner: null,
-  filterType: 'all', // 'all' | 'arr' | 'dep'
+  filterType: 'all',
   reservations: []
 };
 
@@ -277,7 +267,9 @@ function saveConfig(){ fbSet('config',{cleaners:S.cleaners,studioNames:S.studioN
 function saveAssignments(){ fbSet('assignments',Object.keys(S.assignments).length?S.assignments:null); }
 
 function setStatus(msg,loading=false){
-  document.getElementById('status-bar').innerHTML=loading?`<span class="spinner"></span><span>${msg}</span>`:`<span>${msg}</span>`;
+  document.getElementById('status-bar').innerHTML=loading
+    ?`<span class="spinner"></span><span>${msg}</span>`
+    :`<span>${msg}</span>`;
 }
 
 const getKey = r => r.uid;
@@ -285,13 +277,17 @@ const getKey = r => r.uid;
 function getAssignment(r){
   const a=S.assignments[getKey(r)];
   if(!a) return {c1:null,c2:null,note:''};
-  if(typeof a === 'string') return {c1:a,c2:null,note:''};
+  if(typeof a==='string') return {c1:a,c2:null,note:''};
   return {c1:a.cleaner||a.c1||null, c2:a.c2||null, note:a.note||''};
 }
 
 const cleanerColor = n => { const i=S.cleaners.indexOf(n); return i>=0?CLEANER_COLORS[i%CLEANER_COLORS.length]:'#aaa'; };
-
 function dayTime(d){ return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime(); }
+
+function getCheckouts(d,si){
+  const t=dayTime(d);
+  return S.reservations.filter(r=>r.studio===si && dayTime(r.end)===t);
+}
 
 function getResasForDay(d,si){
   const t=dayTime(d);
@@ -301,9 +297,21 @@ function getResasForDay(d,si){
   });
 }
 
-function getCheckouts(d,si){
-  const t=dayTime(d);
-  return S.reservations.filter(r=>r.studio===si && dayTime(r.end)===t);
+// Calcule le statut du pip pour un jour donné (basé uniquement sur les départs)
+function getDayPip(d){
+  const allCheckouts = [];
+  for(let si=0;si<2;si++) allCheckouts.push(...getCheckouts(d,si));
+  if(!allCheckouts.length) return null; // pas de départ ce jour
+
+  let totalAssigned = 0;
+  for(const r of allCheckouts){
+    const {c1,c2}=getAssignment(r);
+    if(c1||c2) totalAssigned++;
+  }
+
+  if(totalAssigned === 0) return 'red';
+  if(totalAssigned < allCheckouts.length) return 'orange';
+  return null; // tout assigné → pas de point
 }
 
 function renderCalendar(){
@@ -319,7 +327,11 @@ function renderCalendar(){
 
   const cell=(d,other)=>{
     const isToday=d.getTime()===today.getTime();
-    let inner=`<div class="day-num">${d.getDate()}</div>`;
+    const pip = other ? null : getDayPip(d);
+    const pipHtml = pip ? `<span class="status-pip ${pip}"></span>` : '';
+
+    let inner=`<div class="day-num-row"><span class="day-num">${d.getDate()}</span>${pipHtml}</div>`;
+
     for(let si=0;si<2;si++){
       if(showDep){
         for(const r of getCheckouts(d,si)){
@@ -328,16 +340,18 @@ function renderCalendar(){
           inner+=`<div class="resa-block checkout" onclick="window._oa('${getKey(r)}')" title="Départ — ${S.studioNames[si]}">Départ S${si+1}</div>`;
           if(c1||c2){
             inner+=`<div class="assign-wrap">`;
-            if(c1) inner+=`<span class="assign-badge c1" style="color:${cleanerColor(c1)}">${c1}</span> `;
-            if(c2) inner+=`<span class="assign-badge c2" style="color:${cleanerColor(c2)}">${c2}</span>`;
+            if(c1) inner+=`<span class="assign-badge" style="color:${cleanerColor(c1)}">${c1}</span> `;
+            if(c2) inner+=`<span class="assign-badge" style="color:${cleanerColor(c2)}">${c2}</span>`;
             inner+=`</div>`;
           }
         }
       }
       if(showArr){
         for(const r of getResasForDay(d,si)){
-          const {c1,c2}=getAssignment(r);
-          if(S.filterCleaner && c1!==S.filterCleaner && c2!==S.filterCleaner) continue;
+          if(S.filterCleaner){
+            const {c1,c2}=getAssignment(r);
+            if(c1!==S.filterCleaner && c2!==S.filterCleaner) continue;
+          }
           const isStart=dayTime(d)===dayTime(r.start);
           if(isStart){
             inner+=`<div class="resa-block s${si+1}" onclick="window._oa('${getKey(r)}')" title="${r.summary}">S${si+1}</div>`;
@@ -355,71 +369,32 @@ function renderCalendar(){
   document.getElementById('calendar-view').innerHTML=`<div class="calendar-grid">${html}</div>`;
 }
 
-function renderList(){
-  const now=new Date(); now.setHours(0,0,0,0);
-  const showArr=S.filterType==='all'||S.filterType==='arr';
-  const showDep=S.filterType==='all'||S.filterType==='dep';
-
-  let items=[];
-  for(const r of S.reservations){
-    if(new Date(r.end)<now) continue;
-    const {c1,c2}=getAssignment(r);
-    if(S.filterCleaner && c1!==S.filterCleaner && c2!==S.filterCleaner) continue;
-    if(showArr) items.push({r,type:'arr',date:r.start});
-    if(showDep) items.push({r,type:'dep',date:r.end});
-  }
-  items.sort((a,b)=>a.date-b.date);
-
-  if(!items.length){ document.getElementById('list-view').innerHTML='<div class="empty-state">Aucune réservation à venir</div>'; return; }
-
-  const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'});
-  const COLS=['#378ADD','#1D9E75'];
-  const typeLabel={arr:'Arrivée',dep:'Départ'};
-
-  document.getElementById('list-view').innerHTML='<div class="list-view-wrap">'+items.map(({r,type})=>{
-    const {c1,c2}=getAssignment(r);
-    const hasAssign=c1||c2;
-    const n=Math.round((r.end-r.start)/86400000);
-    return `<div class="list-item" onclick="window._oa('${getKey(r)}')">
-      <div class="list-dot" style="background:${COLS[r.studio]}"></div>
-      <div class="list-info">
-        <div class="list-name">${S.studioNames[r.studio]} — ${fmt(type==='arr'?r.start:r.end)}</div>
-        <div class="list-dates">${fmt(r.start)} → ${fmt(r.end)} · ${n} nuit(s)</div>
-        <div class="list-assign-row">
-          ${c1?`<span class="list-assign" style="color:${cleanerColor(c1)}">${c1}</span>`:''}
-          ${c2?`<span class="list-assign" style="color:${cleanerColor(c2)}">${c2}</span>`:''}
-          ${!hasAssign?`<span class="list-assign missing">Non assigné</span>`:''}
-        </div>
-      </div>
-      <div class="list-type ${type}">${typeLabel[type]}</div>
-    </div>`;
-  }).join('')+'</div>';
-}
-
 function renderControls(){
   const types=[
     {k:'all',label:'Tout'},
     {k:'arr',label:'Arrivées',cls:'arr'},
     {k:'dep',label:'Départs',cls:'dep'}
   ];
-  let html=`<div class="chip-group">
-    <span class="chip-label">Afficher :</span>
-    ${types.map(t=>`<button class="chip${t.cls?' '+t.cls:''}${S.filterType===t.k?' active':''}" onclick="window._st('${t.k}')">${t.label}</button>`).join('')}
-  </div>
-  <div class="divider"></div>
-  <div class="chip-group">
-    <span class="chip-label">Intervenante :</span>
-    <button class="chip${!S.filterCleaner?' active':''}" onclick="window._sf(null)">Toutes</button>
-    ${S.cleaners.map(c=>`<button class="chip${S.filterCleaner===c?' active':''}" onclick="window._sf('${c}')">${c}</button>`).join('')}
-  </div>`;
-  document.getElementById('controls-row').innerHTML=html;
+  document.getElementById('controls-row').innerHTML=`
+    <div class="chip-group">
+      <span class="chip-label">Afficher :</span>
+      ${types.map(t=>`<button class="chip${t.cls?' '+t.cls:''}${S.filterType===t.k?' active':''}" onclick="window._st('${t.k}')">${t.label}</button>`).join('')}
+    </div>
+    <div class="divider"></div>
+    <div class="chip-group">
+      <span class="chip-label">Intervenante :</span>
+      <button class="chip${!S.filterCleaner?' active':''}" onclick="window._sf(null)">Toutes</button>
+      ${S.cleaners.map(c=>`<button class="chip${S.filterCleaner===c?' active':''}" onclick="window._sf('${c}')">${c}</button>`).join('')}
+    </div>`;
 }
 
 function renderLegend(){
   document.getElementById('legend-bar').innerHTML=`
     <div class="legend-item"><div class="legend-dot" style="background:#daeafe"></div>${S.studioNames[0]}</div>
     <div class="legend-item"><div class="legend-dot" style="background:#c6f0df"></div>${S.studioNames[1]}</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#fde8b0"></div>Départ / ménage</div>`;
+    <div class="legend-item"><div class="legend-dot" style="background:#fde8b0"></div>Départ</div>
+    <div class="legend-item"><span class="legend-pip" style="background:#E24B4A;width:7px;height:7px;border-radius:50%;display:inline-block"></span>Non assigné</div>
+    <div class="legend-item"><span class="legend-pip" style="background:#F59E0B;width:7px;height:7px;border-radius:50%;display:inline-block"></span>Partiel</div>`;
 }
 
 function renderSettings(){
@@ -437,8 +412,19 @@ function render(){
   const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   document.getElementById('month-title').textContent=MO[S.currentMonth]+' '+S.currentYear;
   document.getElementById('topbar-sub').textContent=S.studioNames.join(' · ');
-  if(S.view!=='settings'){ renderControls(); renderLegend(); S.view==='cal'?renderCalendar():renderList(); }
-  else renderSettings();
+  document.getElementById('settings-btn').classList.toggle('active', S.showSettings);
+
+  if(S.showSettings){
+    document.getElementById('view-calendar').style.display='none';
+    document.getElementById('view-settings').style.display='';
+    renderSettings();
+  } else {
+    document.getElementById('view-calendar').style.display='';
+    document.getElementById('view-settings').style.display='none';
+    renderControls();
+    renderLegend();
+    renderCalendar();
+  }
 }
 
 function findResa(key){ return S.reservations.find(r=>getKey(r)===key)||null; }
@@ -448,7 +434,7 @@ window._oa = function(key){
   const {c1,c2,note}=getAssignment(r);
   const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
   const n=Math.round((r.end-r.start)/86400000);
-  const opts=c=>`<option value="">— Aucune —</option>`+S.cleaners.map(x=>`<option value="${x}"${c===x?' selected':''}>${x}</option>`).join('');
+  const opts=sel=>`<option value="">— Aucune —</option>`+S.cleaners.map(x=>`<option value="${x}"${sel===x?' selected':''}>${x}</option>`).join('');
   document.getElementById('modal-container').innerHTML=`
     <div class="modal-overlay" onclick="if(event.target===this)window._cm()">
       <div class="modal">
@@ -460,13 +446,9 @@ window._oa = function(key){
           ${r.summary&&r.summary!=='Réservation'?'Voyageur : '+r.summary:''}
         </div>
         <div class="modal-section-title">Intervenante 1</div>
-        <div class="modal-field">
-          <select id="mc1">${opts(c1)}</select>
-        </div>
+        <div class="modal-field"><select id="mc1">${opts(c1)}</select></div>
         <div class="modal-section-title">Intervenante 2 (optionnel)</div>
-        <div class="modal-field">
-          <select id="mc2">${opts(c2)}</select>
-        </div>
+        <div class="modal-field"><select id="mc2">${opts(c2)}</select></div>
         <div class="modal-field" style="margin-top:0.5rem">
           <label>Note</label>
           <input type="text" id="mn" placeholder="Ex: clé boîte, code entrée..." value="${note}">
@@ -497,8 +479,8 @@ window._st = t=>{ S.filterType=t; render(); };
 window._rc = i=>{ if(!confirm('Supprimer '+S.cleaners[i]+' ?')) return; S.cleaners.splice(i,1); saveConfig(); renderSettings(); };
 window.addCleaner = ()=>{ const inp=document.getElementById('new-cleaner'),n=inp.value.trim(); if(!n||S.cleaners.includes(n)) return; S.cleaners.push(n); saveConfig(); renderSettings(); inp.value=''; showToast(n+' ajouté ✓'); };
 window.saveNames = ()=>{ S.studioNames[0]=document.getElementById('name-s1').value||'Studio 1'; S.studioNames[1]=document.getElementById('name-s2').value||'Studio 2'; saveConfig(); showToast('Noms enregistrés ✓'); render(); };
+window.toggleSettings = ()=>{ S.showSettings=!S.showSettings; render(); };
 window.changeMonth = d=>{ if(d===0){S.currentMonth=new Date().getMonth();S.currentYear=new Date().getFullYear();}else{S.currentMonth+=d;if(S.currentMonth>11){S.currentMonth=0;S.currentYear++;}if(S.currentMonth<0){S.currentMonth=11;S.currentYear--;}} render(); };
-window.setView = v=>{ S.view=v; ['cal','list','settings'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('active',t===v)); document.getElementById('view-content').style.display=v!=='settings'?'':'none'; document.getElementById('view-settings').style.display=v==='settings'?'':'none'; render(); };
 
 render();
 </script>
