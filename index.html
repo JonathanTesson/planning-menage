@@ -16,7 +16,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .sync-dot.loading{background:#FAC775;animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .container{max-width:960px;margin:0 auto;padding:1rem 1rem 0}
-.header{display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;margin-bottom:0.75rem;flex-wrap:wrap;gap:8px}
+.header{display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;margin-bottom:0.5rem;flex-wrap:wrap;gap:8px}
 .nav-btns{display:flex;gap:6px;align-items:center}
 .nav-btn{background:#fff;border:1px solid #ddd;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;color:#333}
 .nav-btn:hover{background:#f5f5f0}
@@ -24,39 +24,60 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .view-tabs{display:flex;gap:6px}
 .tab{padding:6px 14px;border-radius:8px;border:1px solid #ddd;cursor:pointer;font-size:12px;color:#666;background:#fff}
 .tab.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
-.legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:0.75rem;align-items:center}
-.legend-item{display:flex;align-items:center;gap:5px;font-size:12px;color:#666}
-.legend-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0}
-.status-bar{font-size:12px;color:#888;min-height:20px;margin-bottom:0.5rem;display:flex;align-items:center;gap:6px}
+
+.controls-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:0.5rem}
+.chip-group{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.chip-label{font-size:11px;color:#aaa;margin-right:2px}
+.chip{padding:4px 10px;border-radius:20px;font-size:11px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#555;transition:all 0.12s;white-space:nowrap}
+.chip:hover{border-color:#bbb}
+.chip.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.chip.arr.active{background:#1047a0;border-color:#1047a0;color:#fff}
+.chip.dep.active{background:#7a4a00;border-color:#7a4a00;color:#fff}
+.divider{width:1px;height:20px;background:#e0e0d8;margin:0 4px}
+
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:0.75rem;align-items:center}
+.legend-item{display:flex;align-items:center;gap:4px;font-size:11px;color:#666}
+.legend-dot{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+
+.status-bar{font-size:12px;color:#888;min-height:18px;margin-bottom:0.4rem;display:flex;align-items:center;gap:6px}
 .spinner{width:12px;height:12px;border:2px solid #ddd;border-top-color:#378ADD;border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block;flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
-.top-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:0.75rem}
-.filter-label{font-size:12px;color:#888}
-.filter-chip{padding:4px 12px;border-radius:20px;font-size:12px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#555;transition:all 0.15s}
-.filter-chip.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+
 .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:1rem}
-.day-header{text-align:center;font-size:11px;color:#999;padding:5px 0;font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
-.day-cell{min-height:72px;border-radius:8px;border:1px solid #e8e8e2;padding:4px;background:#fff;cursor:default;transition:border-color 0.1s}
+.day-header{text-align:center;font-size:11px;color:#999;padding:4px 0;font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
+.day-cell{min-height:76px;border-radius:8px;border:1px solid #e8e8e2;padding:4px;background:#fff;transition:border-color 0.1s}
 .day-cell:hover{border-color:#bbb}
 .day-cell.other-month{opacity:0.3;background:#fafaf8}
 .day-cell.today{border-color:#378ADD;border-width:2px}
 .day-num{font-size:11px;color:#999;margin-bottom:2px;line-height:1}
 .day-cell.today .day-num{color:#185FA5;font-weight:700}
-.resa-block{border-radius:4px;font-size:10px;padding:2px 5px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;user-select:none}
-.resa-block:active{opacity:0.8}
+
+.resa-block{border-radius:4px;font-size:10px;padding:2px 5px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;user-select:none;line-height:1.3}
+.resa-block:active{opacity:0.75}
 .resa-block.s1{background:#daeafe;color:#1047a0}
 .resa-block.s2{background:#c6f0df;color:#075c3a}
 .resa-block.checkout{background:#fde8b0;color:#7a4a00}
-.assign-badge{font-size:9px;background:#f0f0eb;border-radius:3px;padding:1px 4px;margin-top:1px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.resa-block.hidden-block{display:none}
+
+.assign-wrap{margin-top:1px;margin-bottom:2px}
+.assign-badge{display:inline-block;font-size:9px;background:#f0f0eb;border-radius:3px;padding:1px 4px;color:#555;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
+.assign-badge.c1{background:#e8f2ff;color:#1047a0}
+.assign-badge.c2{background:#e6f7f0;color:#075c3a}
+
 .list-view-wrap{display:flex;flex-direction:column;gap:8px;margin-bottom:1rem}
-.list-item{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:0.875rem 1rem;display:flex;align-items:center;gap:12px;cursor:pointer;transition:border-color 0.1s}
+.list-item{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:0.875rem 1rem;display:flex;align-items:flex-start;gap:12px;cursor:pointer;transition:border-color 0.1s}
 .list-item:hover{border-color:#bbb}
-.list-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.list-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:3px}
 .list-info{flex:1;min-width:0}
-.list-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list-name{font-size:13px;font-weight:600}
 .list-dates{font-size:11px;color:#888;margin-top:2px}
-.list-assign{font-size:11px;padding:3px 10px;border-radius:8px;background:#f0f0eb;color:#555;white-space:nowrap;flex-shrink:0}
+.list-assign-row{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap}
+.list-assign{font-size:11px;padding:3px 10px;border-radius:8px;background:#f0f0eb;color:#555;white-space:nowrap}
 .list-assign.missing{background:#fde8e8;color:#a32d2d}
+.list-type{font-size:10px;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0}
+.list-type.arr{background:#daeafe;color:#1047a0}
+.list-type.dep{background:#fde8b0;color:#7a4a00}
+
 .settings-wrap{display:flex;flex-direction:column;gap:1rem;margin-bottom:1rem}
 .settings-card{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:1rem 1.25rem}
 .settings-card h4{font-size:13px;font-weight:600;margin-bottom:0.875rem}
@@ -70,29 +91,33 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .btn-danger:hover{background:#fde8e8}
 .btn-cancel{background:#fff;border:1px solid #ddd;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;color:#333}
 .btn-cancel:hover{background:#f5f5f0}
+
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem}
-.modal{background:#fff;border-radius:16px;padding:1.5rem;width:100%;max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.12)}
+.modal{background:#fff;border-radius:16px;padding:1.5rem;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,0.12);max-height:90vh;overflow-y:auto}
 .modal h3{font-size:16px;font-weight:600;margin-bottom:1rem}
 .modal-field{margin-bottom:0.875rem}
 .modal-field label{font-size:12px;color:#888;display:block;margin-bottom:4px;font-weight:500}
 .modal-field select,.modal-field input[type=text]{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
+.modal-field select:focus,.modal-field input[type=text]:focus{outline:none;border-color:#378ADD}
 .modal-btns{display:flex;gap:8px;margin-top:1.25rem;justify-content:flex-end}
 .modal-meta{background:#f5f5f0;border-radius:8px;padding:0.75rem;margin-bottom:1rem;font-size:12px;color:#555;line-height:1.6}
 .modal-meta strong{color:#1a1a1a;font-weight:600}
+.modal-section-title{font-size:11px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin:1rem 0 0.5rem}
 .cleaner-item{display:flex;gap:8px;align-items:center;margin-bottom:6px}
 .cleaner-item input{flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a}
 .error-banner{background:#fde8e8;color:#a32d2d;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:0.75rem}
 .empty-state{text-align:center;padding:3rem 1rem;color:#999;font-size:13px}
 .toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
-.lastsync{font-size:11px;color:#aaa;margin-left:8px}
+
 @media(max-width:600px){
   .calendar-grid{gap:2px}
-  .day-cell{min-height:52px;padding:2px}
+  .day-cell{min-height:60px;padding:3px}
   .day-num{font-size:10px}
   .resa-block{font-size:9px;padding:1px 3px}
-  .assign-badge{display:none}
+  .assign-badge{font-size:8px;padding:1px 3px}
   .month-title{font-size:16px}
+  .chip{font-size:10px;padding:3px 8px}
 }
 </style>
 </head>
@@ -130,7 +155,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
   <div id="error-banner" style="display:none" class="error-banner"></div>
 
   <div id="view-content">
-    <div class="top-controls" id="filter-bar"></div>
+    <div class="controls-row" id="controls-row"></div>
     <div class="legend" id="legend-bar"></div>
     <div id="calendar-view"></div>
     <div id="list-view" style="display:none"></div>
@@ -140,17 +165,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
     <div class="settings-wrap">
       <div class="settings-card">
         <h4>Noms des studios</h4>
-        <div class="settings-row">
-          <label>Studio 1</label>
-          <input type="text" id="name-s1">
-        </div>
-        <div class="settings-row">
-          <label>Studio 2</label>
-          <input type="text" id="name-s2">
-        </div>
-        <div style="margin-top:10px">
-          <button class="btn-primary" onclick="saveNames()">Enregistrer</button>
-        </div>
+        <div class="settings-row"><label>Studio 1</label><input type="text" id="name-s1"></div>
+        <div class="settings-row"><label>Studio 2</label><input type="text" id="name-s2"></div>
+        <div style="margin-top:10px"><button class="btn-primary" onclick="saveNames()">Enregistrer</button></div>
       </div>
       <div class="settings-card">
         <h4>Femmes de ménage</h4>
@@ -162,8 +179,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
       </div>
       <div class="settings-card" style="font-size:12px;color:#999;line-height:1.8">
         <h4 style="margin-bottom:6px;color:#1a1a1a">Synchronisation</h4>
-        Les réservations Airbnb sont automatiquement mises à jour <strong style="color:#555">toutes les heures</strong> via GitHub Actions.<br>
-        Les assignations et paramètres sont synchronisés en temps réel via Firebase sur tous les appareils.<br><br>
+        Les réservations Airbnb sont mises à jour <strong style="color:#555">toutes les heures</strong> via GitHub Actions.<br>
+        Les assignations et paramètres sont synchronisés en temps réel via Firebase.<br><br>
         <span id="last-sync-info" style="color:#aaa"></span>
       </div>
     </div>
@@ -200,150 +217,137 @@ let S = {
   currentYear: new Date().getFullYear(),
   view: 'cal',
   filterCleaner: null,
+  filterType: 'all', // 'all' | 'arr' | 'dep'
   reservations: []
 };
 
 let fbReady = false;
+const loaded = {config:false, assignments:false, reservations:false};
+
+function checkReady() {
+  if(loaded.config && loaded.assignments && loaded.reservations && !fbReady) {
+    fbReady = true; setStatus(''); render();
+  }
+}
 
 function setSyncStatus(s, extra) {
-  const dot = document.getElementById('sync-dot');
-  const lbl = document.getElementById('sync-label');
-  dot.className = 'sync-dot ' + s;
-  lbl.textContent = s==='ok' ? (extra||'Synchronisé') : s==='err' ? 'Hors ligne' : 'Chargement...';
+  document.getElementById('sync-dot').className = 'sync-dot '+s;
+  document.getElementById('sync-label').textContent = s==='ok'?(extra||'Synchronisé'):s==='err'?'Hors ligne':'Chargement...';
 }
 
 function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  const t=document.getElementById('toast'); t.textContent=msg;
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500);
 }
 
-function fbSet(path, data) {
-  set(ref(db, path), data)
-    .then(() => setSyncStatus('ok'))
-    .catch(() => setSyncStatus('err'));
-}
-
-let loadedFlags = {config: false, assignments: false, reservations: false};
-function checkReady() {
-  if(loadedFlags.config && loadedFlags.assignments && loadedFlags.reservations && !fbReady) {
-    fbReady = true;
-    setStatus('');
-    render();
-  }
+function fbSet(path,data) {
+  set(ref(db,path),data).then(()=>setSyncStatus('ok')).catch(()=>setSyncStatus('err'));
 }
 
 setStatus('Chargement depuis Firebase...', true);
 
-onValue(ref(db, 'config'), snap => {
-  const d = snap.val();
-  if(d) {
-    S.cleaners = d.cleaners || S.cleaners;
-    S.studioNames = d.studioNames || S.studioNames;
-  } else {
-    fbSet('config', { cleaners: S.cleaners, studioNames: S.studioNames });
-  }
-  setSyncStatus('ok');
-  loadedFlags.config = true;
-  if(fbReady) render();
-  else checkReady();
-}, () => { setSyncStatus('err'); loadedFlags.config=true; checkReady(); });
+onValue(ref(db,'config'), snap => {
+  const d=snap.val();
+  if(d){ S.cleaners=d.cleaners||S.cleaners; S.studioNames=d.studioNames||S.studioNames; }
+  else fbSet('config',{cleaners:S.cleaners,studioNames:S.studioNames});
+  setSyncStatus('ok'); loaded.config=true; fbReady?render():checkReady();
+}, ()=>{ setSyncStatus('err'); loaded.config=true; checkReady(); });
 
-onValue(ref(db, 'assignments'), snap => {
-  S.assignments = snap.val() || {};
-  loadedFlags.assignments = true;
-  if(fbReady) render();
-  else checkReady();
+onValue(ref(db,'assignments'), snap => {
+  S.assignments=snap.val()||{}; loaded.assignments=true; fbReady?render():checkReady();
 });
 
-onValue(ref(db, 'reservations'), snap => {
-  const data = snap.val() || {};
-  S.reservations = Object.values(data).map(r => ({
-    ...r,
-    start: new Date(r.start),
-    end: new Date(r.end)
-  }));
-  loadedFlags.reservations = true;
-  if(fbReady) render();
-  else checkReady();
+onValue(ref(db,'reservations'), snap => {
+  const data=snap.val()||{};
+  S.reservations=Object.values(data).map(r=>({...r,start:new Date(r.start),end:new Date(r.end)}));
+  loaded.reservations=true; fbReady?render():checkReady();
 });
 
-onValue(ref(db, 'lastSync'), snap => {
-  const d = snap.val();
-  if(d && d.ts) {
-    const dt = new Date(d.ts);
-    const fmt = dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
-    const el = document.getElementById('last-sync-info');
-    if(el) el.textContent = `Dernière sync Airbnb : ${fmt} (${d.count} réservation(s))`;
-    setSyncStatus('ok', `Sync ${fmt}`);
+onValue(ref(db,'lastSync'), snap => {
+  const d=snap.val();
+  if(d&&d.ts){
+    const fmt=new Date(d.ts).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+    const el=document.getElementById('last-sync-info');
+    if(el) el.textContent=`Dernière sync Airbnb : ${fmt} (${d.count} résa)`;
+    setSyncStatus('ok',`Sync ${fmt}`);
   }
 });
 
-function saveConfig() { fbSet('config', { cleaners: S.cleaners, studioNames: S.studioNames }); }
-function saveAssignments() { fbSet('assignments', Object.keys(S.assignments).length ? S.assignments : null); }
+function saveConfig(){ fbSet('config',{cleaners:S.cleaners,studioNames:S.studioNames}); }
+function saveAssignments(){ fbSet('assignments',Object.keys(S.assignments).length?S.assignments:null); }
 
-function setStatus(msg, loading=false) {
-  document.getElementById('status-bar').innerHTML = loading
-    ? `<span class="spinner"></span><span>${msg}</span>`
-    : `<span>${msg}</span>`;
-}
-
-function showError(msg) {
-  const el = document.getElementById('error-banner');
-  el.textContent = msg; el.style.display = msg ? '' : 'none';
+function setStatus(msg,loading=false){
+  document.getElementById('status-bar').innerHTML=loading?`<span class="spinner"></span><span>${msg}</span>`:`<span>${msg}</span>`;
 }
 
 const getKey = r => r.uid;
-const getAssigned = r => (S.assignments[getKey(r)]||{}).cleaner || null;
-const getNote = r => (S.assignments[getKey(r)]||{}).note || '';
-const cleanerColor = n => { const i=S.cleaners.indexOf(n); return i>=0 ? CLEANER_COLORS[i%CLEANER_COLORS.length] : '#aaa'; };
 
-function getResasForDay(d, si) {
-  const t = new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();
-  return S.reservations.filter(r => {
-    if(r.studio !== si) return false;
-    const s=new Date(r.start.getFullYear(),r.start.getMonth(),r.start.getDate()).getTime();
-    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate()).getTime();
-    return t>=s && t<e;
+function getAssignment(r){
+  const a=S.assignments[getKey(r)];
+  if(!a) return {c1:null,c2:null,note:''};
+  if(typeof a === 'string') return {c1:a,c2:null,note:''};
+  return {c1:a.cleaner||a.c1||null, c2:a.c2||null, note:a.note||''};
+}
+
+const cleanerColor = n => { const i=S.cleaners.indexOf(n); return i>=0?CLEANER_COLORS[i%CLEANER_COLORS.length]:'#aaa'; };
+
+function dayTime(d){ return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime(); }
+
+function getResasForDay(d,si){
+  const t=dayTime(d);
+  return S.reservations.filter(r=>{
+    if(r.studio!==si) return false;
+    return t>=dayTime(r.start) && t<dayTime(r.end);
   });
 }
 
-function getCheckouts(d, si) {
-  const t=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();
-  return S.reservations.filter(r => r.studio===si &&
-    new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate()).getTime()===t);
+function getCheckouts(d,si){
+  const t=dayTime(d);
+  return S.reservations.filter(r=>r.studio===si && dayTime(r.end)===t);
 }
 
-function renderCalendar() {
+function renderCalendar(){
   const yr=S.currentYear, mo=S.currentMonth;
   const first=new Date(yr,mo,1), last=new Date(yr,mo+1,0);
   let sd=first.getDay(); if(sd===0)sd=7;
   const today=new Date(); today.setHours(0,0,0,0);
   const DAYS=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
   let html=DAYS.map(d=>`<div class="day-header">${d}</div>`).join('');
+
+  const showArr = S.filterType==='all'||S.filterType==='arr';
+  const showDep = S.filterType==='all'||S.filterType==='dep';
+
   const cell=(d,other)=>{
     const isToday=d.getTime()===today.getTime();
     let inner=`<div class="day-num">${d.getDate()}</div>`;
     for(let si=0;si<2;si++){
-      for(const r of getCheckouts(d,si)){
-        const a=getAssigned(r);
-        if(S.filterCleaner&&a!==S.filterCleaner) continue;
-        inner+=`<div class="resa-block checkout" onclick="window._oa('${getKey(r)}')" title="Départ — ${S.studioNames[si]}">Départ S${si+1}</div>`;
-        if(a) inner+=`<div class="assign-badge" style="color:${cleanerColor(a)}">${a}</div>`;
+      if(showDep){
+        for(const r of getCheckouts(d,si)){
+          const {c1,c2}=getAssignment(r);
+          if(S.filterCleaner && c1!==S.filterCleaner && c2!==S.filterCleaner) continue;
+          inner+=`<div class="resa-block checkout" onclick="window._oa('${getKey(r)}')" title="Départ — ${S.studioNames[si]}">Départ S${si+1}</div>`;
+          if(c1||c2){
+            inner+=`<div class="assign-wrap">`;
+            if(c1) inner+=`<span class="assign-badge c1" style="color:${cleanerColor(c1)}">${c1}</span> `;
+            if(c2) inner+=`<span class="assign-badge c2" style="color:${cleanerColor(c2)}">${c2}</span>`;
+            inner+=`</div>`;
+          }
+        }
       }
-      for(const r of getResasForDay(d,si)){
-        const a=getAssigned(r);
-        if(S.filterCleaner&&a!==S.filterCleaner) continue;
-        const isStart=d.getTime()===new Date(r.start.getFullYear(),r.start.getMonth(),r.start.getDate()).getTime();
-        if(isStart){
-          inner+=`<div class="resa-block s${si+1}" onclick="window._oa('${getKey(r)}')" title="${r.summary}">S${si+1}</div>`;
-          if(a) inner+=`<div class="assign-badge" style="color:${cleanerColor(a)}">${a}</div>`;
+      if(showArr){
+        for(const r of getResasForDay(d,si)){
+          const {c1,c2}=getAssignment(r);
+          if(S.filterCleaner && c1!==S.filterCleaner && c2!==S.filterCleaner) continue;
+          const isStart=dayTime(d)===dayTime(r.start);
+          if(isStart){
+            inner+=`<div class="resa-block s${si+1}" onclick="window._oa('${getKey(r)}')" title="${r.summary}">S${si+1}</div>`;
+          }
         }
       }
     }
     return `<div class="day-cell${other?' other-month':''}${isToday?' today':''}">${inner}</div>`;
   };
+
   for(let i=1;i<sd;i++) html+=cell(new Date(yr,mo,1-sd+i),true);
   for(let i=1;i<=last.getDate();i++) html+=cell(new Date(yr,mo,i),false);
   const rem=7-((sd-1+last.getDate())%7);
@@ -351,42 +355,74 @@ function renderCalendar() {
   document.getElementById('calendar-view').innerHTML=`<div class="calendar-grid">${html}</div>`;
 }
 
-function renderList() {
+function renderList(){
   const now=new Date(); now.setHours(0,0,0,0);
-  const all=S.reservations
-    .filter(r=>new Date(r.end)>=now&&(!S.filterCleaner||getAssigned(r)===S.filterCleaner))
-    .sort((a,b)=>a.start-b.start);
-  if(!all.length){ document.getElementById('list-view').innerHTML='<div class="empty-state">Aucune réservation à venir</div>'; return; }
+  const showArr=S.filterType==='all'||S.filterType==='arr';
+  const showDep=S.filterType==='all'||S.filterType==='dep';
+
+  let items=[];
+  for(const r of S.reservations){
+    if(new Date(r.end)<now) continue;
+    const {c1,c2}=getAssignment(r);
+    if(S.filterCleaner && c1!==S.filterCleaner && c2!==S.filterCleaner) continue;
+    if(showArr) items.push({r,type:'arr',date:r.start});
+    if(showDep) items.push({r,type:'dep',date:r.end});
+  }
+  items.sort((a,b)=>a.date-b.date);
+
+  if(!items.length){ document.getElementById('list-view').innerHTML='<div class="empty-state">Aucune réservation à venir</div>'; return; }
+
   const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'});
   const COLS=['#378ADD','#1D9E75'];
-  document.getElementById('list-view').innerHTML='<div class="list-view-wrap">'+all.map(r=>{
-    const a=getAssigned(r);
+  const typeLabel={arr:'Arrivée',dep:'Départ'};
+
+  document.getElementById('list-view').innerHTML='<div class="list-view-wrap">'+items.map(({r,type})=>{
+    const {c1,c2}=getAssignment(r);
+    const hasAssign=c1||c2;
+    const n=Math.round((r.end-r.start)/86400000);
     return `<div class="list-item" onclick="window._oa('${getKey(r)}')">
       <div class="list-dot" style="background:${COLS[r.studio]}"></div>
       <div class="list-info">
-        <div class="list-name">${S.studioNames[r.studio]}</div>
-        <div class="list-dates">${fmt(r.start)} → ${fmt(r.end)} · ${Math.round((r.end-r.start)/86400000)} nuit(s)</div>
+        <div class="list-name">${S.studioNames[r.studio]} — ${fmt(type==='arr'?r.start:r.end)}</div>
+        <div class="list-dates">${fmt(r.start)} → ${fmt(r.end)} · ${n} nuit(s)</div>
+        <div class="list-assign-row">
+          ${c1?`<span class="list-assign" style="color:${cleanerColor(c1)}">${c1}</span>`:''}
+          ${c2?`<span class="list-assign" style="color:${cleanerColor(c2)}">${c2}</span>`:''}
+          ${!hasAssign?`<span class="list-assign missing">Non assigné</span>`:''}
+        </div>
       </div>
-      <div class="list-assign${a?'':' missing'}">${a||'Non assigné'}</div>
+      <div class="list-type ${type}">${typeLabel[type]}</div>
     </div>`;
   }).join('')+'</div>';
 }
 
-function renderFilterBar() {
-  document.getElementById('filter-bar').innerHTML=
-    `<span class="filter-label">Filtrer :</span>
-    <button class="filter-chip${!S.filterCleaner?' active':''}" onclick="window._sf(null)">Toutes</button>`+
-    S.cleaners.map(c=>`<button class="filter-chip${S.filterCleaner===c?' active':''}" onclick="window._sf('${c}')">${c}</button>`).join('');
+function renderControls(){
+  const types=[
+    {k:'all',label:'Tout'},
+    {k:'arr',label:'Arrivées',cls:'arr'},
+    {k:'dep',label:'Départs',cls:'dep'}
+  ];
+  let html=`<div class="chip-group">
+    <span class="chip-label">Afficher :</span>
+    ${types.map(t=>`<button class="chip${t.cls?' '+t.cls:''}${S.filterType===t.k?' active':''}" onclick="window._st('${t.k}')">${t.label}</button>`).join('')}
+  </div>
+  <div class="divider"></div>
+  <div class="chip-group">
+    <span class="chip-label">Intervenante :</span>
+    <button class="chip${!S.filterCleaner?' active':''}" onclick="window._sf(null)">Toutes</button>
+    ${S.cleaners.map(c=>`<button class="chip${S.filterCleaner===c?' active':''}" onclick="window._sf('${c}')">${c}</button>`).join('')}
+  </div>`;
+  document.getElementById('controls-row').innerHTML=html;
 }
 
-function renderLegend() {
+function renderLegend(){
   document.getElementById('legend-bar').innerHTML=`
     <div class="legend-item"><div class="legend-dot" style="background:#daeafe"></div>${S.studioNames[0]}</div>
     <div class="legend-item"><div class="legend-dot" style="background:#c6f0df"></div>${S.studioNames[1]}</div>
     <div class="legend-item"><div class="legend-dot" style="background:#fde8b0"></div>Départ / ménage</div>`;
 }
 
-function renderSettings() {
+function renderSettings(){
   document.getElementById('name-s1').value=S.studioNames[0];
   document.getElementById('name-s2').value=S.studioNames[1];
   document.getElementById('cleaners-list').innerHTML=S.cleaners.map((c,i)=>`
@@ -397,38 +433,42 @@ function renderSettings() {
     </div>`).join('');
 }
 
-function render() {
+function render(){
   const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   document.getElementById('month-title').textContent=MO[S.currentMonth]+' '+S.currentYear;
   document.getElementById('topbar-sub').textContent=S.studioNames.join(' · ');
-  if(S.view!=='settings'){ renderFilterBar(); renderLegend(); S.view==='cal'?renderCalendar():renderList(); }
+  if(S.view!=='settings'){ renderControls(); renderLegend(); S.view==='cal'?renderCalendar():renderList(); }
   else renderSettings();
 }
 
-function findResa(key) { return S.reservations.find(r=>getKey(r)===key)||null; }
+function findResa(key){ return S.reservations.find(r=>getKey(r)===key)||null; }
 
-window._oa = function(key) {
+window._oa = function(key){
   const r=findResa(key); if(!r) return;
-  const a=getAssigned(r)||'', note=getNote(r);
+  const {c1,c2,note}=getAssignment(r);
   const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
   const n=Math.round((r.end-r.start)/86400000);
-  const opts=S.cleaners.map(c=>`<option value="${c}"${a===c?' selected':''}>${c}</option>`).join('');
+  const opts=c=>`<option value="">— Aucune —</option>`+S.cleaners.map(x=>`<option value="${x}"${c===x?' selected':''}>${x}</option>`).join('');
   document.getElementById('modal-container').innerHTML=`
     <div class="modal-overlay" onclick="if(event.target===this)window._cm()">
       <div class="modal">
-        <h3>Assigner une intervenante</h3>
+        <h3>Assigner les intervenantes</h3>
         <div class="modal-meta">
           <strong>${S.studioNames[r.studio]}</strong><br>
           Arrivée : ${fmt(r.start)}<br>
           Départ : ${fmt(r.end)} (${n} nuit${n>1?'s':''})<br>
           ${r.summary&&r.summary!=='Réservation'?'Voyageur : '+r.summary:''}
         </div>
+        <div class="modal-section-title">Intervenante 1</div>
         <div class="modal-field">
-          <label>Femme de ménage</label>
-          <select id="mc"><option value="">— Aucune —</option>${opts}</select>
+          <select id="mc1">${opts(c1)}</select>
         </div>
+        <div class="modal-section-title">Intervenante 2 (optionnel)</div>
         <div class="modal-field">
-          <label>Note (optionnel)</label>
+          <select id="mc2">${opts(c2)}</select>
+        </div>
+        <div class="modal-field" style="margin-top:0.5rem">
+          <label>Note</label>
           <input type="text" id="mn" placeholder="Ex: clé boîte, code entrée..." value="${note}">
         </div>
         <div class="modal-btns">
@@ -439,23 +479,26 @@ window._oa = function(key) {
     </div>`;
 };
 
-window._sa = function(key) {
-  const c=document.getElementById('mc').value;
-  const n=document.getElementById('mn').value;
-  if(c) S.assignments[key]={cleaner:c,note:n};
+window._sa = function(key){
+  const c1=document.getElementById('mc1').value;
+  const c2=document.getElementById('mc2').value;
+  const note=document.getElementById('mn').value;
+  if(c1||c2) S.assignments[key]={c1:c1||null,c2:c2||null,note};
   else delete S.assignments[key];
   saveAssignments();
-  showToast(c?`Assigné à ${c} ✓`:'Assignation supprimée');
+  const names=[c1,c2].filter(Boolean).join(' + ');
+  showToast(names?`Assigné : ${names} ✓`:'Assignation supprimée');
   window._cm(); render();
 };
 
-window._cm = () => document.getElementById('modal-container').innerHTML='';
-window._sf = n => { S.filterCleaner=n; render(); };
-window._rc = i => { if(!confirm('Supprimer '+S.cleaners[i]+' ?')) return; S.cleaners.splice(i,1); saveConfig(); renderSettings(); };
-window.addCleaner = () => { const inp=document.getElementById('new-cleaner'),n=inp.value.trim(); if(!n||S.cleaners.includes(n)) return; S.cleaners.push(n); saveConfig(); renderSettings(); inp.value=''; showToast(n+' ajouté ✓'); };
-window.saveNames = () => { S.studioNames[0]=document.getElementById('name-s1').value||'Studio 1'; S.studioNames[1]=document.getElementById('name-s2').value||'Studio 2'; saveConfig(); showToast('Noms enregistrés ✓'); render(); };
-window.changeMonth = d => { if(d===0){S.currentMonth=new Date().getMonth();S.currentYear=new Date().getFullYear();}else{S.currentMonth+=d;if(S.currentMonth>11){S.currentMonth=0;S.currentYear++;}if(S.currentMonth<0){S.currentMonth=11;S.currentYear--;}} render(); };
-window.setView = v => { S.view=v; ['cal','list','settings'].forEach(t=>{document.getElementById('tab-'+t).classList.toggle('active',t===v);}); document.getElementById('view-content').style.display=v!=='settings'?'':'none'; document.getElementById('view-settings').style.display=v==='settings'?'':'none'; render(); };
+window._cm = ()=>document.getElementById('modal-container').innerHTML='';
+window._sf = n=>{ S.filterCleaner=n; render(); };
+window._st = t=>{ S.filterType=t; render(); };
+window._rc = i=>{ if(!confirm('Supprimer '+S.cleaners[i]+' ?')) return; S.cleaners.splice(i,1); saveConfig(); renderSettings(); };
+window.addCleaner = ()=>{ const inp=document.getElementById('new-cleaner'),n=inp.value.trim(); if(!n||S.cleaners.includes(n)) return; S.cleaners.push(n); saveConfig(); renderSettings(); inp.value=''; showToast(n+' ajouté ✓'); };
+window.saveNames = ()=>{ S.studioNames[0]=document.getElementById('name-s1').value||'Studio 1'; S.studioNames[1]=document.getElementById('name-s2').value||'Studio 2'; saveConfig(); showToast('Noms enregistrés ✓'); render(); };
+window.changeMonth = d=>{ if(d===0){S.currentMonth=new Date().getMonth();S.currentYear=new Date().getFullYear();}else{S.currentMonth+=d;if(S.currentMonth>11){S.currentMonth=0;S.currentYear++;}if(S.currentMonth<0){S.currentMonth=11;S.currentYear--;}} render(); };
+window.setView = v=>{ S.view=v; ['cal','list','settings'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('active',t===v)); document.getElementById('view-content').style.display=v!=='settings'?'':'none'; document.getElementById('view-settings').style.display=v==='settings'?'':'none'; render(); };
 
 render();
 </script>
