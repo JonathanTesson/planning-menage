@@ -85,6 +85,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .empty-state{text-align:center;padding:3rem 1rem;color:#999;font-size:13px}
 .toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
+.lastsync{font-size:11px;color:#aaa;margin-left:8px}
 @media(max-width:600px){
   .calendar-grid{gap:2px}
   .day-cell{min-height:52px;padding:2px}
@@ -110,7 +111,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
 <div class="container">
   <div class="header">
-    <div style="display:flex;align-items:center;gap:10px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span class="month-title" id="month-title"></span>
       <div class="nav-btns">
         <button class="nav-btn" onclick="changeMonth(-1)">&#8592;</button>
@@ -138,20 +139,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
   <div id="view-settings" style="display:none">
     <div class="settings-wrap">
       <div class="settings-card">
-        <h4>URLs iCal Airbnb</h4>
-        <div class="settings-row">
-          <label>Studio 1</label>
-          <input type="text" id="ical1" placeholder="https://www.airbnb.fr/calendar/ical/...">
-        </div>
-        <div class="settings-row">
-          <label>Studio 2</label>
-          <input type="text" id="ical2" placeholder="https://www.airbnb.fr/calendar/ical/...">
-        </div>
-        <div style="margin-top:10px">
-          <button class="btn-primary" onclick="saveAndReload()">&#8635; Recharger les réservations</button>
-        </div>
-      </div>
-      <div class="settings-card">
         <h4>Noms des studios</h4>
         <div class="settings-row">
           <label>Studio 1</label>
@@ -174,10 +161,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
         </div>
       </div>
       <div class="settings-card" style="font-size:12px;color:#999;line-height:1.8">
-        <h4 style="margin-bottom:6px;color:#1a1a1a">Synchronisation Firebase</h4>
-        Toutes les modifications sont synchronisées en temps réel sur tous les appareils.<br>
-        Les réservations Airbnb sont rechargées à chaque ouverture de la page.<br><br>
-        <strong style="color:#555">URLs iCal :</strong> Airbnb → Calendrier → Paramètres → Export du calendrier.
+        <h4 style="margin-bottom:6px;color:#1a1a1a">Synchronisation</h4>
+        Les réservations Airbnb sont automatiquement mises à jour <strong style="color:#555">toutes les heures</strong> via GitHub Actions.<br>
+        Les assignations et paramètres sont synchronisés en temps réel via Firebase sur tous les appareils.<br><br>
+        <span id="last-sync-info" style="color:#aaa"></span>
       </div>
     </div>
   </div>
@@ -203,31 +190,26 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-const PROXY = 'https://api.allorigins.win/raw?url=';
 const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A6E','#c0392b'];
 
 let S = {
   cleaners: ['Steffie','Emmy','Valérie','Myrtille','Pikpik'],
   studioNames: ['Studio 1','Studio 2'],
-  icalUrls: [
-    'https://www.airbnb.fr/calendar/ical/23714051.ics?s=1c507a926f8f63d87b20fea875da704e',
-    'https://www.airbnb.fr/calendar/ical/846411261288811527.ics?s=998c515b74309dda07f768a2083cf270'
-  ],
   assignments: {},
   currentMonth: new Date().getMonth(),
   currentYear: new Date().getFullYear(),
   view: 'cal',
   filterCleaner: null,
-  reservations: [[],[]]
+  reservations: []
 };
 
 let fbReady = false;
 
-function setSyncStatus(s) {
+function setSyncStatus(s, extra) {
   const dot = document.getElementById('sync-dot');
   const lbl = document.getElementById('sync-label');
   dot.className = 'sync-dot ' + s;
-  lbl.textContent = s==='ok' ? 'Synchronisé' : s==='err' ? 'Hors ligne' : 'Connexion...';
+  lbl.textContent = s==='ok' ? (extra||'Synchronisé') : s==='err' ? 'Hors ligne' : 'Chargement...';
 }
 
 function showToast(msg) {
@@ -243,45 +225,63 @@ function fbSet(path, data) {
     .catch(() => setSyncStatus('err'));
 }
 
+let loadedFlags = {config: false, assignments: false, reservations: false};
+function checkReady() {
+  if(loadedFlags.config && loadedFlags.assignments && loadedFlags.reservations && !fbReady) {
+    fbReady = true;
+    setStatus('');
+    render();
+  }
+}
+
+setStatus('Chargement depuis Firebase...', true);
+
 onValue(ref(db, 'config'), snap => {
   const d = snap.val();
   if(d) {
     S.cleaners = d.cleaners || S.cleaners;
     S.studioNames = d.studioNames || S.studioNames;
-    S.icalUrls = d.icalUrls || S.icalUrls;
   } else {
-    fbSet('config', { cleaners: S.cleaners, studioNames: S.studioNames, icalUrls: S.icalUrls });
+    fbSet('config', { cleaners: S.cleaners, studioNames: S.studioNames });
   }
   setSyncStatus('ok');
-  if(!fbReady) { fbReady = true; loadReservations(); }
-  else render();
-}, () => { setSyncStatus('err'); if(!fbReady){ fbReady=true; loadReservations(); } });
+  loadedFlags.config = true;
+  if(fbReady) render();
+  else checkReady();
+}, () => { setSyncStatus('err'); loadedFlags.config=true; checkReady(); });
 
 onValue(ref(db, 'assignments'), snap => {
   S.assignments = snap.val() || {};
+  loadedFlags.assignments = true;
   if(fbReady) render();
+  else checkReady();
 });
 
-function saveConfig() { fbSet('config', { cleaners: S.cleaners, studioNames: S.studioNames, icalUrls: S.icalUrls }); }
-function saveAssignments() { fbSet('assignments', Object.keys(S.assignments).length ? S.assignments : null); }
+onValue(ref(db, 'reservations'), snap => {
+  const data = snap.val() || {};
+  S.reservations = Object.values(data).map(r => ({
+    ...r,
+    start: new Date(r.start),
+    end: new Date(r.end)
+  }));
+  loadedFlags.reservations = true;
+  if(fbReady) render();
+  else checkReady();
+});
 
-function parseIcal(text, si) {
-  const resas = [];
-  for(const ev of text.split('BEGIN:VEVENT').slice(1)) {
-    const uid = ((ev.match(/UID:([^\r\n]+)/)||[])[1]||'uid_'+Math.random()).trim();
-    let sum = ((ev.match(/SUMMARY:([^\r\n]+)/)||[])[1]||'Réservation').trim();
-    const low = sum.toLowerCase();
-    if(low.includes('not available')||low.includes('airbnb')||low.includes('unavailable')) continue;
-    const ds = ((ev.match(/DTSTART(?:;[^:]*)?:([^\r\n]+)/)||[])[1]||'').trim();
-    const de = ((ev.match(/DTEND(?:;[^:]*)?:([^\r\n]+)/)||[])[1]||'').trim();
-    if(!ds||!de) continue;
-    const pd = s => { const c=s.replace(/\D/g,''); return new Date(+c.slice(0,4),+c.slice(4,6)-1,+c.slice(6,8)); };
-    const start=pd(ds), end=pd(de);
-    if(isNaN(start)||isNaN(end)||end<=start) continue;
-    resas.push({ uid, summary:sum, start, end, studio:si });
+onValue(ref(db, 'lastSync'), snap => {
+  const d = snap.val();
+  if(d && d.ts) {
+    const dt = new Date(d.ts);
+    const fmt = dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+    const el = document.getElementById('last-sync-info');
+    if(el) el.textContent = `Dernière sync Airbnb : ${fmt} (${d.count} réservation(s))`;
+    setSyncStatus('ok', `Sync ${fmt}`);
   }
-  return resas;
-}
+});
+
+function saveConfig() { fbSet('config', { cleaners: S.cleaners, studioNames: S.studioNames }); }
+function saveAssignments() { fbSet('assignments', Object.keys(S.assignments).length ? S.assignments : null); }
 
 function setStatus(msg, loading=false) {
   document.getElementById('status-bar').innerHTML = loading
@@ -294,44 +294,25 @@ function showError(msg) {
   el.textContent = msg; el.style.display = msg ? '' : 'none';
 }
 
-async function fetchIcal(url, si) {
-  try {
-    const r = await fetch(PROXY + encodeURIComponent(url), {signal: AbortSignal.timeout(12000)});
-    if(!r.ok) throw 0;
-    const t = await r.text();
-    if(!t.includes('BEGIN:VCALENDAR')) throw 0;
-    return parseIcal(t, si);
-  } catch(e) { return null; }
-}
-
-async function loadReservations() {
-  setStatus('Chargement des calendriers Airbnb...', true);
-  showError('');
-  const [r1,r2] = await Promise.all([fetchIcal(S.icalUrls[0],0), fetchIcal(S.icalUrls[1],1)]);
-  S.reservations[0] = r1||[]; S.reservations[1] = r2||[];
-  const errs = [r1===null&&S.studioNames[0], r2===null&&S.studioNames[1]].filter(Boolean);
-  if(errs.length) showError('Impossible de charger : '+errs.join(', ')+'. Vérifiez les URLs dans ⚙');
-  const total = S.reservations[0].length + S.reservations[1].length;
-  setStatus(total > 0 ? `${total} réservation(s) chargée(s) · Cliquez sur un bloc pour assigner` : errs.length ? '' : 'Aucune réservation. Vérifiez les URLs iCal dans ⚙');
-  render();
-}
-
-const getKey = r => r.uid.replace(/[.#$/\[\]]/g,'_');
+const getKey = r => r.uid;
 const getAssigned = r => (S.assignments[getKey(r)]||{}).cleaner || null;
 const getNote = r => (S.assignments[getKey(r)]||{}).note || '';
 const cleanerColor = n => { const i=S.cleaners.indexOf(n); return i>=0 ? CLEANER_COLORS[i%CLEANER_COLORS.length] : '#aaa'; };
 
 function getResasForDay(d, si) {
   const t = new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();
-  return S.reservations[si].filter(r => {
+  return S.reservations.filter(r => {
+    if(r.studio !== si) return false;
     const s=new Date(r.start.getFullYear(),r.start.getMonth(),r.start.getDate()).getTime();
     const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate()).getTime();
     return t>=s && t<e;
   });
 }
+
 function getCheckouts(d, si) {
   const t=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();
-  return S.reservations[si].filter(r => new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate()).getTime()===t);
+  return S.reservations.filter(r => r.studio===si &&
+    new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate()).getTime()===t);
 }
 
 function renderCalendar() {
@@ -372,7 +353,7 @@ function renderCalendar() {
 
 function renderList() {
   const now=new Date(); now.setHours(0,0,0,0);
-  const all=[...S.reservations[0],...S.reservations[1]]
+  const all=S.reservations
     .filter(r=>new Date(r.end)>=now&&(!S.filterCleaner||getAssigned(r)===S.filterCleaner))
     .sort((a,b)=>a.start-b.start);
   if(!all.length){ document.getElementById('list-view').innerHTML='<div class="empty-state">Aucune réservation à venir</div>'; return; }
@@ -406,8 +387,6 @@ function renderLegend() {
 }
 
 function renderSettings() {
-  document.getElementById('ical1').value=S.icalUrls[0];
-  document.getElementById('ical2').value=S.icalUrls[1];
   document.getElementById('name-s1').value=S.studioNames[0];
   document.getElementById('name-s2').value=S.studioNames[1];
   document.getElementById('cleaners-list').innerHTML=S.cleaners.map((c,i)=>`
@@ -426,10 +405,7 @@ function render() {
   else renderSettings();
 }
 
-function findResa(key) {
-  for(const arr of S.reservations){ const r=arr.find(r=>getKey(r)===key); if(r) return r; }
-  return null;
-}
+function findResa(key) { return S.reservations.find(r=>getKey(r)===key)||null; }
 
 window._oa = function(key) {
   const r=findResa(key); if(!r) return;
@@ -453,7 +429,7 @@ window._oa = function(key) {
         </div>
         <div class="modal-field">
           <label>Note (optionnel)</label>
-          <input type="text" id="mn" placeholder="Ex: clé boîte, code..." value="${note}">
+          <input type="text" id="mn" placeholder="Ex: clé boîte, code entrée..." value="${note}">
         </div>
         <div class="modal-btns">
           <button class="btn-cancel" onclick="window._cm()">Annuler</button>
@@ -478,7 +454,6 @@ window._sf = n => { S.filterCleaner=n; render(); };
 window._rc = i => { if(!confirm('Supprimer '+S.cleaners[i]+' ?')) return; S.cleaners.splice(i,1); saveConfig(); renderSettings(); };
 window.addCleaner = () => { const inp=document.getElementById('new-cleaner'),n=inp.value.trim(); if(!n||S.cleaners.includes(n)) return; S.cleaners.push(n); saveConfig(); renderSettings(); inp.value=''; showToast(n+' ajouté ✓'); };
 window.saveNames = () => { S.studioNames[0]=document.getElementById('name-s1').value||'Studio 1'; S.studioNames[1]=document.getElementById('name-s2').value||'Studio 2'; saveConfig(); showToast('Noms enregistrés ✓'); render(); };
-window.saveAndReload = () => { S.icalUrls[0]=document.getElementById('ical1').value.trim(); S.icalUrls[1]=document.getElementById('ical2').value.trim(); saveConfig(); setView('cal'); loadReservations(); };
 window.changeMonth = d => { if(d===0){S.currentMonth=new Date().getMonth();S.currentYear=new Date().getFullYear();}else{S.currentMonth+=d;if(S.currentMonth>11){S.currentMonth=0;S.currentYear++;}if(S.currentMonth<0){S.currentMonth=11;S.currentYear--;}} render(); };
 window.setView = v => { S.view=v; ['cal','list','settings'].forEach(t=>{document.getElementById('tab-'+t).classList.toggle('active',t===v);}); document.getElementById('view-content').style.display=v!=='settings'?'':'none'; document.getElementById('view-settings').style.display=v==='settings'?'':'none'; render(); };
 
