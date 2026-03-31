@@ -16,7 +16,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .sync-dot.loading{background:#FAC775;animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .container{max-width:960px;margin:0 auto;padding:1rem 1rem 0}
-.header{display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;margin-bottom:0.5rem;flex-wrap:wrap;gap:8px}
+.header{display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;margin-bottom:0;flex-wrap:wrap;gap:8px}
 .nav-btns{display:flex;gap:6px;align-items:center}
 .nav-btn{background:#fff;border:1px solid #ddd;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;color:#333}
 .nav-btn:hover{background:#f5f5f0}
@@ -35,11 +35,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .chip.dep.active{background:#7a4a00;border-color:#7a4a00;color:#fff}
 .divider{width:1px;height:20px;background:#e0e0d8;margin:0 4px;flex-shrink:0}
 
-.legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:0.75rem;align-items:center}
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:0.5rem;margin-bottom:0.5rem;align-items:center;padding:0.5rem 0;border-top:1px solid #e8e8e2}
 .legend-item{display:flex;align-items:center;gap:4px;font-size:11px;color:#666}
 .legend-dot{width:11px;height:11px;border-radius:3px;flex-shrink:0}
 
-.status-bar{font-size:12px;color:#888;min-height:18px;margin-bottom:0.4rem;display:flex;align-items:center;gap:6px}
+.status-bar{font-size:12px;color:#888;min-height:0;margin-bottom:0;display:flex;align-items:center;gap:6px}
 .spinner{width:12px;height:12px;border:2px solid #ddd;border-top-color:#378ADD;border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block;flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -154,8 +154,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
   <div id="view-calendar">
     <div class="kpi-bar" id="kpi-bar"></div>
     <div class="controls-row" id="controls-row"></div>
-    <div class="legend" id="legend-bar"></div>
     <div id="calendar-view"></div>
+    <div class="legend" id="legend-bar"></div>
   </div>
 
   <div id="view-settings" style="display:none">
