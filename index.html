@@ -444,21 +444,33 @@ function renderKpi(){
 }
 
 function renderControls(){
-  const types=[
-    {k:'all',label:'Tout'},
-    {k:'arr',label:'Arrivées',cls:'arr'},
-    {k:'dep',label:'Départs',cls:'dep'}
-  ];
+  const cleanerChips = S.cleaners.map((c,i)=>{
+    const col = CLEANER_COLORS[i%CLEANER_COLORS.length];
+    const isActive = S.filterCleaner===c;
+    const style = isActive
+      ? `background:${col};color:#fff;border-color:${col}`
+      : `border-color:${col}22;color:${col}`;
+    return `<button class="chip" style="${style}" onclick="window._sf('${c}')">${c}</button>`;
+  }).join('');
+
+  const labelTypeStyle = !S.filterCleaner && S.filterType==='all'
+    ? 'background:#1a1a1a;color:#fff;border-color:#1a1a1a'
+    : 'background:none;color:#555;border-color:transparent';
+
+  const labelCleanerStyle = S.filterCleaner || S.filterType!=='all'
+    ? 'background:none;color:#aaa;border-color:transparent;cursor:pointer'
+    : 'background:#1a1a1a;color:#fff;border-color:#1a1a1a;cursor:pointer';
+
   document.getElementById('controls-row').innerHTML=`
     <div class="chip-group">
-      <span class="chip-label">Afficher :</span>
-      ${types.map(t=>`<button class="chip${t.cls?' '+t.cls:''}${S.filterType===t.k?' active':''}" onclick="window._st('${t.k}')">${t.label}</button>`).join('')}
+      <button class="chip" style="${labelTypeStyle}" onclick="window._st('all');window._sf(null)">Afficher</button>
+      <button class="chip arr${S.filterType==='arr'?' active':''}" onclick="window._st('arr')">Arrivées</button>
+      <button class="chip dep${S.filterType==='dep'?' active':''}" onclick="window._st('dep')">Départs</button>
     </div>
     <div class="divider"></div>
     <div class="chip-group">
-      <span class="chip-label">Intervenante :</span>
-      <button class="chip${!S.filterCleaner?' active':''}" onclick="window._sf(null)">Toutes</button>
-      ${S.cleaners.map(c=>`<button class="chip${S.filterCleaner===c?' active':''}" onclick="window._sf('${c}')">${c}</button>`).join('')}
+      <button class="chip" style="${S.filterCleaner?'background:none;color:#aaa;border-color:transparent':'background:#1a1a1a;color:#fff;border-color:#1a1a1a'}" onclick="window._sf(null);window._st('all')">Intervenante</button>
+      ${cleanerChips}
     </div>`;
 }
 
