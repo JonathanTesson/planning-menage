@@ -66,7 +66,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .assign-wrap{margin-top:1px;margin-bottom:2px}
 .assign-badge{display:inline-block;font-size:9px;background:#f0f0eb;border-radius:3px;padding:1px 4px;color:#555;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
 
-.settings-wrap{display:flex;flex-direction:column;gap:1rem;margin-bottom:1rem}
+.settings-tabs{display:flex;gap:6px;margin-bottom:1rem;border-bottom:1px solid #e8e8e2;padding-bottom:0.75rem}
+.settings-tab{padding:6px 14px;border-radius:8px;border:1px solid #ddd;cursor:pointer;font-size:12px;color:#666;background:#fff}
+.settings-tab.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.histo-month{margin-bottom:1rem}
+.histo-month-title{font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:0.5rem;display:flex;align-items:center;justify-content:space-between}
+.histo-month-title span{font-size:11px;font-weight:400;color:#aaa}
+.histo-table{width:100%;border-collapse:collapse;font-size:12px}
+.histo-table th{text-align:left;padding:5px 8px;color:#aaa;font-weight:500;border-bottom:1px solid #e8e8e2}
+.histo-table td{padding:5px 8px;border-bottom:1px solid #f0f0eb;color:#555}
+.histo-table tr:last-child td{border-bottom:none}
+.histo-summary{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:1rem}
+.histo-summary-card{background:#fff;border:1px solid #e8e8e2;border-radius:10px;padding:0.6rem 0.75rem;display:flex;align-items:center;gap:10px}
+.histo-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;flex-shrink:0}
+.histo-count{font-size:20px;font-weight:700}
+.histo-name{font-size:11px;color:#aaa}
+.export-btns{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap}
 .settings-card{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:1rem 1.25rem}
 .settings-card h4{font-size:13px;font-weight:600;margin-bottom:0.875rem}
 .settings-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
@@ -166,6 +181,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
   </div>
 
   <div id="view-settings" style="display:none">
+    <div class="settings-tabs">
+      <button class="settings-tab active" id="stab-params" onclick="switchSettingsTab('params')">Paramètres</button>
+      <button class="settings-tab" id="stab-histo" onclick="switchSettingsTab('histo')">Historique</button>
+    </div>
+    <div id="settings-params">
     <div class="settings-wrap">
       <div class="settings-card">
         <h4>Noms des studios</h4>
@@ -193,6 +213,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
         Les assignations sont synchronisées en temps réel via Firebase.<br><br>
         <span id="last-sync-info" style="color:#aaa"></span>
       </div>
+    </div>
+    </div><!-- end settings-params -->
+    <div id="settings-histo" style="display:none">
+      <div class="export-btns">
+        <button class="btn-primary" onclick="exportCSV()">⬇ Exporter CSV</button>
+      </div>
+      <div id="histo-summary-wrap"></div>
+      <div id="histo-months-wrap"></div>
     </div>
   </div>
 </div>
@@ -226,6 +254,7 @@ let S = {
   currentMonth: new Date().getMonth(),
   currentYear: new Date().getFullYear(),
   showSettings: false,
+  settingsTab: 'params',
   filterCleaner: null,
   filterType: 'dep',
   reservations: []
@@ -581,7 +610,104 @@ window._toggleType = t=>{
 window._rc = i=>{ if(!confirm('Supprimer '+S.cleaners[i]+' ?')) return; S.cleaners.splice(i,1); saveConfig(); renderSettings(); };
 window.addCleaner = ()=>{ const inp=document.getElementById('new-cleaner'),n=inp.value.trim(); if(!n||S.cleaners.includes(n)) return; S.cleaners.push(n); saveConfig(); renderSettings(); inp.value=''; showToast(n+' ajouté ✓'); };
 window.saveNames = ()=>{ S.studioNames[0]=document.getElementById('name-s1').value||'Studio 1'; S.studioNames[1]=document.getElementById('name-s2').value||'Studio 2'; saveConfig(); showToast('Noms enregistrés ✓'); render(); };
-window.toggleSettings = ()=>{ S.showSettings=!S.showSettings; render(); };
+window.toggleSettings = ()=>{ S.showSettings=!S.showSettings; if(S.showSettings) S.settingsTab='params'; render(); };
+
+window.switchSettingsTab = tab=>{
+  S.settingsTab=tab;
+  document.getElementById('settings-params').style.display=tab==='params'?'':'none';
+  document.getElementById('settings-histo').style.display=tab==='histo'?'':'none';
+  document.getElementById('stab-params').classList.toggle('active',tab==='params');
+  document.getElementById('stab-histo').classList.toggle('active',tab==='histo');
+  if(tab==='histo') renderHistorique();
+};
+
+function renderHistorique(){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const past=S.reservations.filter(r=>new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate())<today);
+  if(!past.length){
+    document.getElementById('histo-summary-wrap').innerHTML='<p style="color:#aaa;font-size:13px;padding:1rem 0">Aucun historique disponible pour le moment.</p>';
+    document.getElementById('histo-months-wrap').innerHTML='';
+    return;
+  }
+
+  // Résumé par intervenante
+  const counts={};
+  for(const r of past){
+    const {c1,c2}=getAssignment(r);
+    if(c1){ counts[c1]=(counts[c1]||0)+1; }
+    if(c2){ counts[c2]=(counts[c2]||0)+1; }
+  }
+  let summaryHtml='<div class="histo-summary">';
+  for(const c of S.cleaners){
+    if(!counts[c]) continue;
+    const col=cleanerColor(c);
+    summaryHtml+=`<div class="histo-summary-card">
+      <div class="histo-avatar" style="background:${col}">${c[0]}</div>
+      <div><div class="histo-count" style="color:${col}">${counts[c]}</div><div class="histo-name">${c}</div></div>
+    </div>`;
+  }
+  summaryHtml+='</div>';
+  document.getElementById('histo-summary-wrap').innerHTML=summaryHtml;
+
+  // Par mois
+  const byMonth={};
+  for(const r of past){
+    const e=r.end;
+    const key=`${e.getFullYear()}-${String(e.getMonth()+1).padStart(2,'0')}`;
+    if(!byMonth[key]) byMonth[key]=[];
+    byMonth[key].push(r);
+  }
+  const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const sortedKeys=Object.keys(byMonth).sort().reverse();
+  let html='';
+  for(const key of sortedKeys){
+    const [yr,mo]=key.split('-');
+    const resas=byMonth[key].sort((a,b)=>a.end-b.end);
+    const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
+    html+=`<div class="histo-month">
+      <div class="histo-month-title">${MO[+mo-1]} ${yr} <span>${resas.length} départ(s)</span></div>
+      <div class="settings-card" style="padding:0;overflow:hidden">
+        <table class="histo-table">
+          <thead><tr><th>Date départ</th><th>Studio</th><th>Intervenante(s)</th><th>Note</th></tr></thead>
+          <tbody>${resas.map(r=>{
+            const {c1,c2,note}=getAssignment(r);
+            const names=[c1,c2].filter(Boolean);
+            const nameHtml=names.length
+              ? names.map(n=>`<span style="color:${cleanerColor(n)};font-weight:500">${n}</span>`).join(' + ')
+              : '<span style="color:#E24B4A">Non assigné</span>';
+            return `<tr>
+              <td>${fmt(r.end)}</td>
+              <td>${S.studioNames[r.studio]}</td>
+              <td>${nameHtml}</td>
+              <td style="color:#aaa">${note||'—'}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+  document.getElementById('histo-months-wrap').innerHTML=html;
+}
+
+window.exportCSV = function(){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const past=S.reservations
+    .filter(r=>new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate())<today)
+    .sort((a,b)=>a.end-b.end);
+  if(!past.length){ showToast('Aucun historique à exporter'); return; }
+  const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  let csv='Date départ;Studio;Arrivée;Intervenante 1;Intervenante 2;Note\n';
+  for(const r of past){
+    const {c1,c2,note}=getAssignment(r);
+    csv+=`${fmt(r.end)};${S.studioNames[r.studio]};${fmt(r.start)};${c1||''};${c2||''};${note||''}\n`;
+  }
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='historique-menage.csv'; a.click();
+  URL.revokeObjectURL(url);
+  showToast('Export CSV téléchargé ✓');
+};
 window.changeMonth = d=>{ if(d===0){S.currentMonth=new Date().getMonth();S.currentYear=new Date().getFullYear();}else{S.currentMonth+=d;if(S.currentMonth>11){S.currentMonth=0;S.currentYear++;}if(S.currentMonth<0){S.currentMonth=11;S.currentYear--;}} render(); };
 
 render();
