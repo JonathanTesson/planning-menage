@@ -449,27 +449,22 @@ function renderControls(){
     const isActive = S.filterCleaner===c;
     const style = isActive
       ? `background:${col};color:#fff;border-color:${col}`
-      : `border-color:${col}22;color:${col}`;
+      : `border-left:3px solid ${col};color:#555;padding-left:8px`;
     return `<button class="chip" style="${style}" onclick="window._sf('${c}')">${c}</button>`;
   }).join('');
 
-  const labelTypeStyle = !S.filterCleaner && S.filterType==='all'
-    ? 'background:#1a1a1a;color:#fff;border-color:#1a1a1a'
-    : 'background:none;color:#555;border-color:transparent';
-
-  const labelCleanerStyle = S.filterCleaner || S.filterType!=='all'
-    ? 'background:none;color:#aaa;border-color:transparent;cursor:pointer'
-    : 'background:#1a1a1a;color:#fff;border-color:#1a1a1a;cursor:pointer';
+  const afficherReset = !S.filterCleaner && S.filterType==='all';
+  const intervReset = !S.filterCleaner;
 
   document.getElementById('controls-row').innerHTML=`
     <div class="chip-group">
-      <button class="chip" style="${labelTypeStyle}" onclick="window._st('all');window._sf(null)">Afficher</button>
+      <button class="chip" style="${afficherReset?'background:#1a1a1a;color:#fff;border-color:#1a1a1a':'background:none;color:#aaa;border-color:transparent'}" onclick="window._st('all')">Afficher :</button>
       <button class="chip arr${S.filterType==='arr'?' active':''}" onclick="window._st('arr')">Arrivées</button>
       <button class="chip dep${S.filterType==='dep'?' active':''}" onclick="window._st('dep')">Départs</button>
     </div>
     <div class="divider"></div>
     <div class="chip-group">
-      <button class="chip" style="${S.filterCleaner?'background:none;color:#aaa;border-color:transparent':'background:#1a1a1a;color:#fff;border-color:#1a1a1a'}" onclick="window._sf(null);window._st('all')">Intervenante</button>
+      <button class="chip" style="${intervReset?'background:#1a1a1a;color:#fff;border-color:#1a1a1a':'background:none;color:#aaa;border-color:transparent'}" onclick="window._sf(null)">Intervenante :</button>
       ${cleanerChips}
     </div>`;
 }
