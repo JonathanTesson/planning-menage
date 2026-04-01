@@ -6,17 +6,6 @@ Application web de planning des interventions ménage pour 2 studios Airbnb, ave
 
 ---
 
-## Liens rapides
-
-| Lien | Description |
-|------|-------------|
-| [Calendrier (index.html)](https://jonathantesson.github.io/planning-menage/) | Interface principale — femmes de ménage |
-| [Administration (admin.html)](https://jonathantesson.github.io/planning-menage/admin.html) | Back-office — exports, stats, paramètres avancés |
-| [Firebase Console](https://console.firebase.google.com/project/planning-menage-18b09) | Base de données temps réel |
-| [GitHub Actions](https://github.com/JonathanTesson/planning-menage/actions) | Sync iCal automatique toutes les heures |
-
----
-
 ## Architecture du projet
 
 ```
@@ -59,28 +48,15 @@ planning-menage/
 ## Infrastructure technique
 
 ### Firebase Realtime Database
-**URL** : `https://planning-menage-18b09-default-rtdb.firebaseio.com`
-**Project ID** : `planning-menage-18b09`
+Base de données temps réel pour les réservations, assignations et configuration.
 
 Structure des données :
 ```
-/config
-  cleaners: ["Steffie", "Emmy", "Valérie", "Myrtille", "Pikpik"]
-  studioNames: ["Studio 1", "Studio 2"]
-
-/reservations
-  {uid}: { uid, summary, start, end, studio }
-
-/assignments
-  {uid}: { c1, c2, note }
-
-/adminConfig
-  pwdEnabled: false
-  pwdHash: "..."
-
-/lastSync
-  ts: "2026-04-01T..."
-  count: 116
+/config        → noms studios, liste intervenantes
+/reservations  → réservations Airbnb (conservées 24 mois)
+/assignments   → assignations intervenantes par réservation
+/adminConfig   → configuration back-office
+/lastSync      → date et stats de la dernière synchronisation
 ```
 
 ### GitHub Actions
@@ -90,8 +66,7 @@ Structure des données :
 - **Mode** : fusion (merge) — les réservations passées sont conservées 24 mois
 
 ### URLs iCal Airbnb
-- Studio 1 : `https://www.airbnb.fr/calendar/ical/23714051.ics?s=1c507a926f8f63d87b20fea875da704e`
-- Studio 2 : `https://www.airbnb.fr/calendar/ical/846411261288811527.ics?s=998c515b74309dda07f768a2083cf270`
+- Stockées dans `sync-ical.js` — à ne pas partager publiquement
 
 ### Sécurité
 - Accès restreint au domaine de production
@@ -104,7 +79,6 @@ Structure des données :
 
 | | Studio 1 | Studio 2 |
 |--|----------|----------|
-| ID Airbnb | 23714051 | 846411261288811527 |
 | Couleur calendrier | Bleu | Vert |
 
 *(Studio 3 en perspective — prévoir ajout URL iCal dans sync-ical.js et index.html)*
@@ -172,10 +146,8 @@ Projet : Planning Ménage Airbnb
 Version actuelle : 2.4.0
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
-Admin : https://jonathantesson.github.io/planning-menage/admin.html
-Firebase : planning-menage-18b09
 Fichiers principaux : index.html, admin.html, sync-ical.js
-README complet : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
+README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ```
 
 ### Pour modifier index.html ou admin.html
