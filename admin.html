@@ -98,35 +98,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
   <!-- ADMIN CONTENT -->
   <div id="admin-content" style="display:none">
 
-    <!-- Statistiques rapides -->
+    <!-- Statistiques + Export fusionnés -->
     <div class="section">
-      <h3><span>📊</span> Statistiques du mois en cours</h3>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+        <h3 style="margin-bottom:0"><span>📊</span> <span id="admin-month-title">...</span></h3>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button class="nav-btn" onclick="adminChangeMonth(-1)">&#8592;</button>
+          <button class="nav-btn" onclick="adminChangeMonth(0)" id="admin-month-btn" style="min-width:60px">Avril</button>
+          <button class="nav-btn" onclick="adminChangeMonth(1)">&#8594;</button>
+        </div>
+      </div>
       <div class="stat-grid" id="stat-grid">
         <div class="stat-card"><div class="stat-val" id="stat-total">—</div><div class="stat-lbl">Départs total</div></div>
         <div class="stat-card"><div class="stat-val" id="stat-assigned">—</div><div class="stat-lbl">Assignés</div></div>
         <div class="stat-card"><div class="stat-val" id="stat-missing">—</div><div class="stat-lbl">Non assignés</div></div>
       </div>
-      <div id="cleaner-stats"></div>
-    </div>
-
-    <!-- Rapports email -->
-    <div class="section">
-      <h3><span>📊</span> Export des interventions</h3>
-      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:1rem">
-        <div>
-          <div style="font-size:12px;color:#888;margin-bottom:6px;font-weight:500">Mois</div>
-          <select id="export-month" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;cursor:pointer">
-          </select>
-        </div>
-        <div>
-          <div style="font-size:12px;color:#888;margin-bottom:6px;font-weight:500">Année</div>
-          <select id="export-year" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;cursor:pointer">
-          </select>
-        </div>
+      <div id="cleaner-stats" style="margin-bottom:1rem"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-primary" onclick="exportSelected()">⬇ Exporter Excel</button>
         <button class="btn-secondary" onclick="exportCSV()">⬇ Historique complet</button>
       </div>
-      <div id="export-preview" style="display:none" class="report-preview"></div>
+      <div id="export-preview" style="display:none;margin-top:0.75rem" class="report-preview"></div>
     </div>
 
     <!-- Sécurité -->
@@ -196,14 +188,10 @@ let A = {
   studioNames: ['Studio 1','Studio 2'],
   assignments: {},
   reservations: [],
-  adminConfig: {
-    pwdEnabled: false,
-    pwdHash: '',
-    autoReport: false,
-    emails: [],
-    emailjsKey: ''
-  },
-  unlocked: false
+  adminConfig: { pwdEnabled: false, pwdHash: '' },
+  unlocked: false,
+  selectedMonth: new Date().getMonth(),
+  selectedYear: new Date().getFullYear()
 };
 
 function hashSimple(str){
@@ -286,49 +274,64 @@ window.logout = function(){
   document.getElementById('pwd-input').value='';
 };
 
-function renderAdminContent(){
+window.adminChangeMonth = function(dir){
+  if(dir===0){ A.selectedMonth=new Date().getMonth(); A.selectedYear=new Date().getFullYear(); }
+  else {
+    A.selectedMonth+=dir;
+    if(A.selectedMonth>11){A.selectedMonth=0;A.selectedYear++;}
+    if(A.selectedMonth<0){A.selectedMonth=11;A.selectedYear--;}
+  }
+  renderStats();
+};
+
+const MO_FR=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+function renderStats(){
+  const mo=A.selectedMonth, yr=A.selectedYear;
+  const label=`${MO_FR[mo]} ${yr}`;
+
+  // Mettre à jour le titre
+  const titleEl=document.getElementById('admin-month-title');
+  const btnEl=document.getElementById('admin-month-btn');
+  if(titleEl) titleEl.textContent=label;
+  if(btnEl) btnEl.textContent=MO_FR[mo];
+
   // Stats
-  const now=new Date(); now.setHours(0,0,0,0);
-  const mo=now.getMonth(), yr=now.getFullYear();
   const checkouts=A.reservations.filter(r=>{
     const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
-    return e.getMonth()===mo && e.getFullYear()===yr && e>=now;
+    return e.getMonth()===mo && e.getFullYear()===yr;
   });
   const assigned=checkouts.filter(r=>{ const {c1,c2}=getAssignment(r); return c1||c2; });
   document.getElementById('stat-total').textContent=checkouts.length;
   document.getElementById('stat-assigned').textContent=assigned.length;
   document.getElementById('stat-missing').textContent=checkouts.length-assigned.length;
 
-  // Stats par intervenante (mois en cours)
+  // Stats par intervenante
   const counts={};
-  const allCheckoutsMonth=A.reservations.filter(r=>{
-    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
-    return e.getMonth()===mo && e.getFullYear()===yr;
-  });
-  for(const r of allCheckoutsMonth){
+  for(const r of checkouts){
     const {c1,c2}=getAssignment(r);
     if(c1) counts[c1]=(counts[c1]||0)+1;
     if(c2) counts[c2]=(counts[c2]||0)+1;
   }
   document.getElementById('cleaner-stats').innerHTML=
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
     A.cleaners.filter(c=>counts[c]).map(c=>`
       <div style="display:flex;align-items:center;gap:6px;background:#f5f5f0;border-radius:8px;padding:5px 10px">
         <span style="width:8px;height:8px;border-radius:50%;background:${cleanerColor(c)};display:inline-block"></span>
         <span style="font-size:12px;font-weight:500">${c}</span>
         <span style="font-size:14px;font-weight:700;color:${cleanerColor(c)}">${counts[c]}</span>
       </div>`).join('')+
+    (Object.keys(counts).length?'':'<span style="font-size:12px;color:#aaa">Aucune intervention ce mois</span>')+
     '</div>';
 
-  // Config admin
-  document.getElementById('toggle-auto-report').checked=A.adminConfig.autoReport||false;
+  // Cacher l'aperçu si on change de mois
+  const prev=document.getElementById('export-preview');
+  if(prev) prev.style.display='none';
+}
+
+function renderAdminContent(){
+  renderStats();
   document.getElementById('toggle-pwd').checked=A.adminConfig.pwdEnabled||false;
-  document.getElementById('emailjs-key').value=A.adminConfig.emailjsKey||'';
-
-  // Sélecteurs de mois
-  populateMonthSelectors();
-
-  // Historique
   renderHisto();
 }
 
@@ -378,25 +381,9 @@ window.saveAdminConfig = function(){
     .catch(()=>showToast('Erreur de sauvegarde'));
 };
 
-function populateMonthSelectors(){
-  const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-  const now=new Date();
-  const moSel=document.getElementById('export-month');
-  const yrSel=document.getElementById('export-year');
-  if(!moSel||!yrSel) return;
-  moSel.innerHTML=MO.map((m,i)=>`<option value="${i}"${i===now.getMonth()?' selected':''}>${m}</option>`).join('');
-  // Années disponibles basées sur les réservations
-  const years=new Set(A.reservations.map(r=>r.end.getFullYear()));
-  years.add(now.getFullYear());
-  const sortedYears=[...years].sort((a,b)=>b-a);
-  yrSel.innerHTML=sortedYears.map(y=>`<option value="${y}"${y===now.getFullYear()?' selected':''}>${y}</option>`).join('');
-}
-
 window.exportSelected = function(){
-  const mo=parseInt(document.getElementById('export-month').value);
-  const yr=parseInt(document.getElementById('export-year').value);
-  const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-  const label=`${MO[mo]} ${yr}`;
+  const mo=A.selectedMonth, yr=A.selectedYear;
+  const label=`${MO_FR[mo]} ${yr}`;
   const resas=A.reservations.filter(r=>{
     const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
     return e.getMonth()===mo && e.getFullYear()===yr;
@@ -483,43 +470,6 @@ window.exportCSV = function(){
   showToast('Excel téléchargé ✓');
 };
 
-window.sendReportNow = function(period){
-  const today=new Date(); today.setHours(0,0,0,0);
-  let targetMonth, targetYear;
-  if(period==='last'){
-    const d=new Date(today.getFullYear(),today.getMonth()-1,1);
-    targetMonth=d.getMonth(); targetYear=d.getFullYear();
-  } else {
-    targetMonth=today.getMonth(); targetYear=today.getFullYear();
-  }
-  const resas=A.reservations.filter(r=>{
-    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
-    return e.getMonth()===targetMonth && e.getFullYear()===targetYear;
-  });
-  if(!resas.length){ showToast('Aucune réservation pour cette période'); return; }
-
-  const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-  const label=`${MO[targetMonth]} ${targetYear}`;
-
-  // Aperçu dans la page
-  const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
-  const counts={};
-  for(const r of resas){ const {c1,c2}=getAssignment(r); if(c1) counts[c1]=(counts[c1]||0)+1; if(c2) counts[c2]=(counts[c2]||0)+1; }
-  const recapLines=A.cleaners.filter(c=>counts[c]).map(c=>`  ${c} : ${counts[c]} intervention(s)`).join('\n');
-  const detailLines=resas.sort((a,b)=>a.end-b.end).map(r=>{
-    const {c1,c2}=getAssignment(r);
-    return `${fmt(r.end)} — ${A.studioNames[r.studio]} — ${[c1,c2].filter(Boolean).join(' + ')||'Non assigné'}`;
-  }).join('\n');
-
-  const previewEl=document.getElementById('report-preview');
-  previewEl.style.display='';
-  previewEl.textContent=`Rapport ${label}\n\nRécap :\n${recapLines}\n\nDétail :\n${detailLines}`;
-
-  // Téléchargement Excel
-  const wb = buildExcel(resas, label);
-  window.XLSX.writeFile(wb, `rapport-menage-${targetYear}-${String(targetMonth+1).padStart(2,'0')}.xlsx`);
-  showToast(`Rapport ${label} exporté ✓`);
-};
 </script>
 </body>
 </html>
