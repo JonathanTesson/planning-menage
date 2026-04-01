@@ -8,6 +8,9 @@ const ICAL_URLS = [
 
 const FIREBASE_DB_URL = 'https://planning-menage-18b09-default-rtdb.firebaseio.com';
 
+// Garde les réservations jusqu'à 24 mois dans le passé
+const HISTORY_MONTHS = 24;
+
 function fetchUrl(url, redirectCount = 0) {
   return new Promise((resolve, reject) => {
     if (redirectCount > 5) return reject(new Error('Too many redirects'));
@@ -51,48 +54,53 @@ function parseIcal(text, studioIndex) {
 async function getFirebaseToken() {
   const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
   const { private_key, client_email } = serviceAccount;
-
   const now = Math.floor(Date.now() / 1000);
   const payload = {
-    iss: client_email,
-    sub: client_email,
+    iss: client_email, sub: client_email,
     aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
+    iat: now, exp: now + 3600,
     scope: 'https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email'
   };
-
   const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const signingInput = `${header}.${body}`;
-
   const crypto = require('crypto');
   const sign = crypto.createSign('RSA-SHA256');
   sign.update(signingInput);
   const signature = sign.sign(private_key, 'base64url');
   const jwt = `${signingInput}.${signature}`;
-
   const tokenData = await new Promise((resolve, reject) => {
     const postData = `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`;
     const req = https.request({
-      hostname: 'oauth2.googleapis.com',
-      path: '/token',
-      method: 'POST',
+      hostname: 'oauth2.googleapis.com', path: '/token', method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': postData.length }
     }, res => {
-      let d = '';
-      res.on('data', c => d += c);
-      res.on('end', () => resolve(JSON.parse(d)));
+      let d = ''; res.on('data', c => d += c); res.on('end', () => resolve(JSON.parse(d)));
     });
-    req.on('error', reject);
-    req.write(postData);
-    req.end();
+    req.on('error', reject); req.write(postData); req.end();
   });
-
   return tokenData.access_token;
 }
 
-async function writeToFirebase(path, data, token) {
+async function firebaseGet(path, token) {
+  const url = new URL(`${FIREBASE_DB_URL}/${path}.json`);
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: url.hostname,
+      path: url.pathname + '?access_token=' + token,
+      method: 'GET'
+    }, res => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => {
+        if (res.statusCode === 200) resolve(d === 'null' ? null : JSON.parse(d));
+        else reject(new Error('Firebase GET error: ' + res.statusCode));
+      });
+    });
+    req.on('error', reject); req.end();
+  });
+}
+
+async function firebasePut(path, data, token) {
   const body = JSON.stringify(data);
   const url = new URL(`${FIREBASE_DB_URL}/${path}.json`);
   return new Promise((resolve, reject) => {
@@ -102,21 +110,18 @@ async function writeToFirebase(path, data, token) {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
     }, res => {
-      let d = '';
-      res.on('data', c => d += c);
+      let d = ''; res.on('data', c => d += c);
       res.on('end', () => {
         if (res.statusCode === 200) resolve(JSON.parse(d));
-        else reject(new Error('Firebase write error: ' + res.statusCode + ' ' + d));
+        else reject(new Error('Firebase PUT error: ' + res.statusCode + ' ' + d));
       });
     });
-    req.on('error', reject);
-    req.write(body);
-    req.end();
+    req.on('error', reject); req.write(body); req.end();
   });
 }
 
 async function main() {
-  console.log('🔄 Démarrage de la synchronisation iCal → Firebase...');
+  console.log('🔄 Démarrage de la synchronisation iCal → Firebase (mode fusion)...');
 
   let token;
   try {
@@ -127,26 +132,71 @@ async function main() {
     process.exit(1);
   }
 
-  const allReservations = [[], []];
+  // Charger les réservations existantes dans Firebase
+  let existing = {};
+  try {
+    const data = await firebaseGet('reservations', token);
+    existing = data || {};
+    console.log(`📦 ${Object.keys(existing).length} réservation(s) existante(s) dans Firebase`);
+  } catch (e) {
+    console.warn('⚠️ Impossible de lire les réservations existantes:', e.message);
+  }
+
+  // Calculer la date limite de conservation (24 mois en arrière)
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - HISTORY_MONTHS);
+  const cutoffStr = cutoff.toISOString().split('T')[0];
+  console.log(`📅 Conservation des réservations depuis : ${cutoffStr}`);
+
+  // Filtrer les existantes — garder uniquement celles dans la fenêtre d'historique
+  const merged = {};
+  let keptOld = 0;
+  for (const [uid, r] of Object.entries(existing)) {
+    if (r.end >= cutoffStr) {
+      merged[uid] = r;
+      keptOld++;
+    }
+  }
+  console.log(`♻️ ${keptOld} réservation(s) historiques conservées`);
+
+  // Charger et parser les nouveaux iCal
+  let newCount = 0;
+  let updatedCount = 0;
   for (let i = 0; i < ICAL_URLS.length; i++) {
     try {
       console.log(`📅 Chargement Studio ${i + 1}...`);
       const text = await fetchUrl(ICAL_URLS[i]);
-      allReservations[i] = parseIcal(text, i);
-      console.log(`✅ Studio ${i + 1}: ${allReservations[i].length} réservation(s)`);
+      const resas = parseIcal(text, i);
+      for (const r of resas) {
+        if (merged[r.uid]) {
+          // Mise à jour des données Airbnb mais on preserve l'uid
+          const wasNew = !existing[r.uid];
+          merged[r.uid] = { ...merged[r.uid], ...r };
+          if (wasNew) newCount++; else updatedCount++;
+        } else {
+          merged[r.uid] = r;
+          newCount++;
+        }
+      }
+      console.log(`✅ Studio ${i + 1}: ${resas.length} réservation(s) depuis Airbnb`);
     } catch (e) {
       console.error(`❌ Studio ${i + 1} erreur:`, e.message);
     }
   }
 
-  const flat = [...allReservations[0], ...allReservations[1]];
-  const asObject = {};
-  for (const r of flat) asObject[r.uid] = r;
+  const total = Object.keys(merged).length;
+  console.log(`📊 Total après fusion : ${total} réservation(s) (${newCount} nouvelles, ${updatedCount} mises à jour)`);
 
+  // Écrire dans Firebase
   try {
-    await writeToFirebase('reservations', asObject, token);
-    await writeToFirebase('lastSync', { ts: new Date().toISOString(), count: flat.length }, token);
-    console.log(`✅ ${flat.length} réservation(s) écrites dans Firebase`);
+    await firebasePut('reservations', merged, token);
+    await firebasePut('lastSync', {
+      ts: new Date().toISOString(),
+      count: total,
+      newCount,
+      updatedCount
+    }, token);
+    console.log(`✅ Firebase mis à jour avec ${total} réservation(s)`);
     console.log('🎉 Synchronisation terminée !');
   } catch (e) {
     console.error('❌ Erreur écriture Firebase:', e.message);
