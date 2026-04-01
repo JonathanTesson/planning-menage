@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Administration — Planning Ménage</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f5f5f0;color:#1a1a1a;padding:0 0 2rem}
@@ -133,9 +134,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
         Les adresses email sont stockées dans Firebase uniquement — elles ne sont jamais visibles sur GitHub.
       </div>
       <div style="margin-top:1rem;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn-primary" onclick="sendReportNow('last')">📤 Envoyer rapport mois dernier</button>
-        <button class="btn-secondary" onclick="sendReportNow('current')">📤 Rapport mois en cours</button>
-        <button class="btn-secondary" onclick="exportCSV()">⬇ Exporter CSV complet</button>
+        <button class="btn-primary" onclick="sendReportNow('last')">📤 Rapport mois dernier (.xlsx)</button>
+        <button class="btn-secondary" onclick="sendReportNow('current')">📤 Rapport mois en cours (.xlsx)</button>
+        <button class="btn-secondary" onclick="exportCSV()">⬇ Historique complet (.xlsx)</button>
       </div>
       <div id="report-preview" style="display:none" class="report-preview"></div>
       <div class="info-box warn" style="margin-top:0.75rem">
@@ -438,28 +439,53 @@ window.changePwd = function(){
   document.getElementById('new-pwd2').value='';
 };
 
-function buildCSV(reservations){
-  const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
-  let csv='Date départ;Studio;Arrivée;Intervenante 1;Intervenante 2;Note\n';
-  const sorted=[...reservations].sort((a,b)=>b.end-a.end);
+function buildExcel(reservations, label){
+  const XLSX = window.XLSX;
+  const fmt = d => d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const sorted = [...reservations].sort((a,b)=>a.end-b.end);
+
+  // Onglet 1 — Détail
+  const detail = [['Date départ','Studio','Arrivée','Intervenante 1','Intervenante 2','Note']];
   for(const r of sorted){
     const {c1,c2,note}=getAssignment(r);
-    csv+=`${fmt(r.end)};${A.studioNames[r.studio]};${fmt(r.start)};${c1||''};${c2||''};${note||''}\n`;
+    detail.push([fmt(r.end), A.studioNames[r.studio], fmt(r.start), c1||'', c2||'', note||'']);
   }
-  return csv;
+
+  // Onglet 2 — Récap par intervenante
+  const counts={};
+  for(const r of sorted){
+    const {c1,c2}=getAssignment(r);
+    if(c1) counts[c1]=(counts[c1]||0)+1;
+    if(c2) counts[c2]=(counts[c2]||0)+1;
+  }
+  const recap = [['Intervenante','Nombre d\'interventions']];
+  for(const c of A.cleaners){
+    if(counts[c]) recap.push([c, counts[c]]);
+  }
+  recap.push(['','']);
+  recap.push(['Total interventions', Object.values(counts).reduce((a,b)=>a+b,0)]);
+  recap.push(['Période', label]);
+
+  const wb = XLSX.utils.book_new();
+
+  const ws1 = XLSX.utils.aoa_to_sheet(detail);
+  ws1['!cols']=[{wch:14},{wch:12},{wch:12},{wch:14},{wch:14},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Détail interventions');
+
+  const ws2 = XLSX.utils.aoa_to_sheet(recap);
+  ws2['!cols']=[{wch:18},{wch:24}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Récap par intervenante');
+
+  return wb;
 }
 
 window.exportCSV = function(){
   const today=new Date(); today.setHours(0,0,0,0);
   const past=A.reservations.filter(r=>new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate())<today);
   if(!past.length){ showToast('Aucun historique à exporter'); return; }
-  const csv=buildCSV(past);
-  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download='historique-menage.csv'; a.click();
-  URL.revokeObjectURL(url);
-  showToast('CSV téléchargé ✓');
+  const wb = buildExcel(past, 'Historique complet');
+  window.XLSX.writeFile(wb, 'historique-menage.xlsx');
+  showToast('Excel téléchargé ✓');
 };
 
 window.sendReportNow = function(period){
@@ -479,27 +505,24 @@ window.sendReportNow = function(period){
 
   const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   const label=`${MO[targetMonth]} ${targetYear}`;
-  const csv=buildCSV(resas);
 
   // Aperçu dans la page
   const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
-  const preview=resas.sort((a,b)=>a.end-b.end).map(r=>{
+  const counts={};
+  for(const r of resas){ const {c1,c2}=getAssignment(r); if(c1) counts[c1]=(counts[c1]||0)+1; if(c2) counts[c2]=(counts[c2]||0)+1; }
+  const recapLines=A.cleaners.filter(c=>counts[c]).map(c=>`  ${c} : ${counts[c]} intervention(s)`).join('\n');
+  const detailLines=resas.sort((a,b)=>a.end-b.end).map(r=>{
     const {c1,c2}=getAssignment(r);
-    const names=[c1,c2].filter(Boolean).join(' + ')||'Non assigné';
-    return `${fmt(r.end)} — ${A.studioNames[r.studio]} — ${names}`;
+    return `${fmt(r.end)} — ${A.studioNames[r.studio]} — ${[c1,c2].filter(Boolean).join(' + ')||'Non assigné'}`;
   }).join('\n');
 
   const previewEl=document.getElementById('report-preview');
   previewEl.style.display='';
-  previewEl.textContent=`Rapport ${label} :\n\n${preview}`;
+  previewEl.textContent=`Rapport ${label}\n\nRécap :\n${recapLines}\n\nDétail :\n${detailLines}`;
 
-  // Téléchargement CSV
-  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download=`rapport-menage-${targetYear}-${String(targetMonth+1).padStart(2,'0')}.csv`;
-  a.click(); URL.revokeObjectURL(url);
-
+  // Téléchargement Excel
+  const wb = buildExcel(resas, label);
+  window.XLSX.writeFile(wb, `rapport-menage-${targetYear}-${String(targetMonth+1).padStart(2,'0')}.xlsx`);
   showToast(`Rapport ${label} exporté ✓`);
 };
 </script>
