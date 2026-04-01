@@ -168,7 +168,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
         <button class="nav-btn" onclick="changeMonth(1)">&#8594;</button>
       </div>
     </div>
-    <button class="settings-btn" id="settings-btn" onclick="toggleSettings()" title="Paramètres">&#9881;</button>
+    <div style="display:flex;gap:6px">
+      <a href="admin.html" class="settings-btn" title="Administration">&#128274;</a>
+      <button class="settings-btn" id="settings-btn" onclick="toggleSettings()" title="Paramètres">&#9881;</button>
+    </div>
   </div>
 
   <div id="status-bar" class="status-bar"></div>
@@ -181,11 +184,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
   </div>
 
   <div id="view-settings" style="display:none">
-    <div class="settings-tabs">
-      <button class="settings-tab active" id="stab-params" onclick="switchSettingsTab('params')">Paramètres</button>
-      <button class="settings-tab" id="stab-histo" onclick="switchSettingsTab('histo')">Historique</button>
-    </div>
-    <div id="settings-params">
     <div class="settings-wrap">
       <div class="settings-card">
         <h4>Noms des studios</h4>
@@ -213,14 +211,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
         Les assignations sont synchronisées en temps réel via Firebase.<br><br>
         <span id="last-sync-info" style="color:#aaa"></span>
       </div>
-    </div>
-    </div><!-- end settings-params -->
-    <div id="settings-histo" style="display:none">
-      <div class="export-btns">
-        <button class="btn-primary" onclick="exportCSV()">⬇ Exporter CSV</button>
-      </div>
-      <div id="histo-summary-wrap"></div>
-      <div id="histo-months-wrap"></div>
     </div>
   </div>
 </div>
@@ -254,7 +244,7 @@ let S = {
   currentMonth: new Date().getMonth(),
   currentYear: new Date().getFullYear(),
   showSettings: false,
-  settingsTab: 'params',
+  filterCleaner: null,
   filterCleaner: null,
   filterType: 'dep',
   reservations: []
@@ -424,33 +414,28 @@ function renderKpi(){
   const lastDay=new Date(yr,mo+1,0);
   const today=new Date(); today.setHours(0,0,0,0);
 
-  // Tous les départs du mois affiché (à partir d'aujourd'hui si mois courant)
-  const checkoutsThisMonth=[];
-  for(const r of S.reservations){
+  // KPI 1 & 2 — basés sur le mois AFFICHÉ (départs restants)
+  const checkoutsThisMonth=S.reservations.filter(r=>{
     const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
-    if(e>=firstDay && e<=lastDay) checkoutsThisMonth.push(r);
-  }
-
-  // Départs restants (futurs ou aujourd'hui)
-  const remaining=checkoutsThisMonth.filter(r=>{
-    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
-    return e>=today;
+    return e>=firstDay && e<=lastDay && e>=today;
   });
-
-  const total=remaining.length;
-  const assigned=remaining.filter(r=>{ const {c1,c2}=getAssignment(r); return c1||c2; }).length;
+  const total=checkoutsThisMonth.length;
+  const assigned=checkoutsThisMonth.filter(r=>{ const {c1,c2}=getAssignment(r); return c1||c2; }).length;
   const unassigned=total-assigned;
 
-  // Couleur du KPI principal
   let scoreColor='green';
   if(total===0) scoreColor='green';
   else if(assigned===total) scoreColor='green';
   else if(assigned/total>=0.7) scoreColor='orange';
   else scoreColor='red';
 
-  // KPI 2 : prochain départ non assigné
-  const nextUnassigned=remaining
-    .filter(r=>{ const {c1,c2}=getAssignment(r); return !c1&&!c2; })
+  // KPI 3 — toujours basé sur AUJOURD'HUI, tous mois confondus
+  const nextUnassigned=S.reservations
+    .filter(r=>{
+      const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
+      const {c1,c2}=getAssignment(r);
+      return e>=today && !c1 && !c2;
+    })
     .sort((a,b)=>a.end-b.end)[0];
 
   let nextLabel='Aucun';
@@ -610,104 +595,8 @@ window._toggleType = t=>{
 window._rc = i=>{ if(!confirm('Supprimer '+S.cleaners[i]+' ?')) return; S.cleaners.splice(i,1); saveConfig(); renderSettings(); };
 window.addCleaner = ()=>{ const inp=document.getElementById('new-cleaner'),n=inp.value.trim(); if(!n||S.cleaners.includes(n)) return; S.cleaners.push(n); saveConfig(); renderSettings(); inp.value=''; showToast(n+' ajouté ✓'); };
 window.saveNames = ()=>{ S.studioNames[0]=document.getElementById('name-s1').value||'Studio 1'; S.studioNames[1]=document.getElementById('name-s2').value||'Studio 2'; saveConfig(); showToast('Noms enregistrés ✓'); render(); };
-window.toggleSettings = ()=>{ S.showSettings=!S.showSettings; if(S.showSettings) S.settingsTab='params'; render(); };
+window.toggleSettings = ()=>{ S.showSettings=!S.showSettings; render(); };
 
-window.switchSettingsTab = tab=>{
-  S.settingsTab=tab;
-  document.getElementById('settings-params').style.display=tab==='params'?'':'none';
-  document.getElementById('settings-histo').style.display=tab==='histo'?'':'none';
-  document.getElementById('stab-params').classList.toggle('active',tab==='params');
-  document.getElementById('stab-histo').classList.toggle('active',tab==='histo');
-  if(tab==='histo') renderHistorique();
-};
-
-function renderHistorique(){
-  const today=new Date(); today.setHours(0,0,0,0);
-  const past=S.reservations.filter(r=>new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate())<today);
-  if(!past.length){
-    document.getElementById('histo-summary-wrap').innerHTML='<p style="color:#aaa;font-size:13px;padding:1rem 0">Aucun historique disponible pour le moment.</p>';
-    document.getElementById('histo-months-wrap').innerHTML='';
-    return;
-  }
-
-  // Résumé par intervenante
-  const counts={};
-  for(const r of past){
-    const {c1,c2}=getAssignment(r);
-    if(c1){ counts[c1]=(counts[c1]||0)+1; }
-    if(c2){ counts[c2]=(counts[c2]||0)+1; }
-  }
-  let summaryHtml='<div class="histo-summary">';
-  for(const c of S.cleaners){
-    if(!counts[c]) continue;
-    const col=cleanerColor(c);
-    summaryHtml+=`<div class="histo-summary-card">
-      <div class="histo-avatar" style="background:${col}">${c[0]}</div>
-      <div><div class="histo-count" style="color:${col}">${counts[c]}</div><div class="histo-name">${c}</div></div>
-    </div>`;
-  }
-  summaryHtml+='</div>';
-  document.getElementById('histo-summary-wrap').innerHTML=summaryHtml;
-
-  // Par mois
-  const byMonth={};
-  for(const r of past){
-    const e=r.end;
-    const key=`${e.getFullYear()}-${String(e.getMonth()+1).padStart(2,'0')}`;
-    if(!byMonth[key]) byMonth[key]=[];
-    byMonth[key].push(r);
-  }
-  const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-  const sortedKeys=Object.keys(byMonth).sort().reverse();
-  let html='';
-  for(const key of sortedKeys){
-    const [yr,mo]=key.split('-');
-    const resas=byMonth[key].sort((a,b)=>a.end-b.end);
-    const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
-    html+=`<div class="histo-month">
-      <div class="histo-month-title">${MO[+mo-1]} ${yr} <span>${resas.length} départ(s)</span></div>
-      <div class="settings-card" style="padding:0;overflow:hidden">
-        <table class="histo-table">
-          <thead><tr><th>Date départ</th><th>Studio</th><th>Intervenante(s)</th><th>Note</th></tr></thead>
-          <tbody>${resas.map(r=>{
-            const {c1,c2,note}=getAssignment(r);
-            const names=[c1,c2].filter(Boolean);
-            const nameHtml=names.length
-              ? names.map(n=>`<span style="color:${cleanerColor(n)};font-weight:500">${n}</span>`).join(' + ')
-              : '<span style="color:#E24B4A">Non assigné</span>';
-            return `<tr>
-              <td>${fmt(r.end)}</td>
-              <td>${S.studioNames[r.studio]}</td>
-              <td>${nameHtml}</td>
-              <td style="color:#aaa">${note||'—'}</td>
-            </tr>`;
-          }).join('')}</tbody>
-        </table>
-      </div>
-    </div>`;
-  }
-  document.getElementById('histo-months-wrap').innerHTML=html;
-}
-
-window.exportCSV = function(){
-  const today=new Date(); today.setHours(0,0,0,0);
-  const past=S.reservations
-    .filter(r=>new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate())<today)
-    .sort((a,b)=>a.end-b.end);
-  if(!past.length){ showToast('Aucun historique à exporter'); return; }
-  const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
-  let csv='Date départ;Studio;Arrivée;Intervenante 1;Intervenante 2;Note\n';
-  for(const r of past){
-    const {c1,c2,note}=getAssignment(r);
-    csv+=`${fmt(r.end)};${S.studioNames[r.studio]};${fmt(r.start)};${c1||''};${c2||''};${note||''}\n`;
-  }
-  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download='historique-menage.csv'; a.click();
-  URL.revokeObjectURL(url);
-  showToast('Export CSV téléchargé ✓');
-};
 window.changeMonth = d=>{ if(d===0){S.currentMonth=new Date().getMonth();S.currentYear=new Date().getFullYear();}else{S.currentMonth+=d;if(S.currentMonth>11){S.currentMonth=0;S.currentYear++;}if(S.currentMonth<0){S.currentMonth=11;S.currentYear--;}} render(); };
 
 render();
