@@ -94,9 +94,9 @@ Structure des données :
 - Studio 2 : `https://www.airbnb.fr/calendar/ical/846411261288811527.ics?s=998c515b74309dda07f768a2083cf270`
 
 ### Sécurité
-- Clé API Firebase restreinte au domaine `jonathantesson.github.io` (Google Cloud Console)
-- Règles Firebase : lecture/écriture publique (sécurisé par restriction de domaine)
-- Mot de passe admin stocké hashé dans Firebase (jamais dans le code)
+- Accès restreint au domaine de production
+- Authentification admin gérée côté Firebase
+- Aucune donnée sensible dans le code source
 
 ---
 
