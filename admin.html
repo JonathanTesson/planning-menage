@@ -111,41 +111,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
     <!-- Rapports email -->
     <div class="section">
-      <h3><span>📧</span> Rapports par email</h3>
-      <div class="toggle-row">
+      <h3><span>📊</span> Export des interventions</h3>
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:1rem">
         <div>
-          <div class="toggle-label">Rapport automatique mensuel</div>
-          <div class="toggle-sub">Envoyé le 1er de chaque mois via GitHub Actions</div>
+          <div style="font-size:12px;color:#888;margin-bottom:6px;font-weight:500">Mois</div>
+          <select id="export-month" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;cursor:pointer">
+          </select>
         </div>
-        <label class="toggle">
-          <input type="checkbox" id="toggle-auto-report" onchange="saveAdminConfig()">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-      <div style="margin-top:1rem">
-        <div style="font-size:12px;font-weight:500;color:#555;margin-bottom:8px">Destinataires du rapport</div>
-        <div id="email-list"></div>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <input type="email" id="new-email" placeholder="adresse@email.com" style="flex:1;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px">
-          <button class="btn-primary" onclick="addEmail()">Ajouter</button>
+        <div>
+          <div style="font-size:12px;color:#888;margin-bottom:6px;font-weight:500">Année</div>
+          <select id="export-year" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;cursor:pointer">
+          </select>
         </div>
+        <button class="btn-primary" onclick="exportSelected()">⬇ Exporter Excel</button>
+        <button class="btn-secondary" onclick="exportCSV()">⬇ Historique complet</button>
       </div>
-      <div class="info-box" style="margin-top:1rem">
-        Les adresses email sont stockées dans Firebase uniquement — elles ne sont jamais visibles sur GitHub.
-      </div>
-      <div style="margin-top:1rem;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn-primary" onclick="sendReportNow('last')">📤 Rapport mois dernier (.xlsx)</button>
-        <button class="btn-secondary" onclick="sendReportNow('current')">📤 Rapport mois en cours (.xlsx)</button>
-        <button class="btn-secondary" onclick="exportCSV()">⬇ Historique complet (.xlsx)</button>
-      </div>
-      <div id="report-preview" style="display:none" class="report-preview"></div>
-      <div class="info-box warn" style="margin-top:0.75rem">
-        L'envoi d'email nécessite de configurer EmailJS. <strong>Clé publique EmailJS :</strong>
-        <div style="margin-top:4px">
-          <input type="text" id="emailjs-key" placeholder="Votre clé publique EmailJS" style="width:100%;padding:6px 10px;border:1px solid #fac775;border-radius:6px;font-size:12px;margin-top:4px" onchange="saveAdminConfig()">
-        </div>
-        <a href="https://www.emailjs.com" target="_blank" style="color:#7a4a00;font-size:11px">→ Créer un compte EmailJS gratuit (200 emails/mois)</a>
-      </div>
+      <div id="export-preview" style="display:none" class="report-preview"></div>
     </div>
 
     <!-- Sécurité -->
@@ -344,20 +325,11 @@ function renderAdminContent(){
   document.getElementById('toggle-pwd').checked=A.adminConfig.pwdEnabled||false;
   document.getElementById('emailjs-key').value=A.adminConfig.emailjsKey||'';
 
-  // Emails
-  renderEmails();
+  // Sélecteurs de mois
+  populateMonthSelectors();
 
   // Historique
   renderHisto();
-}
-
-function renderEmails(){
-  const emails=A.adminConfig.emails||[];
-  document.getElementById('email-list').innerHTML=emails.map((e,i)=>`
-    <div class="email-item">
-      <input type="email" value="${e}" onchange="A.adminConfig.emails[${i}]=this.value">
-      <button class="btn-danger" onclick="removeEmail(${i})">Suppr.</button>
-    </div>`).join('');
 }
 
 function renderHisto(){
@@ -399,31 +371,54 @@ function renderHisto(){
   document.getElementById('histo-content').innerHTML=html;
 }
 
-window.addEmail = function(){
-  const inp=document.getElementById('new-email');
-  const e=inp.value.trim();
-  if(!e||!e.includes('@')) return;
-  if(!A.adminConfig.emails) A.adminConfig.emails=[];
-  A.adminConfig.emails.push(e);
-  inp.value='';
-  saveAdminConfig();
-  renderEmails();
-  showToast('Email ajouté ✓');
-};
-
-window.removeEmail = function(i){
-  A.adminConfig.emails.splice(i,1);
-  saveAdminConfig();
-  renderEmails();
-};
-
 window.saveAdminConfig = function(){
-  A.adminConfig.autoReport=document.getElementById('toggle-auto-report').checked;
   A.adminConfig.pwdEnabled=document.getElementById('toggle-pwd').checked;
-  A.adminConfig.emailjsKey=document.getElementById('emailjs-key').value;
   set(ref(db,'adminConfig'), A.adminConfig)
     .then(()=>showToast('Paramètres sauvegardés ✓'))
     .catch(()=>showToast('Erreur de sauvegarde'));
+};
+
+function populateMonthSelectors(){
+  const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const now=new Date();
+  const moSel=document.getElementById('export-month');
+  const yrSel=document.getElementById('export-year');
+  if(!moSel||!yrSel) return;
+  moSel.innerHTML=MO.map((m,i)=>`<option value="${i}"${i===now.getMonth()?' selected':''}>${m}</option>`).join('');
+  // Années disponibles basées sur les réservations
+  const years=new Set(A.reservations.map(r=>r.end.getFullYear()));
+  years.add(now.getFullYear());
+  const sortedYears=[...years].sort((a,b)=>b-a);
+  yrSel.innerHTML=sortedYears.map(y=>`<option value="${y}"${y===now.getFullYear()?' selected':''}>${y}</option>`).join('');
+}
+
+window.exportSelected = function(){
+  const mo=parseInt(document.getElementById('export-month').value);
+  const yr=parseInt(document.getElementById('export-year').value);
+  const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const label=`${MO[mo]} ${yr}`;
+  const resas=A.reservations.filter(r=>{
+    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
+    return e.getMonth()===mo && e.getFullYear()===yr;
+  });
+  if(!resas.length){ showToast(`Aucune intervention en ${label}`); return; }
+
+  // Aperçu
+  const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
+  const counts={};
+  for(const r of resas){ const {c1,c2}=getAssignment(r); if(c1) counts[c1]=(counts[c1]||0)+1; if(c2) counts[c2]=(counts[c2]||0)+1; }
+  const recapLines=A.cleaners.filter(c=>counts[c]).map(c=>`  ${c} : ${counts[c]} intervention(s)`).join('\n');
+  const detailLines=resas.sort((a,b)=>a.end-b.end).map(r=>{
+    const {c1,c2}=getAssignment(r);
+    return `${fmt(r.end)} — ${A.studioNames[r.studio]} — ${[c1,c2].filter(Boolean).join(' + ')||'Non assigné'}`;
+  }).join('\n');
+  const prev=document.getElementById('export-preview');
+  prev.style.display='';
+  prev.textContent=`${label} — ${resas.length} intervention(s)\n\nRécap :\n${recapLines}\n\nDétail :\n${detailLines}`;
+
+  const wb=buildExcel(resas,label);
+  window.XLSX.writeFile(wb,`rapport-menage-${yr}-${String(mo+1).padStart(2,'0')}.xlsx`);
+  showToast(`${label} exporté ✓`);
 };
 
 window.changePwd = function(){
