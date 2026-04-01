@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administration — Planning Ménage</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f5f5f0;color:#1a1a1a;padding:0 0 2rem}
+.topbar{background:#fff;border-bottom:1px solid #e0e0d8;padding:0.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar-title{font-size:16px;font-weight:600}
+.topbar-sub{font-size:12px;color:#888;margin-top:1px}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;margin-right:5px}
+.sync-dot.ok{background:#1D9E75}
+.back-btn{font-size:12px;color:#555;text-decoration:none;display:flex;align-items:center;gap:4px;padding:6px 12px;border:1px solid #ddd;border-radius:8px;background:#fff}
+.back-btn:hover{background:#f5f5f0}
+.container{max-width:680px;margin:0 auto;padding:1.25rem 1rem}
+
+/* Lock screen */
+.lock-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:1rem}
+.lock-icon{font-size:48px;margin-bottom:0.5rem}
+.lock-title{font-size:18px;font-weight:600}
+.lock-sub{font-size:13px;color:#888;text-align:center}
+.lock-input{width:100%;max-width:280px;padding:10px 14px;border:1px solid #ddd;border-radius:10px;font-size:16px;text-align:center;letter-spacing:4px}
+.lock-input:focus{outline:none;border-color:#378ADD}
+.lock-error{color:#E24B4A;font-size:12px}
+.btn-primary{background:#1a1a1a;color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500}
+.btn-primary:hover{background:#333}
+.btn-secondary{background:#fff;color:#555;border:1px solid #ddd;padding:8px 20px;border-radius:8px;cursor:pointer;font-size:13px}
+.btn-secondary:hover{background:#f5f5f0}
+.btn-danger{background:#fff;color:#a32d2d;border:1px solid #f0c0c0;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px}
+.btn-danger:hover{background:#fde8e8}
+
+/* Admin content */
+.section{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
+.section h3{font-size:14px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+.section h3 span{font-size:16px}
+.field-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.field-row label{font-size:12px;color:#888;width:120px;flex-shrink:0}
+.field-row input[type=text],.field-row input[type=email],.field-row input[type=password]{flex:1;min-width:180px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
+.field-row input:focus{outline:none;border-color:#378ADD}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0eb}
+.toggle-row:last-child{border-bottom:none}
+.toggle-label{font-size:13px;color:#333}
+.toggle-sub{font-size:11px;color:#aaa;margin-top:2px}
+.toggle{position:relative;width:44px;height:24px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:#ddd;border-radius:24px;cursor:pointer;transition:0.2s}
+.toggle-slider:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:0.2s}
+.toggle input:checked+.toggle-slider{background:#1D9E75}
+.toggle input:checked+.toggle-slider:before{transform:translateX(20px)}
+.email-item{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.email-item input{flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a}
+.info-box{background:#f0f7ff;border:1px solid #b5d4f4;border-radius:8px;padding:0.75rem;font-size:12px;color:#185FA5;line-height:1.7;margin-top:0.75rem}
+.info-box.warn{background:#fff9e6;border-color:#fac775;color:#7a4a00}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem}
+.stat-card{background:#f5f5f0;border-radius:10px;padding:0.75rem;text-align:center}
+.stat-val{font-size:22px;font-weight:700;color:#1a1a1a}
+.stat-lbl{font-size:10px;color:#aaa;margin-top:2px}
+.report-preview{background:#f5f5f0;border-radius:8px;padding:0.75rem;font-size:12px;color:#555;line-height:1.8;margin-top:0.75rem;max-height:200px;overflow-y:auto}
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+.histo-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:0.5rem}
+.histo-table th{text-align:left;padding:5px 8px;color:#aaa;font-weight:500;border-bottom:1px solid #e8e8e2;font-size:11px}
+.histo-table td{padding:5px 8px;border-bottom:1px solid #f0f0eb;color:#555}
+.histo-table tr:last-child td{border-bottom:none}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="topbar-title">Administration</div>
+    <div class="topbar-sub">Planning Ménage</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#aaa">
+      <span class="sync-dot" id="sync-dot"></span>
+      <span id="sync-label">...</span>
+    </div>
+    <a href="index.html" class="back-btn">← Calendrier</a>
+  </div>
+</div>
+
+<div class="container">
+  <!-- LOCK SCREEN -->
+  <div id="lock-screen" class="lock-screen">
+    <div class="lock-icon">🔐</div>
+    <div class="lock-title">Espace administration</div>
+    <div class="lock-sub">Entrez le mot de passe pour accéder<br>aux paramètres avancés</div>
+    <input type="password" class="lock-input" id="pwd-input" placeholder="••••••" onkeydown="if(event.key==='Enter')checkPwd()">
+    <div class="lock-error" id="pwd-error" style="display:none">Mot de passe incorrect</div>
+    <button class="btn-primary" onclick="checkPwd()">Accéder</button>
+    <div id="no-pwd-hint" style="font-size:11px;color:#aaa;text-align:center;margin-top:0.5rem"></div>
+  </div>
+
+  <!-- ADMIN CONTENT -->
+  <div id="admin-content" style="display:none">
+
+    <!-- Statistiques rapides -->
+    <div class="section">
+      <h3><span>📊</span> Statistiques du mois en cours</h3>
+      <div class="stat-grid" id="stat-grid">
+        <div class="stat-card"><div class="stat-val" id="stat-total">—</div><div class="stat-lbl">Départs total</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-assigned">—</div><div class="stat-lbl">Assignés</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-missing">—</div><div class="stat-lbl">Non assignés</div></div>
+      </div>
+      <div id="cleaner-stats"></div>
+    </div>
+
+    <!-- Rapports email -->
+    <div class="section">
+      <h3><span>📧</span> Rapports par email</h3>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Rapport automatique mensuel</div>
+          <div class="toggle-sub">Envoyé le 1er de chaque mois via GitHub Actions</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-auto-report" onchange="saveAdminConfig()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div style="margin-top:1rem">
+        <div style="font-size:12px;font-weight:500;color:#555;margin-bottom:8px">Destinataires du rapport</div>
+        <div id="email-list"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input type="email" id="new-email" placeholder="adresse@email.com" style="flex:1;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px">
+          <button class="btn-primary" onclick="addEmail()">Ajouter</button>
+        </div>
+      </div>
+      <div class="info-box" style="margin-top:1rem">
+        Les adresses email sont stockées dans Firebase uniquement — elles ne sont jamais visibles sur GitHub.
+      </div>
+      <div style="margin-top:1rem;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-primary" onclick="sendReportNow('last')">📤 Envoyer rapport mois dernier</button>
+        <button class="btn-secondary" onclick="sendReportNow('current')">📤 Rapport mois en cours</button>
+        <button class="btn-secondary" onclick="exportCSV()">⬇ Exporter CSV complet</button>
+      </div>
+      <div id="report-preview" style="display:none" class="report-preview"></div>
+      <div class="info-box warn" style="margin-top:0.75rem">
+        L'envoi d'email nécessite de configurer EmailJS. <strong>Clé publique EmailJS :</strong>
+        <div style="margin-top:4px">
+          <input type="text" id="emailjs-key" placeholder="Votre clé publique EmailJS" style="width:100%;padding:6px 10px;border:1px solid #fac775;border-radius:6px;font-size:12px;margin-top:4px" onchange="saveAdminConfig()">
+        </div>
+        <a href="https://www.emailjs.com" target="_blank" style="color:#7a4a00;font-size:11px">→ Créer un compte EmailJS gratuit (200 emails/mois)</a>
+      </div>
+    </div>
+
+    <!-- Sécurité -->
+    <div class="section">
+      <h3><span>🔒</span> Sécurité</h3>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Protection par mot de passe</div>
+          <div class="toggle-sub">Désactiver pour les tests, activer en production</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-pwd" onchange="saveAdminConfig()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div style="margin-top:1rem" id="pwd-change-section">
+        <div class="field-row">
+          <label>Nouveau mot de passe</label>
+          <input type="password" id="new-pwd" placeholder="Minimum 4 caractères">
+        </div>
+        <div class="field-row">
+          <label>Confirmer</label>
+          <input type="password" id="new-pwd2" placeholder="Répéter le mot de passe">
+        </div>
+        <div style="margin-top:8px">
+          <button class="btn-primary" onclick="changePwd()">Changer le mot de passe</button>
+        </div>
+        <div id="pwd-msg" style="font-size:12px;margin-top:8px"></div>
+      </div>
+    </div>
+
+    <!-- Historique -->
+    <div class="section">
+      <h3><span>📋</span> Historique des interventions</h3>
+      <div id="histo-content">Chargement...</div>
+    </div>
+
+    <div style="text-align:center;margin-top:1.5rem">
+      <button class="btn-secondary" onclick="logout()">Se déconnecter</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, set, onValue, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
+  authDomain: "planning-menage-18b09.firebaseapp.com",
+  databaseURL: "https://planning-menage-18b09-default-rtdb.firebaseio.com",
+  projectId: "planning-menage-18b09",
+  storageBucket: "planning-menage-18b09.firebasestorage.app",
+  messagingSenderId: "685094108459",
+  appId: "1:685094108459:web:b90ec9f136de34d699996e"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A6E','#c0392b'];
+
+let A = {
+  cleaners: [],
+  studioNames: ['Studio 1','Studio 2'],
+  assignments: {},
+  reservations: [],
+  adminConfig: {
+    pwdEnabled: false,
+    pwdHash: '',
+    autoReport: false,
+    emails: [],
+    emailjsKey: ''
+  },
+  unlocked: false
+};
+
+function hashSimple(str){
+  let h=0;
+  for(let i=0;i<str.length;i++) h=((h<<5)-h)+str.charCodeAt(i), h|=0;
+  return h.toString(36);
+}
+
+function setSyncStatus(s){
+  document.getElementById('sync-dot').className='sync-dot '+(s==='ok'?'ok':'');
+  document.getElementById('sync-label').textContent=s==='ok'?'Connecté':'Connexion...';
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg;
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+const cleanerColor = n => { const i=A.cleaners.indexOf(n); return i>=0?CLEANER_COLORS[i%CLEANER_COLORS.length]:'#aaa'; };
+
+function getAssignment(r){
+  const a=A.assignments[r.uid];
+  if(!a) return {c1:null,c2:null,note:''};
+  if(typeof a==='string') return {c1:a,c2:null,note:''};
+  return {c1:a.cleaner||a.c1||null, c2:a.c2||null, note:a.note||''};
+}
+
+// Chargement Firebase
+onValue(ref(db,'config'), snap=>{
+  const d=snap.val();
+  if(d){ A.cleaners=d.cleaners||[]; A.studioNames=d.studioNames||A.studioNames; }
+  setSyncStatus('ok');
+  if(A.unlocked) renderAdminContent();
+});
+
+onValue(ref(db,'assignments'), snap=>{ A.assignments=snap.val()||{}; if(A.unlocked) renderAdminContent(); });
+
+onValue(ref(db,'reservations'), snap=>{
+  const data=snap.val()||{};
+  A.reservations=Object.values(data).map(r=>({...r,start:new Date(r.start),end:new Date(r.end)}));
+  if(A.unlocked) renderAdminContent();
+});
+
+onValue(ref(db,'adminConfig'), snap=>{
+  const d=snap.val();
+  if(d) A.adminConfig={...A.adminConfig,...d};
+  checkLock();
+});
+
+function checkLock(){
+  if(!A.adminConfig.pwdEnabled){
+    // Pas de mot de passe requis
+    document.getElementById('no-pwd-hint').textContent='Protection par mot de passe désactivée — accès direct';
+    // Auto-unlock si pas de mdp
+    unlock();
+  }
+}
+
+window.checkPwd = function(){
+  const val=document.getElementById('pwd-input').value;
+  if(!A.adminConfig.pwdEnabled || hashSimple(val)===A.adminConfig.pwdHash){
+    unlock();
+  } else {
+    document.getElementById('pwd-error').style.display='';
+    document.getElementById('pwd-input').value='';
+  }
+};
+
+function unlock(){
+  A.unlocked=true;
+  document.getElementById('lock-screen').style.display='none';
+  document.getElementById('admin-content').style.display='';
+  renderAdminContent();
+}
+
+window.logout = function(){
+  A.unlocked=false;
+  document.getElementById('lock-screen').style.display='flex';
+  document.getElementById('admin-content').style.display='none';
+  document.getElementById('pwd-input').value='';
+};
+
+function renderAdminContent(){
+  // Stats
+  const now=new Date(); now.setHours(0,0,0,0);
+  const mo=now.getMonth(), yr=now.getFullYear();
+  const checkouts=A.reservations.filter(r=>{
+    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
+    return e.getMonth()===mo && e.getFullYear()===yr && e>=now;
+  });
+  const assigned=checkouts.filter(r=>{ const {c1,c2}=getAssignment(r); return c1||c2; });
+  document.getElementById('stat-total').textContent=checkouts.length;
+  document.getElementById('stat-assigned').textContent=assigned.length;
+  document.getElementById('stat-missing').textContent=checkouts.length-assigned.length;
+
+  // Stats par intervenante (mois en cours)
+  const counts={};
+  const allCheckoutsMonth=A.reservations.filter(r=>{
+    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
+    return e.getMonth()===mo && e.getFullYear()===yr;
+  });
+  for(const r of allCheckoutsMonth){
+    const {c1,c2}=getAssignment(r);
+    if(c1) counts[c1]=(counts[c1]||0)+1;
+    if(c2) counts[c2]=(counts[c2]||0)+1;
+  }
+  document.getElementById('cleaner-stats').innerHTML=
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'+
+    A.cleaners.filter(c=>counts[c]).map(c=>`
+      <div style="display:flex;align-items:center;gap:6px;background:#f5f5f0;border-radius:8px;padding:5px 10px">
+        <span style="width:8px;height:8px;border-radius:50%;background:${cleanerColor(c)};display:inline-block"></span>
+        <span style="font-size:12px;font-weight:500">${c}</span>
+        <span style="font-size:14px;font-weight:700;color:${cleanerColor(c)}">${counts[c]}</span>
+      </div>`).join('')+
+    '</div>';
+
+  // Config admin
+  document.getElementById('toggle-auto-report').checked=A.adminConfig.autoReport||false;
+  document.getElementById('toggle-pwd').checked=A.adminConfig.pwdEnabled||false;
+  document.getElementById('emailjs-key').value=A.adminConfig.emailjsKey||'';
+
+  // Emails
+  renderEmails();
+
+  // Historique
+  renderHisto();
+}
+
+function renderEmails(){
+  const emails=A.adminConfig.emails||[];
+  document.getElementById('email-list').innerHTML=emails.map((e,i)=>`
+    <div class="email-item">
+      <input type="email" value="${e}" onchange="A.adminConfig.emails[${i}]=this.value">
+      <button class="btn-danger" onclick="removeEmail(${i})">Suppr.</button>
+    </div>`).join('');
+}
+
+function renderHisto(){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const past=A.reservations.filter(r=>new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate())<today)
+    .sort((a,b)=>b.end-a.end);
+  if(!past.length){
+    document.getElementById('histo-content').innerHTML='<p style="color:#aaa;font-size:13px">Aucun historique disponible. Les interventions passées apparaîtront ici.</p>';
+    return;
+  }
+  const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const MO=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  // Grouper par mois
+  const byMonth={};
+  for(const r of past){
+    const key=`${r.end.getFullYear()}-${r.end.getMonth()}`;
+    if(!byMonth[key]) byMonth[key]={label:`${MO[r.end.getMonth()]} ${r.end.getFullYear()}`,resas:[]};
+    byMonth[key].resas.push(r);
+  }
+  let html='';
+  for(const k of Object.keys(byMonth)){
+    const {label,resas}=byMonth[k];
+    html+=`<div style="margin-bottom:1rem">
+      <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:6px">${label} — ${resas.length} départ(s)</div>
+      <table class="histo-table">
+        <thead><tr><th>Date</th><th>Studio</th><th>Intervenante(s)</th></tr></thead>
+        <tbody>${resas.map(r=>{
+          const {c1,c2}=getAssignment(r);
+          const names=[c1,c2].filter(Boolean);
+          return `<tr>
+            <td>${fmt(r.end)}</td>
+            <td>${A.studioNames[r.studio]}</td>
+            <td>${names.length?names.map(n=>`<span style="color:${cleanerColor(n)};font-weight:500">${n}</span>`).join(' + '):'<span style="color:#E24B4A">Non assigné</span>'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`;
+  }
+  document.getElementById('histo-content').innerHTML=html;
+}
+
+window.addEmail = function(){
+  const inp=document.getElementById('new-email');
+  const e=inp.value.trim();
+  if(!e||!e.includes('@')) return;
+  if(!A.adminConfig.emails) A.adminConfig.emails=[];
+  A.adminConfig.emails.push(e);
+  inp.value='';
+  saveAdminConfig();
+  renderEmails();
+  showToast('Email ajouté ✓');
+};
+
+window.removeEmail = function(i){
+  A.adminConfig.emails.splice(i,1);
+  saveAdminConfig();
+  renderEmails();
+};
+
+window.saveAdminConfig = function(){
+  A.adminConfig.autoReport=document.getElementById('toggle-auto-report').checked;
+  A.adminConfig.pwdEnabled=document.getElementById('toggle-pwd').checked;
+  A.adminConfig.emailjsKey=document.getElementById('emailjs-key').value;
+  set(ref(db,'adminConfig'), A.adminConfig)
+    .then(()=>showToast('Paramètres sauvegardés ✓'))
+    .catch(()=>showToast('Erreur de sauvegarde'));
+};
+
+window.changePwd = function(){
+  const p1=document.getElementById('new-pwd').value;
+  const p2=document.getElementById('new-pwd2').value;
+  const msg=document.getElementById('pwd-msg');
+  if(p1.length<4){ msg.style.color='#E24B4A'; msg.textContent='Minimum 4 caractères'; return; }
+  if(p1!==p2){ msg.style.color='#E24B4A'; msg.textContent='Les mots de passe ne correspondent pas'; return; }
+  A.adminConfig.pwdHash=hashSimple(p1);
+  saveAdminConfig();
+  msg.style.color='#1D9E75'; msg.textContent='Mot de passe changé ✓';
+  document.getElementById('new-pwd').value='';
+  document.getElementById('new-pwd2').value='';
+};
+
+function buildCSV(reservations){
+  const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  let csv='Date départ;Studio;Arrivée;Intervenante 1;Intervenante 2;Note\n';
+  const sorted=[...reservations].sort((a,b)=>b.end-a.end);
+  for(const r of sorted){
+    const {c1,c2,note}=getAssignment(r);
+    csv+=`${fmt(r.end)};${A.studioNames[r.studio]};${fmt(r.start)};${c1||''};${c2||''};${note||''}\n`;
+  }
+  return csv;
+}
+
+window.exportCSV = function(){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const past=A.reservations.filter(r=>new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate())<today);
+  if(!past.length){ showToast('Aucun historique à exporter'); return; }
+  const csv=buildCSV(past);
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='historique-menage.csv'; a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV téléchargé ✓');
+};
+
+window.sendReportNow = function(period){
+  const today=new Date(); today.setHours(0,0,0,0);
+  let targetMonth, targetYear;
+  if(period==='last'){
+    const d=new Date(today.getFullYear(),today.getMonth()-1,1);
+    targetMonth=d.getMonth(); targetYear=d.getFullYear();
+  } else {
+    targetMonth=today.getMonth(); targetYear=today.getFullYear();
+  }
+  const resas=A.reservations.filter(r=>{
+    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
+    return e.getMonth()===targetMonth && e.getFullYear()===targetYear;
+  });
+  if(!resas.length){ showToast('Aucune réservation pour cette période'); return; }
+
+  const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const label=`${MO[targetMonth]} ${targetYear}`;
+  const csv=buildCSV(resas);
+
+  // Aperçu dans la page
+  const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
+  const preview=resas.sort((a,b)=>a.end-b.end).map(r=>{
+    const {c1,c2}=getAssignment(r);
+    const names=[c1,c2].filter(Boolean).join(' + ')||'Non assigné';
+    return `${fmt(r.end)} — ${A.studioNames[r.studio]} — ${names}`;
+  }).join('\n');
+
+  const previewEl=document.getElementById('report-preview');
+  previewEl.style.display='';
+  previewEl.textContent=`Rapport ${label} :\n\n${preview}`;
+
+  // Téléchargement CSV
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`rapport-menage-${targetYear}-${String(targetMonth+1).padStart(2,'0')}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+
+  showToast(`Rapport ${label} exporté ✓`);
+};
+</script>
+</body>
+</html>
