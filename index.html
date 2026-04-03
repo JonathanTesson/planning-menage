@@ -344,10 +344,14 @@ function showToast(msg){
 function fbSet(path,data){ set(ref(db,path),data).then(()=>setSyncStatus('ok')).catch(()=>setSyncStatus('err')); }
 
 function checkReady(){
-  if(Object.values(loaded).every(Boolean) && !fbReady){
+  // On affiche dès que les données essentielles sont là
+  const essentialLoaded = loaded.config && loaded.assignments && loaded.reservations;
+  if(essentialLoaded && !fbReady){
     fbReady=true;
     setStatus('');
     checkAuth();
+  } else if(fbReady){
+    render();
   }
 }
 
@@ -374,11 +378,18 @@ onValue(ref(db,'reservations'), snap=>{
 onValue(ref(db,'adminConfig'), snap=>{
   const d=snap.val();
   if(d) S.adminConfig={...S.adminConfig,...d, accounts:d.accounts||[]};
-  // Même si null, on considère chargé
   loaded.adminConfig=true;
-  fbReady?render():checkReady();
+  if(!fbReady){
+    checkReady();
+  } else {
+    // adminConfig chargé après → re-vérifier auth si auth activée
+    if(S.adminConfig.authEnabled && S.currentUser?.noAuth){
+      checkAuth();
+    } else {
+      render();
+    }
+  }
 }, ()=>{
-  // Erreur → on considère quand même chargé sans auth
   loaded.adminConfig=true;
   fbReady?render():checkReady();
 });
