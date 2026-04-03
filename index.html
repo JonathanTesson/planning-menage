@@ -274,31 +274,34 @@ function checkAuth(){
   showLogin();
 }
 
-function showLogin(){
-  document.getElementById('login-screen').style.display='';
-  document.getElementById('main-app').style.display='none';
-  // Remplir la liste des comptes
-  const accounts=S.adminConfig.accounts||[];
-  const sel=document.getElementById('login-name');
-  sel.innerHTML='<option value="">— Choisissez votre nom —</option>'+
-    accounts.map(a=>`<option value="${a.name}">${a.name}</option>`).join('');
-}
+function el(id){ return document.getElementById(id); }
 
 function showApp(){
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('main-app').style.display='';
+  if(el('login-screen')) el('login-screen').style.display='none';
+  if(el('main-app')) el('main-app').style.display='';
   const noAuth=S.currentUser?.noAuth;
-  document.getElementById('logout-btn').style.display=noAuth?'none':'';
-  const badge=document.getElementById('current-user-badge');
-  if(!noAuth && S.currentUser?.name){
-    badge.textContent=S.currentUser.name;
-    badge.style.display='';
-  } else {
-    badge.style.display='none';
+  if(el('logout-btn')) el('logout-btn').style.display=noAuth?'none':'';
+  const badge=el('current-user-badge');
+  if(badge){
+    if(!noAuth && S.currentUser?.name){
+      badge.textContent=S.currentUser.name;
+      badge.style.display='';
+    } else {
+      badge.style.display='none';
+    }
   }
   const isAdmin=!S.currentUser||S.currentUser.noAuth||S.currentUser.admin;
-  document.getElementById('admin-link').style.display=isAdmin?'':'none';
+  if(el('admin-link')) el('admin-link').style.display=isAdmin?'':'none';
   render();
+}
+
+function showLogin(){
+  if(el('login-screen')) el('login-screen').style.display='';
+  if(el('main-app')) el('main-app').style.display='none';
+  const accounts=S.adminConfig.accounts||[];
+  const sel=el('login-name');
+  if(sel) sel.innerHTML='<option value="">— Choisissez votre nom —</option>'+
+    accounts.map(a=>`<option value="${a.name}">${a.name}</option>`).join('');
 }
 
 window.doLogin = function(){
