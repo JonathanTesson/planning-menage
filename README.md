@@ -1,8 +1,18 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 2.4.0** — Avril 2026
+**Version : 3.0.0** — Avril 2026
 
-Application web de planning des interventions ménage pour 2 studios Airbnb, avec synchronisation temps réel Firebase et export Excel.
+Application web de planning des interventions ménage pour 2 studios Airbnb, avec authentification par rôle, synchronisation temps réel Firebase, notifications Telegram et export Excel.
+
+---
+
+## Liens
+
+| Lien | Description |
+|------|-------------|
+| [Calendrier](https://jonathantesson.github.io/planning-menage/) | Interface principale |
+| [Administration](https://jonathantesson.github.io/planning-menage/admin.html) | Back-office (accès protégé) |
+| [GitHub Actions](https://github.com/JonathanTesson/planning-menage/actions) | Sync automatique + notifications |
 
 ---
 
@@ -10,13 +20,14 @@ Application web de planning des interventions ménage pour 2 studios Airbnb, ave
 
 ```
 planning-menage/
-├── index.html          → Calendrier principal (femmes de ménage + admin)
-├── admin.html          → Back-office (exports Excel, stats, mot de passe)
-├── sync-ical.js        → Script Node.js : fetch iCal Airbnb → Firebase
-├── .github/
-│   └── workflows/
-│       └── sync-ical.yml   → GitHub Actions : sync toutes les heures
-└── README.md           → Ce fichier
+├── index.html           → Calendrier principal
+├── admin.html           → Back-office administration
+├── sync-ical.js         → Sync iCal Airbnb → Firebase (toutes les heures)
+├── notify-departs.js    → Notifications Telegram départs du jour (10h00)
+├── .github/workflows/
+│   ├── sync-ical.yml        → Cron toutes les heures
+│   └── notify-departs.yml   → Cron tous les jours à 10h (8h UTC)
+└── README.md
 ```
 
 ---
@@ -24,54 +35,133 @@ planning-menage/
 ## Fonctionnalités
 
 ### index.html — Calendrier
-- Vue mensuelle avec navigation ← Mois →
-- **4 KPIs** en haut : départs assignés/total, non assignés restants, prochain départ sans intervenante (toujours calculé depuis aujourd'hui), filtres Arrivées/Départs
-- **Filtre par intervenante** avec couleur individuelle
-- **Assignation** de 1 ou 2 intervenantes par réservation + note
-- **Points de statut** sur les jours de départ : rouge = non assigné, orange = partiel
-- Bouton 🔒 → admin.html
-- Bouton ⚙ → Paramètres (noms studios, liste intervenantes)
-- Synchronisation temps réel Firebase
+
+**Authentification**
+- Toggle global dans admin.html : activée ou désactivée
+- Si désactivée : accès direct, tout le monde est admin
+- Si activée : écran de connexion (nom + mot de passe)
+- Session stockée en localStorage (pas besoin de se reconnecter)
+- Bouton "Déco." visible quand connecté
+
+**Rôles**
+- 🧹 Ménage : voit le calendrier, voit tous les noms assignés, peut s'assigner/se retirer sur les départs uniquement (pas sur les arrivées)
+- 👑 Admin : voit tout, assigne n'importe qui, accès au 🔒 back-office
+- Les deux rôles sont cumulables
+
+**Calendrier**
+- Vue mensuelle navigation ← Auj. →
+- Filtre 👥 par intervenante (visible par tous les rôles)
+- Blocs bleu = arrivée Studio 1, vert = arrivée Studio 2, orange = départ
+- Points de statut sur les jours de départ : 🔴 non assigné, 🟠 partiel, rien = tout assigné
+- Arrivées cliquables uniquement pour les admins
+
+**4 KPIs en haut**
+- Départs assignés/total du mois affiché
+- Non assignés restants
+- Prochain départ sans intervenante (toujours calculé depuis aujourd'hui, tous mois confondus)
+- Filtre Arrivées/Départs (par défaut : Départs uniquement)
+
+**Assignation**
+- Admin : 2 intervenantes par réservation + note
+- Ménage : bouton "+" pour s'assigner, "✕ Me retirer" pour se retirer
 
 ### admin.html — Back-office
-- Accès protégé par mot de passe (optionnel, toggle on/off)
-- **Statistiques** du mois sélectionné (← Mois →) : total départs, assignés, non assignés, détail par intervenante
-- **Export Excel (.xlsx)** du mois sélectionné avec 2 onglets :
-  - Onglet 1 : Détail interventions (date, studio, arrivée, intervenante 1, intervenante 2, note)
-  - Onglet 2 : Récap par intervenante (nombre d'interventions, total, période)
-- **Historique complet** : export de toutes les réservations passées
-- Historique des interventions passées par mois
-- Gestion mot de passe admin
+
+Accès protégé par mot de passe admin (indépendant de l'auth utilisateurs).
+
+**Statistiques**
+- Sélecteur de mois ← Avril →
+- Total départs, assignés, non assignés
+- Détail par intervenante avec couleur
+
+**Export Excel**
+- Sélection du mois → fichier .xlsx avec 2 onglets :
+  - Détail interventions (date, studio, arrivée, intervenante 1, intervenante 2, note)
+  - Récap par intervenante (nombre d'interventions, total, période)
+- Historique complet (tous les mois passés)
+
+**Gestion des comptes**
+- Toggle "Activer authentification" global
+- Chaque compte : prénom + mot de passe + rôle 🧹 et/ou 👑
+- Ajout/suppression/modification des comptes
+- Les comptes 🧹 apparaissent automatiquement dans les listes du calendrier
+
+**Studios**
+- Renommer Studio 1 et Studio 2
+
+**Sécurité admin**
+- Mot de passe séparé pour accéder à admin.html
+- Toggle pour activer/désactiver la protection
+
+**Historique**
+- Liste des interventions passées par mois
+- Conservé 24 mois dans Firebase
+
+**Légende & Sync**
+- Explication des points de couleur
+- Date de dernière synchronisation Airbnb
+
+### sync-ical.js — Synchronisation iCal
+
+- Tourne toutes les heures via GitHub Actions
+- Récupère les iCal Airbnb des 2 studios
+- **Mode fusion** : conserve les réservations passées 24 mois (ne les écrase pas)
+- Détecte les **nouvelles réservations** → notification Telegram
+- Détecte les **annulations** → notification Telegram avec nom(s) de l'intervenante prévue
+
+### notify-departs.js — Notifications départs
+
+- Tourne tous les jours à 10h (8h UTC = 10h heure française été)
+- Vérifie s'il y a des départs aujourd'hui dans Firebase
+- Envoie un message Telegram par départ :
+  - Studio concerné
+  - Prochaine arrivée (dans X jours)
+  - Intervenante(s) assignée(s)
+  - Note éventuelle
+  - ⚠️ Si aucune intervenante assignée
 
 ---
 
 ## Infrastructure technique
 
 ### Firebase Realtime Database
-Base de données temps réel pour les réservations, assignations et configuration.
-
 Structure des données :
 ```
-/config        → noms studios, liste intervenantes
-/reservations  → réservations Airbnb (conservées 24 mois)
-/assignments   → assignations intervenantes par réservation
-/adminConfig   → configuration back-office
-/lastSync      → date et stats de la dernière synchronisation
+/config
+  studioNames: ["Studio 1", "Studio 2"]
+  cleaners: ["Steffie", "Emmy", ...]   ← sync auto depuis adminConfig
+
+/reservations
+  {uid}: { uid, summary, start, end, studio }
+
+/assignments
+  {uid}: { c1, c2, note }
+
+/adminConfig
+  authEnabled: false
+  accounts: [{ name, pwdHash, menage, admin }]
+  pwdEnabled: false
+  pwdHash: "..."
+
+/lastSync
+  ts: "2026-04-03T..."
+  count: 116
+  notifications: 0
 ```
 
-### GitHub Actions
-- **Déclencheur** : toutes les heures (cron `0 * * * *`) + manuel
-- **Script** : `sync-ical.js` (Node.js 20)
-- **Secret requis** : `FIREBASE_SERVICE_ACCOUNT` (clé JSON compte de service Firebase)
-- **Mode** : fusion (merge) — les réservations passées sont conservées 24 mois
+### GitHub Actions — Secrets requis
+- `FIREBASE_SERVICE_ACCOUNT` : clé JSON compte de service Firebase
+- `TELEGRAM_BOT_TOKEN` : token du bot @TessonLocationbot
 
-### URLs iCal Airbnb
-- Stockées dans `sync-ical.js` — à ne pas partager publiquement
+### Telegram
+- Bot : @TessonLocationbot
+- Groupe : chat_id `-1002590523626`
+- 2 types de notifications : nouvelles réservations/annulations (sync-ical.js) + départs du jour (notify-departs.js)
 
 ### Sécurité
-- Accès restreint au domaine de production
-- Authentification admin gérée côté Firebase
-- Aucune donnée sensible dans le code source
+- Accès restreint au domaine de production (Google Cloud Console)
+- Authentification admin gérée dans Firebase
+- Tokens et clés dans GitHub Secrets uniquement
 
 ---
 
@@ -81,102 +171,83 @@ Structure des données :
 |--|----------|----------|
 | Couleur calendrier | Bleu | Vert |
 
-*(Studio 3 en perspective — prévoir ajout URL iCal dans sync-ical.js et index.html)*
+*(Studio 3 en perspective — ajouter URL iCal dans sync-ical.js + adapter index.html)*
 
 ---
 
-## Intervenantes
+## Intervenantes (comptes)
 
-| Prénom | Couleur |
-|--------|---------|
-| Steffie | Bleu #378ADD |
-| Emmy | Vert #1D9E75 |
-| Valérie | Orange #D85A30 |
-| Myrtille | Violet #9F3DBF |
-| Pikpik | Ambre #C8860A |
+Gérés dans admin.html → section Comptes. Les rôles et mots de passe sont stockés dans Firebase.
+
+---
+
+## Améliorations prévues
+
+1. **Studio 3** — quand l'URL iCal sera disponible (10 min)
+2. **Code d'accès simple** sur index.html pour sécuriser même sans auth complète
+3. **Sécurisation Firebase** — règles plus strictes (actuellement ouvert, protégé par restriction de domaine)
+4. **Multi-onglets** — page d'accueil avec navigation vers d'autres modules (planning enfants, crèche, périscolaire...)
+5. **Application mobile native** — pour notifications push (chantier important)
+
+---
+
+## Comment reprendre le développement avec Claude
+
+Colle ce bloc au début d'une nouvelle conversation :
+
+```
+Projet : Planning Ménage Airbnb
+Version : 3.0.0
+GitHub : https://github.com/JonathanTesson/planning-menage
+App : https://jonathantesson.github.io/planning-menage/
+Admin : https://jonathantesson.github.io/planning-menage/admin.html
+Fichiers : index.html, admin.html, sync-ical.js, notify-departs.js
+README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
+```
+
+Claude peut lire le README directement depuis GitHub pour reprendre le contexte complet.
 
 ---
 
 ## Historique des versions
 
+### v3.0.0 — Avril 2026
+- Authentification par rôle (🧹 ménage / 👑 admin)
+- Session localStorage (pas de reconnexion à chaque page)
+- Vue ménage : voit tous les noms, s'assigne uniquement sur les départs
+- Gestion des comptes dans admin.html (remplace les paramètres de index.html)
+- Studios déplacés dans admin.html
+- Bouton ⚙ supprimé de index.html, légende/sync dans admin.html
+- Filtre intervenantes visible par tous les rôles
+
 ### v2.4.0 — Avril 2026
-- Bouton cadenas 🔒 vers admin.html dans l'en-tête
-- Suppression onglet Historique de index.html (déplacé dans admin.html)
-- KPI "Prochain départ sans intervenante" figé sur aujourd'hui (indépendant du mois affiché)
-- admin.html : sélecteur de mois avec flèches pour stats et export
-- Export Excel avec 2 onglets (détail + récap par intervenante)
+- Bouton 🔒 vers admin.html dans l'en-tête
+- KPI "Prochain départ" figé sur aujourd'hui
+- Export Excel avec 2 onglets (détail + récap)
+- Sélecteur de mois avec flèches dans admin.html
+- sync-ical.js v3 : notifications Telegram nouvelles réservations et annulations
+- notify-departs.js : notifications Telegram départs du jour à 10h
 
 ### v2.3.0 — Avril 2026
-- sync-ical.js v2 : mode fusion, conservation 24 mois d'historique
+- sync-ical.js v2 : mode fusion, conservation 24 mois
 - admin.html : back-office avec stats, export, historique, mot de passe
-- Suppression section email (inutile)
 
 ### v2.2.0 — Avril 2026
 - KPIs : 3 cartes métriques + carte filtre Arrivées/Départs
-- Emoji 👥 remplace "Intervenante" dans les filtres
-- Filtres indépendants (type et intervenante ne s'interfèrent plus)
-- Affichage par défaut : Départs uniquement
-
-### v2.1.0 — Avril 2026
-- Points de statut par jour (rouge/orange) sur les jours de départ
-- Suppression vues Liste et boutons Mois/Liste
-- Roue ⚙ = toggle paramètres
-- Légende déplacée en bas du calendrier
+- Points de statut rouge/orange sur les jours de départ
+- Filtre par défaut : Départs uniquement
 
 ### v2.0.0 — Mars 2026
-- Réservations stockées dans Firebase (plus de fetch iCal côté client)
+- Réservations stockées dans Firebase
 - GitHub Actions : sync automatique toutes les heures
-- Synchronisation temps réel Firebase pour tous les appareils
+- Synchronisation temps réel Firebase
 - 2 intervenantes par réservation
-- Filtres Arrivées/Départs + filtre par intervenante
 
 ### v1.0.0 — Mars 2026
-- Calendrier mensuel avec réservations Airbnb (2 studios)
-- Assignation d'une intervenante par réservation
-- Stockage local (localStorage) — non partagé
+- Calendrier mensuel avec réservations Airbnb
+- Stockage local (localStorage)
 - Hébergement GitHub Pages
 
 ---
 
-## Comment reprendre le développement
-
-### Contexte à donner à Claude dans une nouvelle conversation
-```
-Projet : Planning Ménage Airbnb
-Version actuelle : 2.4.0
-GitHub : https://github.com/JonathanTesson/planning-menage
-App : https://jonathantesson.github.io/planning-menage/
-Fichiers principaux : index.html, admin.html, sync-ical.js
-README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
-```
-
-### Pour modifier index.html ou admin.html
-1. Modifier sur GitHub (crayon ✏️) ou télécharger, modifier, uploader
-2. GitHub Pages se met à jour automatiquement en 1-2 minutes
-3. Vider le cache navigateur si nécessaire (Ctrl+Shift+R)
-
-### Pour modifier sync-ical.js
-1. Modifier sur GitHub
-2. Aller dans Actions → Sync iCal → Run workflow pour tester immédiatement
-
-### Pour ajouter Studio 3
-1. `sync-ical.js` : ajouter l'URL iCal dans le tableau `ICAL_URLS`
-2. `index.html` : ajouter Studio 3 dans `studioNames`, adapter les couleurs et la légende
-3. `admin.html` : rien à modifier (dynamique)
-
----
-
-## Dépendances externes
-
-| Service | Usage | Gratuit |
-|---------|-------|---------|
-| GitHub Pages | Hébergement HTML statique | ✅ |
-| GitHub Actions | Sync iCal toutes les heures | ✅ (2000 min/mois) |
-| Firebase Realtime Database | Stockage temps réel | ✅ (1 Go) |
-| allorigins.win | Proxy CORS pour iCal (ancien, plus utilisé) | ✅ |
-| SheetJS (xlsx@0.18.5) | Génération fichiers Excel | ✅ |
-| Firebase JS SDK 10.12.0 | Client Firebase | ✅ |
-
----
-
-*Développé avec Claude (Anthropic) — Conversation initiale : mars/avril 2026*
+*Développé avec Claude (Anthropic) — Mars/Avril 2026*
