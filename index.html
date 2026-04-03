@@ -253,15 +253,14 @@ function hashSimple(str){
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 function checkAuth(){
-  if(!S.adminConfig.authEnabled){
-    // Pas d'auth → accès direct
+  const authEnabled = S.adminConfig?.authEnabled || false;
+  if(!authEnabled){
     if(!S.currentUser){
       S.currentUser = { name:'', menage:true, admin:true, noAuth:true };
     }
     showApp();
     return;
   }
-  // Auth activée → vérifier session
   const session = loadSession();
   if(session){
     const acc = (S.adminConfig.accounts||[]).find(a=>a.name===session.name);
@@ -271,7 +270,6 @@ function checkAuth(){
       return;
     }
   }
-  // Pas de session valide → écran login
   S.currentUser = null;
   showLogin();
 }
@@ -289,10 +287,8 @@ function showLogin(){
 function showApp(){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('main-app').style.display='';
-  // Bouton déconnexion
   const noAuth=S.currentUser?.noAuth;
   document.getElementById('logout-btn').style.display=noAuth?'none':'';
-  // Badge utilisateur
   const badge=document.getElementById('current-user-badge');
   if(!noAuth && S.currentUser?.name){
     badge.textContent=S.currentUser.name;
@@ -300,10 +296,8 @@ function showApp(){
   } else {
     badge.style.display='none';
   }
-  // Bouton admin — uniquement admin
-  document.getElementById('admin-link').style.display=(!S.currentUser||S.currentUser.noAuth||S.currentUser.admin)?'':'none';
-  // Bouton settings supprimé — infos dans admin.html
-  document.getElementById('settings-btn').style.display='none';
+  const isAdmin=!S.currentUser||S.currentUser.noAuth||S.currentUser.admin;
+  document.getElementById('admin-link').style.display=isAdmin?'':'none';
   render();
 }
 
@@ -377,7 +371,13 @@ onValue(ref(db,'reservations'), snap=>{
 onValue(ref(db,'adminConfig'), snap=>{
   const d=snap.val();
   if(d) S.adminConfig={...S.adminConfig,...d, accounts:d.accounts||[]};
-  loaded.adminConfig=true; fbReady?render():checkReady();
+  // Même si null, on considère chargé
+  loaded.adminConfig=true;
+  fbReady?render():checkReady();
+}, ()=>{
+  // Erreur → on considère quand même chargé sans auth
+  loaded.adminConfig=true;
+  fbReady?render():checkReady();
 });
 
 onValue(ref(db,'lastSync'), snap=>{
