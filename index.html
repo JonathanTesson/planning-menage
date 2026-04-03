@@ -177,7 +177,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
       <span id="current-user-badge" style="font-size:11px;color:#888;display:none"></span>
       <button id="logout-btn" class="logout-btn" onclick="doLogout()" style="display:none">Déco.</button>
       <a href="admin.html" class="settings-btn" id="admin-link" style="display:none" title="Administration">&#128274;</a>
-      <button class="settings-btn" id="settings-btn" onclick="toggleSettings()" title="Paramètres" style="display:none">&#9881;</button>
     </div>
   </div>
 
@@ -188,23 +187,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
     <div class="controls-row" id="controls-row"></div>
     <div id="calendar-view"></div>
     <div class="legend" id="legend-bar"></div>
-  </div>
-
-  <div id="view-settings" style="display:none">
-    <div class="settings-wrap">
-      <div class="settings-card" style="font-size:12px;color:#999;line-height:1.8">
-        <h4 style="margin-bottom:8px;color:#1a1a1a">Légende des points</h4>
-        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:1rem">
-          <div style="display:flex;align-items:center;gap:8px"><span class="legend-pip" style="background:#E24B4A"></span><span>Rouge — aucune intervenante assignée</span></div>
-          <div style="display:flex;align-items:center;gap:8px"><span class="legend-pip" style="background:#F59E0B"></span><span>Orange — assignation partielle</span></div>
-          <div style="display:flex;align-items:center;gap:8px"><span class="legend-pip" style="background:#e0e0d8"></span><span>Aucun point — tous assignés</span></div>
-        </div>
-        <h4 style="margin-bottom:6px;color:#1a1a1a">Synchronisation</h4>
-        Réservations mises à jour <strong style="color:#555">toutes les heures</strong> via GitHub Actions.<br>
-        Assignations synchronisées en temps réel via Firebase.<br><br>
-        <span id="last-sync-info" style="color:#aaa"></span>
-      </div>
-    </div>
   </div>
 </div>
 </div>
@@ -314,10 +296,10 @@ function showApp(){
   } else {
     badge.style.display='none';
   }
-  // Bouton admin
-  document.getElementById('admin-link').style.display=(!S.currentUser||S.currentUser.admin)?'':'none';
-  // Bouton settings — uniquement admin
-  document.getElementById('settings-btn').style.display=(!S.currentUser||S.currentUser.admin)?'':'none';
+  // Bouton admin — uniquement admin
+  document.getElementById('admin-link').style.display=(!S.currentUser||S.currentUser.noAuth||S.currentUser.admin)?'':'none';
+  // Bouton settings supprimé — infos dans admin.html
+  document.getElementById('settings-btn').style.display='none';
   render();
 }
 
@@ -488,28 +470,18 @@ function renderKpi(){
 }
 
 function renderControls(){
-  const user=S.currentUser;
-  const isAdminOrNoAuth=!user||user.noAuth||user.admin;
-  let chips='';
-
-  if(isAdminOrNoAuth){
-    // Admin → liste déroulante de tous les ménage
-    const cleaners=S.adminConfig.accounts?S.adminConfig.accounts.filter(a=>a.menage).map(a=>a.name):S.cleaners;
-    chips=cleaners.map((c,i)=>{
-      const col=cleanerColor(c);
-      const isActive=S.filterCleaner===c;
-      const style=isActive?`background:${col};color:#fff;border-color:${col}`:`border-left:3px solid ${col};color:#555;padding-left:8px`;
-      return `<button class="chip" style="${style}" onclick="window._sf('${c}')">${c}</button>`;
-    }).join('');
-    document.getElementById('controls-row').innerHTML=`
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <button class="chip" style="${!S.filterCleaner?'background:#555;color:#fff;border-color:#555;font-size:14px':'background:none;color:#aaa;border-color:transparent;font-size:14px'}" onclick="window._sf(null)">👥</button>
-        ${chips}
-      </div>`;
-  } else {
-    // Ménage uniquement → pas de filtre, on cache
-    document.getElementById('controls-row').innerHTML='';
-  }
+  const cleaners=S.adminConfig.accounts?S.adminConfig.accounts.filter(a=>a.menage).map(a=>a.name):S.cleaners;
+  const chips=cleaners.map(c=>{
+    const col=cleanerColor(c);
+    const isActive=S.filterCleaner===c;
+    const style=isActive?`background:${col};color:#fff;border-color:${col}`:`border-left:3px solid ${col};color:#555;padding-left:8px`;
+    return `<button class="chip" style="${style}" onclick="window._sf('${c}')">${c}</button>`;
+  }).join('');
+  document.getElementById('controls-row').innerHTML=`
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <button class="chip" style="${!S.filterCleaner?'background:#555;color:#fff;border-color:#555;font-size:14px':'background:none;color:#aaa;border-color:transparent;font-size:14px'}" onclick="window._sf(null)">👥</button>
+      ${chips}
+    </div>`;
 }
 
 function renderCalendar(){
@@ -535,34 +507,32 @@ function renderCalendar(){
       if(showDep){
         for(const r of getCheckouts(d,si)){
           const {c1,c2}=getAssignment(r);
-          if(isAdminOrNoAuth && S.filterCleaner && c1!==S.filterCleaner && c2!==S.filterCleaner) continue;
-          if(!isAdminOrNoAuth && user?.menage){
-            // Vue ménage : on filtre sur soi uniquement si déjà assigné à quelqu'un d'autre
-          }
+          if(S.filterCleaner && c1!==S.filterCleaner && c2!==S.filterCleaner) continue;
           inner+=`<div class="resa-block checkout" onclick="window._oa('${getKey(r)}')" title="Départ — ${S.studioNames[si]}">Départ S${si+1}</div>`;
-          if(isAdminOrNoAuth){
-            if(c1||c2){
-              inner+=`<div class="assign-wrap">`;
-              if(c1) inner+=`<span class="assign-badge" style="color:${cleanerColor(c1)}">${c1}</span> `;
-              if(c2) inner+=`<span class="assign-badge" style="color:${cleanerColor(c2)}">${c2}</span>`;
-              inner+=`</div>`;
-            }
-          } else {
-            // Vue ménage : affiche uniquement si l'utilisateur est assigné
-            if(c1===user.name||c2===user.name){
-              inner+=`<div class="assign-wrap"><span class="assign-badge" style="color:${cleanerColor(user.name)}">✓ ${user.name}</span></div>`;
-            }
+          // Tout le monde voit les noms assignés
+          if(c1||c2){
+            inner+=`<div class="assign-wrap">`;
+            if(c1) inner+=`<span class="assign-badge" style="color:${cleanerColor(c1)}">${c1}</span> `;
+            if(c2) inner+=`<span class="assign-badge" style="color:${cleanerColor(c2)}">${c2}</span>`;
+            inner+=`</div>`;
           }
         }
       }
       if(showArr){
         for(const r of getResasForDay(d,si)){
-          if(isAdminOrNoAuth && S.filterCleaner){
+          if(S.filterCleaner){
             const {c1,c2}=getAssignment(r);
             if(c1!==S.filterCleaner && c2!==S.filterCleaner) continue;
           }
           const isStart=dayTime(d)===dayTime(r.start);
-          if(isStart) inner+=`<div class="resa-block s${si+1}" onclick="window._oa('${getKey(r)}')" title="${r.summary}">S${si+1}</div>`;
+          if(isStart){
+            // Arrivées : cliquables uniquement pour admin, lecture seule pour ménage
+            if(isAdminOrNoAuth){
+              inner+=`<div class="resa-block s${si+1}" onclick="window._oa('${getKey(r)}')" title="${r.summary}">S${si+1}</div>`;
+            } else {
+              inner+=`<div class="resa-block s${si+1}" title="${r.summary}" style="cursor:default">S${si+1}</div>`;
+            }
+          }
         }
       }
     }
@@ -595,19 +565,10 @@ function render(){
   const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   document.getElementById('month-title').textContent=MO[S.currentMonth]+' '+S.currentYear;
   document.getElementById('topbar-sub').textContent=S.studioNames.join(' · ');
-  document.getElementById('settings-btn') && document.getElementById('settings-btn').classList.toggle('active',S.showSettings);
-
-  if(S.showSettings){
-    document.getElementById('view-calendar').style.display='none';
-    document.getElementById('view-settings').style.display='';
-  } else {
-    document.getElementById('view-calendar').style.display='';
-    document.getElementById('view-settings').style.display='none';
-    renderKpi();
-    renderControls();
-    renderCalendar();
-    renderLegend();
-  }
+  renderKpi();
+  renderControls();
+  renderCalendar();
+  renderLegend();
 }
 
 // ─── Modal assignation ────────────────────────────────────────────────────────
@@ -722,7 +683,7 @@ window._toggleType=t=>{
   render();
 };
 
-window.toggleSettings=()=>{ S.showSettings=!S.showSettings; render(); };
+window.toggleSettings=()=>{}; // supprimé
 window.changeMonth=d=>{
   if(d===0){S.currentMonth=new Date().getMonth();S.currentYear=new Date().getFullYear();}
   else{S.currentMonth+=d;if(S.currentMonth>11){S.currentMonth=0;S.currentYear++;}if(S.currentMonth<0){S.currentMonth=11;S.currentYear--;}}
