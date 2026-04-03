@@ -15,56 +15,64 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .sync-dot.ok{background:#1D9E75}
 .back-btn{font-size:12px;color:#555;text-decoration:none;display:flex;align-items:center;gap:4px;padding:6px 12px;border:1px solid #ddd;border-radius:8px;background:#fff}
 .back-btn:hover{background:#f5f5f0}
-.container{max-width:680px;margin:0 auto;padding:1.25rem 1rem}
-
-/* Lock screen */
+.container{max-width:700px;margin:0 auto;padding:1.25rem 1rem}
 .lock-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:1rem}
-.lock-icon{font-size:48px;margin-bottom:0.5rem}
+.lock-icon{font-size:48px}
 .lock-title{font-size:18px;font-weight:600}
 .lock-sub{font-size:13px;color:#888;text-align:center}
 .lock-input{width:100%;max-width:280px;padding:10px 14px;border:1px solid #ddd;border-radius:10px;font-size:16px;text-align:center;letter-spacing:4px}
 .lock-input:focus{outline:none;border-color:#378ADD}
 .lock-error{color:#E24B4A;font-size:12px}
-.btn-primary{background:#1a1a1a;color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500}
+.btn-primary{background:#1a1a1a;color:#fff;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500}
 .btn-primary:hover{background:#333}
-.btn-secondary{background:#fff;color:#555;border:1px solid #ddd;padding:8px 20px;border-radius:8px;cursor:pointer;font-size:13px}
+.btn-secondary{background:#fff;color:#555;border:1px solid #ddd;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px}
 .btn-secondary:hover{background:#f5f5f0}
-.btn-danger{background:#fff;color:#a32d2d;border:1px solid #f0c0c0;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px}
+.btn-danger{background:#fff;color:#a32d2d;border:1px solid #f0c0c0;padding:5px 10px;border-radius:8px;cursor:pointer;font-size:12px}
 .btn-danger:hover{background:#fde8e8}
-
-/* Admin content */
+.btn-sm{padding:5px 10px;font-size:12px;border-radius:7px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#555}
+.btn-sm:hover{background:#f5f5f0}
 .section{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
 .section h3{font-size:14px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
-.section h3 span{font-size:16px}
-.field-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
-.field-row label{font-size:12px;color:#888;width:120px;flex-shrink:0}
-.field-row input[type=text],.field-row input[type=email],.field-row input[type=password]{flex:1;min-width:180px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
-.field-row input:focus{outline:none;border-color:#378ADD}
-.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0eb}
-.toggle-row:last-child{border-bottom:none}
-.toggle-label{font-size:13px;color:#333}
-.toggle-sub{font-size:11px;color:#aaa;margin-top:2px}
 .toggle{position:relative;width:44px;height:24px;flex-shrink:0}
 .toggle input{opacity:0;width:0;height:0}
 .toggle-slider{position:absolute;inset:0;background:#ddd;border-radius:24px;cursor:pointer;transition:0.2s}
 .toggle-slider:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:0.2s}
 .toggle input:checked+.toggle-slider{background:#1D9E75}
 .toggle input:checked+.toggle-slider:before{transform:translateX(20px)}
-.email-item{display:flex;gap:8px;align-items:center;margin-bottom:6px}
-.email-item input{flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a}
-.info-box{background:#f0f7ff;border:1px solid #b5d4f4;border-radius:8px;padding:0.75rem;font-size:12px;color:#185FA5;line-height:1.7;margin-top:0.75rem}
-.info-box.warn{background:#fff9e6;border-color:#fac775;color:#7a4a00}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0eb}
+.toggle-row:last-child{border-bottom:none}
+.toggle-label{font-size:13px;color:#333}
+.toggle-sub{font-size:11px;color:#aaa;margin-top:2px}
 .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem}
 .stat-card{background:#f5f5f0;border-radius:10px;padding:0.75rem;text-align:center}
 .stat-val{font-size:22px;font-weight:700;color:#1a1a1a}
 .stat-lbl{font-size:10px;color:#aaa;margin-top:2px}
 .report-preview{background:#f5f5f0;border-radius:8px;padding:0.75rem;font-size:12px;color:#555;line-height:1.8;margin-top:0.75rem;max-height:200px;overflow-y:auto}
-.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
-.toast.show{opacity:1}
+.nav-btn{background:#fff;border:1px solid #ddd;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:13px;color:#333}
+.nav-btn:hover{background:#f5f5f0}
 .histo-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:0.5rem}
 .histo-table th{text-align:left;padding:5px 8px;color:#aaa;font-weight:500;border-bottom:1px solid #e8e8e2;font-size:11px}
 .histo-table td{padding:5px 8px;border-bottom:1px solid #f0f0eb;color:#555}
 .histo-table tr:last-child td{border-bottom:none}
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+.field-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.field-row label{font-size:12px;color:#888;width:110px;flex-shrink:0}
+.field-row input[type=text],.field-row input[type=password]{flex:1;min-width:160px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
+.field-row input:focus{outline:none;border-color:#378ADD}
+
+/* Comptes */
+.account-row{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid #f5f5f0;flex-wrap:nowrap}
+.account-row:last-child{border-bottom:none}
+.account-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.account-name{font-size:13px;font-weight:500;min-width:70px}
+.account-pwd{flex:1;min-width:80px;max-width:120px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:#fff;color:#1a1a1a}
+.account-role{display:flex;align-items:center;gap:3px;font-size:16px;cursor:pointer;padding:4px 6px;border-radius:6px;border:1px solid transparent;user-select:none}
+.account-role:hover{background:#f5f5f0}
+.account-role.active{border-color:#ddd;background:#f0f0eb}
+.add-account-row{display:flex;gap:6px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.add-account-row input{padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
+.auth-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem}
 </style>
 </head>
 <body>
@@ -88,27 +96,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
   <div id="lock-screen" class="lock-screen">
     <div class="lock-icon">🔐</div>
     <div class="lock-title">Espace administration</div>
-    <div class="lock-sub">Entrez le mot de passe pour accéder<br>aux paramètres avancés</div>
+    <div class="lock-sub">Entrez le mot de passe admin<br>pour accéder aux paramètres</div>
     <input type="password" class="lock-input" id="pwd-input" placeholder="••••••" onkeydown="if(event.key==='Enter')checkPwd()">
     <div class="lock-error" id="pwd-error" style="display:none">Mot de passe incorrect</div>
     <button class="btn-primary" onclick="checkPwd()">Accéder</button>
-    <div id="no-pwd-hint" style="font-size:11px;color:#aaa;text-align:center;margin-top:0.5rem"></div>
+    <div id="no-pwd-hint" style="font-size:11px;color:#aaa;margin-top:0.5rem"></div>
   </div>
 
   <!-- ADMIN CONTENT -->
   <div id="admin-content" style="display:none">
 
-    <!-- Statistiques + Export fusionnés -->
+    <!-- Statistiques + Export -->
     <div class="section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
         <h3 style="margin-bottom:0"><span>📊</span> <span id="admin-month-title">...</span></h3>
         <div style="display:flex;align-items:center;gap:6px">
           <button class="nav-btn" onclick="adminChangeMonth(-1)">&#8592;</button>
-          <button class="nav-btn" onclick="adminChangeMonth(0)" id="admin-month-btn" style="min-width:60px">Avril</button>
+          <button class="nav-btn" onclick="adminChangeMonth(0)" id="admin-month-btn" style="min-width:55px">...</button>
           <button class="nav-btn" onclick="adminChangeMonth(1)">&#8594;</button>
         </div>
       </div>
-      <div class="stat-grid" id="stat-grid">
+      <div class="stat-grid">
         <div class="stat-card"><div class="stat-val" id="stat-total">—</div><div class="stat-lbl">Départs total</div></div>
         <div class="stat-card"><div class="stat-val" id="stat-assigned">—</div><div class="stat-lbl">Assignés</div></div>
         <div class="stat-card"><div class="stat-val" id="stat-missing">—</div><div class="stat-lbl">Non assignés</div></div>
@@ -116,37 +124,75 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
       <div id="cleaner-stats" style="margin-bottom:1rem"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-primary" onclick="exportSelected()">⬇ Exporter Excel</button>
-        <button class="btn-secondary" onclick="exportCSV()">⬇ Historique complet</button>
+        <button class="btn-secondary" onclick="exportAll()">⬇ Historique complet</button>
       </div>
       <div id="export-preview" style="display:none;margin-top:0.75rem" class="report-preview"></div>
     </div>
 
-    <!-- Sécurité -->
+    <!-- Comptes & Authentification -->
     <div class="section">
-      <h3><span>🔒</span> Sécurité</h3>
-      <div class="toggle-row">
+      <div class="auth-header">
+        <h3 style="margin-bottom:0"><span>👥</span> Comptes</h3>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:12px;color:#888">Activer authentification</span>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-auth" onchange="saveAdminConfig()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:0.75rem">
+        🧹 = peut faire le ménage &nbsp;|&nbsp; 👑 = administrateur
+      </div>
+      <div id="accounts-list"></div>
+      <div class="add-account-row">
+        <input type="text" id="new-name" placeholder="Prénom..." style="width:110px">
+        <input type="password" id="new-pwd-acc" placeholder="Mot de passe..." style="flex:1;min-width:100px">
+        <button class="btn-primary" onclick="addAccount()">Ajouter</button>
+      </div>
+    </div>
+
+    <!-- Studios -->
+    <div class="section">
+      <h3><span>🏠</span> Studios</h3>
+      <div class="field-row">
+        <label>Studio 1</label>
+        <input type="text" id="name-s1">
+      </div>
+      <div class="field-row">
+        <label>Studio 2</label>
+        <input type="text" id="name-s2">
+      </div>
+      <div style="margin-top:10px">
+        <button class="btn-primary" onclick="saveNames()">Enregistrer</button>
+      </div>
+    </div>
+
+    <!-- Sécurité admin -->
+    <div class="section">
+      <h3><span>🔒</span> Mot de passe administration</h3>
+      <div style="font-size:12px;color:#aaa;margin-bottom:0.75rem">Mot de passe pour accéder à cette page admin</div>
+      <div class="field-row">
+        <label>Nouveau</label>
+        <input type="password" id="new-admin-pwd" placeholder="Minimum 4 caractères">
+      </div>
+      <div class="field-row">
+        <label>Confirmer</label>
+        <input type="password" id="new-admin-pwd2" placeholder="Répéter...">
+      </div>
+      <div style="margin-top:8px;display:flex;align-items:center;gap:12px">
+        <button class="btn-primary" onclick="changeAdminPwd()">Changer</button>
+        <div id="pwd-msg" style="font-size:12px"></div>
+      </div>
+      <div class="toggle-row" style="margin-top:1rem">
         <div>
-          <div class="toggle-label">Protection par mot de passe</div>
-          <div class="toggle-sub">Désactiver pour les tests, activer en production</div>
+          <div class="toggle-label">Protection active</div>
+          <div class="toggle-sub">Désactiver pour les tests</div>
         </div>
         <label class="toggle">
           <input type="checkbox" id="toggle-pwd" onchange="saveAdminConfig()">
           <span class="toggle-slider"></span>
         </label>
-      </div>
-      <div style="margin-top:1rem" id="pwd-change-section">
-        <div class="field-row">
-          <label>Nouveau mot de passe</label>
-          <input type="password" id="new-pwd" placeholder="Minimum 4 caractères">
-        </div>
-        <div class="field-row">
-          <label>Confirmer</label>
-          <input type="password" id="new-pwd2" placeholder="Répéter le mot de passe">
-        </div>
-        <div style="margin-top:8px">
-          <button class="btn-primary" onclick="changePwd()">Changer le mot de passe</button>
-        </div>
-        <div id="pwd-msg" style="font-size:12px;margin-top:8px"></div>
       </div>
     </div>
 
@@ -166,7 +212,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
@@ -180,15 +226,14 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-
 const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A6E','#c0392b'];
+const MO_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 
 let A = {
-  cleaners: [],
   studioNames: ['Studio 1','Studio 2'],
   assignments: {},
   reservations: [],
-  adminConfig: { pwdEnabled: false, pwdHash: '' },
+  adminConfig: { pwdEnabled: false, pwdHash: '', authEnabled: false, accounts: [] },
   unlocked: false,
   selectedMonth: new Date().getMonth(),
   selectedYear: new Date().getFullYear()
@@ -196,7 +241,7 @@ let A = {
 
 function hashSimple(str){
   let h=0;
-  for(let i=0;i<str.length;i++) h=((h<<5)-h)+str.charCodeAt(i), h|=0;
+  for(let i=0;i<str.length;i++) h=((h<<5)-h)+str.charCodeAt(i),h|=0;
   return h.toString(36);
 }
 
@@ -210,42 +255,42 @@ function showToast(msg){
   t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500);
 }
 
-const cleanerColor = n => { const i=A.cleaners.indexOf(n); return i>=0?CLEANER_COLORS[i%CLEANER_COLORS.length]:'#aaa'; };
+function fbSet(path,data){ set(ref(db,path),data).then(()=>setSyncStatus('ok')).catch(()=>setSyncStatus('err')); }
 
-function getAssignment(r){
-  const a=A.assignments[r.uid];
-  if(!a) return {c1:null,c2:null,note:''};
-  if(typeof a==='string') return {c1:a,c2:null,note:''};
-  return {c1:a.cleaner||a.c1||null, c2:a.c2||null, note:a.note||''};
-}
+const cleanerColor = n => {
+  const accounts = A.adminConfig.accounts||[];
+  const i = accounts.findIndex(a=>a.name===n);
+  return i>=0 ? CLEANER_COLORS[i%CLEANER_COLORS.length] : '#aaa';
+};
 
-// Chargement Firebase
+// ─── Firebase listeners ───────────────────────────────────────────────────────
+
 onValue(ref(db,'config'), snap=>{
   const d=snap.val();
-  if(d){ A.cleaners=d.cleaners||[]; A.studioNames=d.studioNames||A.studioNames; }
+  if(d){ A.studioNames=d.studioNames||A.studioNames; }
   setSyncStatus('ok');
   if(A.unlocked) renderAdminContent();
 });
 
-onValue(ref(db,'assignments'), snap=>{ A.assignments=snap.val()||{}; if(A.unlocked) renderAdminContent(); });
+onValue(ref(db,'assignments'), snap=>{ A.assignments=snap.val()||{}; if(A.unlocked) renderStats(); });
 
 onValue(ref(db,'reservations'), snap=>{
   const data=snap.val()||{};
   A.reservations=Object.values(data).map(r=>({...r,start:new Date(r.start),end:new Date(r.end)}));
-  if(A.unlocked) renderAdminContent();
+  if(A.unlocked) { renderStats(); renderHisto(); }
 });
 
 onValue(ref(db,'adminConfig'), snap=>{
   const d=snap.val();
-  if(d) A.adminConfig={...A.adminConfig,...d};
+  if(d) A.adminConfig={...A.adminConfig,...d, accounts: d.accounts||[]};
   checkLock();
 });
 
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
 function checkLock(){
   if(!A.adminConfig.pwdEnabled){
-    // Pas de mot de passe requis
-    document.getElementById('no-pwd-hint').textContent='Protection par mot de passe désactivée — accès direct';
-    // Auto-unlock si pas de mdp
+    document.getElementById('no-pwd-hint').textContent='Protection désactivée — accès direct';
     unlock();
   }
 }
@@ -274,65 +319,67 @@ window.logout = function(){
   document.getElementById('pwd-input').value='';
 };
 
-window.adminChangeMonth = function(dir){
-  if(dir===0){ A.selectedMonth=new Date().getMonth(); A.selectedYear=new Date().getFullYear(); }
-  else {
-    A.selectedMonth+=dir;
-    if(A.selectedMonth>11){A.selectedMonth=0;A.selectedYear++;}
-    if(A.selectedMonth<0){A.selectedMonth=11;A.selectedYear--;}
-  }
-  renderStats();
-};
+// ─── Render ───────────────────────────────────────────────────────────────────
 
-const MO_FR=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+function renderAdminContent(){
+  renderStats();
+  renderAccounts();
+  document.getElementById('name-s1').value=A.studioNames[0];
+  document.getElementById('name-s2').value=A.studioNames[1];
+  document.getElementById('toggle-auth').checked=A.adminConfig.authEnabled||false;
+  document.getElementById('toggle-pwd').checked=A.adminConfig.pwdEnabled||false;
+  renderHisto();
+}
 
 function renderStats(){
   const mo=A.selectedMonth, yr=A.selectedYear;
-  const label=`${MO_FR[mo]} ${yr}`;
-
-  // Mettre à jour le titre
-  const titleEl=document.getElementById('admin-month-title');
-  const btnEl=document.getElementById('admin-month-btn');
-  if(titleEl) titleEl.textContent=label;
-  if(btnEl) btnEl.textContent=MO_FR[mo];
-
-  // Stats
+  document.getElementById('admin-month-title').textContent=MO_FR[mo]+' '+yr;
+  document.getElementById('admin-month-btn').textContent=MO_FR[mo];
   const checkouts=A.reservations.filter(r=>{
     const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
     return e.getMonth()===mo && e.getFullYear()===yr;
   });
-  const assigned=checkouts.filter(r=>{ const {c1,c2}=getAssignment(r); return c1||c2; });
+  const assigned=checkouts.filter(r=>{ const a=A.assignments[r.uid]; return a&&(a.c1||a.c2); });
   document.getElementById('stat-total').textContent=checkouts.length;
   document.getElementById('stat-assigned').textContent=assigned.length;
   document.getElementById('stat-missing').textContent=checkouts.length-assigned.length;
-
-  // Stats par intervenante
   const counts={};
   for(const r of checkouts){
-    const {c1,c2}=getAssignment(r);
-    if(c1) counts[c1]=(counts[c1]||0)+1;
-    if(c2) counts[c2]=(counts[c2]||0)+1;
+    const a=A.assignments[r.uid]||{};
+    if(a.c1) counts[a.c1]=(counts[a.c1]||0)+1;
+    if(a.c2) counts[a.c2]=(counts[a.c2]||0)+1;
   }
+  const cleaners=(A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
   document.getElementById('cleaner-stats').innerHTML=
     '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-    A.cleaners.filter(c=>counts[c]).map(c=>`
+    cleaners.filter(c=>counts[c]).map(c=>`
       <div style="display:flex;align-items:center;gap:6px;background:#f5f5f0;border-radius:8px;padding:5px 10px">
         <span style="width:8px;height:8px;border-radius:50%;background:${cleanerColor(c)};display:inline-block"></span>
         <span style="font-size:12px;font-weight:500">${c}</span>
         <span style="font-size:14px;font-weight:700;color:${cleanerColor(c)}">${counts[c]}</span>
       </div>`).join('')+
-    (Object.keys(counts).length?'':'<span style="font-size:12px;color:#aaa">Aucune intervention ce mois</span>')+
+    (cleaners.filter(c=>counts[c]).length?'':'<span style="font-size:12px;color:#aaa">Aucune intervention ce mois</span>')+
     '</div>';
-
-  // Cacher l'aperçu si on change de mois
-  const prev=document.getElementById('export-preview');
-  if(prev) prev.style.display='none';
 }
 
-function renderAdminContent(){
-  renderStats();
-  document.getElementById('toggle-pwd').checked=A.adminConfig.pwdEnabled||false;
-  renderHisto();
+function renderAccounts(){
+  const accounts=A.adminConfig.accounts||[];
+  if(!accounts.length){
+    document.getElementById('accounts-list').innerHTML='<p style="font-size:12px;color:#aaa;padding:8px 0">Aucun compte — ajoutez le premier ci-dessous</p>';
+    return;
+  }
+  document.getElementById('accounts-list').innerHTML=accounts.map((acc,i)=>{
+    const col=CLEANER_COLORS[i%CLEANER_COLORS.length];
+    return `<div class="account-row">
+      <div class="account-dot" style="background:${col}"></div>
+      <div class="account-name">${acc.name}</div>
+      <input type="password" class="account-pwd" placeholder="Nouveau mdp" id="pwd-acc-${i}" title="Laisser vide pour ne pas changer">
+      <div class="account-role${acc.menage?' active':''}" onclick="toggleRole(${i},'menage')" title="Peut faire le ménage">🧹</div>
+      <div class="account-role${acc.admin?' active':''}" onclick="toggleRole(${i},'admin')" title="Administrateur">👑</div>
+      <button class="btn-sm" onclick="saveAccountPwd(${i})">💾</button>
+      <button class="btn-danger" onclick="removeAccount(${i})">✕</button>
+    </div>`;
+  }).join('');
 }
 
 function renderHisto(){
@@ -340,16 +387,14 @@ function renderHisto(){
   const past=A.reservations.filter(r=>new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate())<today)
     .sort((a,b)=>b.end-a.end);
   if(!past.length){
-    document.getElementById('histo-content').innerHTML='<p style="color:#aaa;font-size:13px">Aucun historique disponible. Les interventions passées apparaîtront ici.</p>';
+    document.getElementById('histo-content').innerHTML='<p style="color:#aaa;font-size:13px">Aucun historique disponible.</p>';
     return;
   }
   const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
-  const MO=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
-  // Grouper par mois
   const byMonth={};
   for(const r of past){
     const key=`${r.end.getFullYear()}-${r.end.getMonth()}`;
-    if(!byMonth[key]) byMonth[key]={label:`${MO[r.end.getMonth()]} ${r.end.getFullYear()}`,resas:[]};
+    if(!byMonth[key]) byMonth[key]={label:`${MO_FR[r.end.getMonth()]} ${r.end.getFullYear()}`,resas:[]};
     byMonth[key].resas.push(r);
   }
   let html='';
@@ -360,8 +405,8 @@ function renderHisto(){
       <table class="histo-table">
         <thead><tr><th>Date</th><th>Studio</th><th>Intervenante(s)</th></tr></thead>
         <tbody>${resas.map(r=>{
-          const {c1,c2}=getAssignment(r);
-          const names=[c1,c2].filter(Boolean);
+          const a=A.assignments[r.uid]||{};
+          const names=[a.c1,a.c2].filter(Boolean);
           return `<tr>
             <td>${fmt(r.end)}</td>
             <td>${A.studioNames[r.studio]}</td>
@@ -374,12 +419,130 @@ function renderHisto(){
   document.getElementById('histo-content').innerHTML=html;
 }
 
-window.saveAdminConfig = function(){
-  A.adminConfig.pwdEnabled=document.getElementById('toggle-pwd').checked;
-  set(ref(db,'adminConfig'), A.adminConfig)
-    .then(()=>showToast('Paramètres sauvegardés ✓'))
-    .catch(()=>showToast('Erreur de sauvegarde'));
+// ─── Accounts ────────────────────────────────────────────────────────────────
+
+window.addAccount = function(){
+  const name=document.getElementById('new-name').value.trim();
+  const pwd=document.getElementById('new-pwd-acc').value;
+  if(!name) return;
+  const accounts=A.adminConfig.accounts||[];
+  if(accounts.find(a=>a.name===name)){ showToast('Ce prénom existe déjà'); return; }
+  accounts.push({ name, pwdHash: pwd?hashSimple(pwd):'', menage:true, admin:false });
+  A.adminConfig.accounts=accounts;
+  saveAdminConfig();
+  document.getElementById('new-name').value='';
+  document.getElementById('new-pwd-acc').value='';
+  renderAccounts();
+  // Sync cleaners dans /config
+  syncCleanersToConfig();
+  showToast(name+' ajouté ✓');
 };
+
+window.removeAccount = function(i){
+  const accounts=A.adminConfig.accounts||[];
+  if(!confirm('Supprimer '+accounts[i].name+' ?')) return;
+  accounts.splice(i,1);
+  A.adminConfig.accounts=accounts;
+  saveAdminConfig();
+  renderAccounts();
+  syncCleanersToConfig();
+};
+
+window.toggleRole = function(i, role){
+  const accounts=A.adminConfig.accounts||[];
+  accounts[i][role]=!accounts[i][role];
+  A.adminConfig.accounts=accounts;
+  saveAdminConfig();
+  renderAccounts();
+  syncCleanersToConfig();
+};
+
+window.saveAccountPwd = function(i){
+  const inp=document.getElementById(`pwd-acc-${i}`);
+  const val=inp.value;
+  if(!val){ showToast('Entrez un nouveau mot de passe'); return; }
+  const accounts=A.adminConfig.accounts||[];
+  accounts[i].pwdHash=hashSimple(val);
+  A.adminConfig.accounts=accounts;
+  saveAdminConfig();
+  inp.value='';
+  showToast('Mot de passe mis à jour ✓');
+};
+
+function syncCleanersToConfig(){
+  // Synchronise la liste des ménage dans /config pour index.html
+  const cleaners=(A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
+  set(ref(db,'config'), { studioNames: A.studioNames, cleaners });
+}
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+
+window.saveAdminConfig = function(){
+  A.adminConfig.authEnabled=document.getElementById('toggle-auth').checked;
+  A.adminConfig.pwdEnabled=document.getElementById('toggle-pwd').checked;
+  fbSet('adminConfig', A.adminConfig);
+};
+
+window.saveNames = function(){
+  A.studioNames[0]=document.getElementById('name-s1').value||'Studio 1';
+  A.studioNames[1]=document.getElementById('name-s2').value||'Studio 2';
+  syncCleanersToConfig();
+  showToast('Studios enregistrés ✓');
+};
+
+window.changeAdminPwd = function(){
+  const p1=document.getElementById('new-admin-pwd').value;
+  const p2=document.getElementById('new-admin-pwd2').value;
+  const msg=document.getElementById('pwd-msg');
+  if(p1.length<4){ msg.style.color='#E24B4A'; msg.textContent='Minimum 4 caractères'; return; }
+  if(p1!==p2){ msg.style.color='#E24B4A'; msg.textContent='Mots de passe différents'; return; }
+  A.adminConfig.pwdHash=hashSimple(p1);
+  saveAdminConfig();
+  msg.style.color='#1D9E75'; msg.textContent='Changé ✓';
+  document.getElementById('new-admin-pwd').value='';
+  document.getElementById('new-admin-pwd2').value='';
+};
+
+window.adminChangeMonth = function(dir){
+  if(dir===0){ A.selectedMonth=new Date().getMonth(); A.selectedYear=new Date().getFullYear(); }
+  else{
+    A.selectedMonth+=dir;
+    if(A.selectedMonth>11){A.selectedMonth=0;A.selectedYear++;}
+    if(A.selectedMonth<0){A.selectedMonth=11;A.selectedYear--;}
+  }
+  renderStats();
+};
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+
+function buildExcel(reservations, label){
+  const XLSX=window.XLSX;
+  const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const sorted=[...reservations].sort((a,b)=>a.end-b.end);
+  const detail=[['Date départ','Studio','Arrivée','Intervenante 1','Intervenante 2','Note']];
+  for(const r of sorted){
+    const a=A.assignments[r.uid]||{};
+    detail.push([fmt(r.end),A.studioNames[r.studio],fmt(r.start),a.c1||'',a.c2||'',a.note||'']);
+  }
+  const counts={};
+  for(const r of sorted){
+    const a=A.assignments[r.uid]||{};
+    if(a.c1) counts[a.c1]=(counts[a.c1]||0)+1;
+    if(a.c2) counts[a.c2]=(counts[a.c2]||0)+1;
+  }
+  const recap=[['Intervenante',"Nb d'interventions"]];
+  const cleaners=(A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
+  for(const c of cleaners){ if(counts[c]) recap.push([c,counts[c]]); }
+  recap.push(['','']);
+  recap.push(['Total',Object.values(counts).reduce((a,b)=>a+b,0)]);
+  recap.push(['Période',label]);
+  const wb=XLSX.utils.book_new();
+  const ws1=XLSX.utils.aoa_to_sheet(detail); ws1['!cols']=[{wch:14},{wch:12},{wch:12},{wch:14},{wch:14},{wch:20}];
+  const ws2=XLSX.utils.aoa_to_sheet(recap); ws2['!cols']=[{wch:18},{wch:22}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Détail interventions');
+  XLSX.utils.book_append_sheet(wb,ws2,'Récap par intervenante');
+  return wb;
+}
 
 window.exportSelected = function(){
   const mo=A.selectedMonth, yr=A.selectedYear;
@@ -389,87 +552,29 @@ window.exportSelected = function(){
     return e.getMonth()===mo && e.getFullYear()===yr;
   });
   if(!resas.length){ showToast(`Aucune intervention en ${label}`); return; }
-
-  // Aperçu
   const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
   const counts={};
-  for(const r of resas){ const {c1,c2}=getAssignment(r); if(c1) counts[c1]=(counts[c1]||0)+1; if(c2) counts[c2]=(counts[c2]||0)+1; }
-  const recapLines=A.cleaners.filter(c=>counts[c]).map(c=>`  ${c} : ${counts[c]} intervention(s)`).join('\n');
-  const detailLines=resas.sort((a,b)=>a.end-b.end).map(r=>{
-    const {c1,c2}=getAssignment(r);
-    return `${fmt(r.end)} — ${A.studioNames[r.studio]} — ${[c1,c2].filter(Boolean).join(' + ')||'Non assigné'}`;
+  for(const r of resas){ const a=A.assignments[r.uid]||{}; if(a.c1) counts[a.c1]=(counts[a.c1]||0)+1; if(a.c2) counts[a.c2]=(counts[a.c2]||0)+1; }
+  const cleaners=(A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
+  const recap=cleaners.filter(c=>counts[c]).map(c=>`  ${c} : ${counts[c]} intervention(s)`).join('\n');
+  const detail=resas.sort((a,b)=>a.end-b.end).map(r=>{
+    const a=A.assignments[r.uid]||{};
+    return `${fmt(r.end)} — ${A.studioNames[r.studio]} — ${[a.c1,a.c2].filter(Boolean).join(' + ')||'Non assigné'}`;
   }).join('\n');
   const prev=document.getElementById('export-preview');
   prev.style.display='';
-  prev.textContent=`${label} — ${resas.length} intervention(s)\n\nRécap :\n${recapLines}\n\nDétail :\n${detailLines}`;
-
-  const wb=buildExcel(resas,label);
-  window.XLSX.writeFile(wb,`rapport-menage-${yr}-${String(mo+1).padStart(2,'0')}.xlsx`);
+  prev.textContent=`${label} — ${resas.length} intervention(s)\n\nRécap :\n${recap}\n\nDétail :\n${detail}`;
+  window.XLSX.writeFile(buildExcel(resas,label),`rapport-${yr}-${String(mo+1).padStart(2,'0')}.xlsx`);
   showToast(`${label} exporté ✓`);
 };
 
-window.changePwd = function(){
-  const p1=document.getElementById('new-pwd').value;
-  const p2=document.getElementById('new-pwd2').value;
-  const msg=document.getElementById('pwd-msg');
-  if(p1.length<4){ msg.style.color='#E24B4A'; msg.textContent='Minimum 4 caractères'; return; }
-  if(p1!==p2){ msg.style.color='#E24B4A'; msg.textContent='Les mots de passe ne correspondent pas'; return; }
-  A.adminConfig.pwdHash=hashSimple(p1);
-  saveAdminConfig();
-  msg.style.color='#1D9E75'; msg.textContent='Mot de passe changé ✓';
-  document.getElementById('new-pwd').value='';
-  document.getElementById('new-pwd2').value='';
-};
-
-function buildExcel(reservations, label){
-  const XLSX = window.XLSX;
-  const fmt = d => d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
-  const sorted = [...reservations].sort((a,b)=>a.end-b.end);
-
-  // Onglet 1 — Détail
-  const detail = [['Date départ','Studio','Arrivée','Intervenante 1','Intervenante 2','Note']];
-  for(const r of sorted){
-    const {c1,c2,note}=getAssignment(r);
-    detail.push([fmt(r.end), A.studioNames[r.studio], fmt(r.start), c1||'', c2||'', note||'']);
-  }
-
-  // Onglet 2 — Récap par intervenante
-  const counts={};
-  for(const r of sorted){
-    const {c1,c2}=getAssignment(r);
-    if(c1) counts[c1]=(counts[c1]||0)+1;
-    if(c2) counts[c2]=(counts[c2]||0)+1;
-  }
-  const recap = [['Intervenante','Nombre d\'interventions']];
-  for(const c of A.cleaners){
-    if(counts[c]) recap.push([c, counts[c]]);
-  }
-  recap.push(['','']);
-  recap.push(['Total interventions', Object.values(counts).reduce((a,b)=>a+b,0)]);
-  recap.push(['Période', label]);
-
-  const wb = XLSX.utils.book_new();
-
-  const ws1 = XLSX.utils.aoa_to_sheet(detail);
-  ws1['!cols']=[{wch:14},{wch:12},{wch:12},{wch:14},{wch:14},{wch:20}];
-  XLSX.utils.book_append_sheet(wb, ws1, 'Détail interventions');
-
-  const ws2 = XLSX.utils.aoa_to_sheet(recap);
-  ws2['!cols']=[{wch:18},{wch:24}];
-  XLSX.utils.book_append_sheet(wb, ws2, 'Récap par intervenante');
-
-  return wb;
-}
-
-window.exportCSV = function(){
+window.exportAll = function(){
   const today=new Date(); today.setHours(0,0,0,0);
   const past=A.reservations.filter(r=>new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate())<today);
-  if(!past.length){ showToast('Aucun historique à exporter'); return; }
-  const wb = buildExcel(past, 'Historique complet');
-  window.XLSX.writeFile(wb, 'historique-menage.xlsx');
-  showToast('Excel téléchargé ✓');
+  if(!past.length){ showToast('Aucun historique'); return; }
+  window.XLSX.writeFile(buildExcel(past,'Historique complet'),'historique-menage.xlsx');
+  showToast('Historique exporté ✓');
 };
-
 </script>
 </body>
 </html>
