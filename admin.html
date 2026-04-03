@@ -196,6 +196,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
       </div>
     </div>
 
+    <!-- Légende & Sync -->
+    <div class="section" style="font-size:12px;color:#999;line-height:1.8">
+      <h3><span>ℹ️</span> Légende & Synchronisation</h3>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:1rem">
+        <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:#E24B4A;display:inline-block"></span><span>Rouge — aucune intervenante assignée</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:#F59E0B;display:inline-block"></span><span>Orange — assignation partielle</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:#e0e0d8;display:inline-block"></span><span>Aucun point — tous assignés</span></div>
+      </div>
+      Réservations mises à jour <strong style="color:#555">toutes les heures</strong> via GitHub Actions.<br>
+      Assignations synchronisées en temps réel via Firebase.<br><br>
+      <span id="last-sync-info" style="color:#aaa"></span>
+    </div>
+
     <!-- Historique -->
     <div class="section">
       <h3><span>📋</span> Historique des interventions</h3>
@@ -264,6 +277,15 @@ const cleanerColor = n => {
 };
 
 // ─── Firebase listeners ───────────────────────────────────────────────────────
+
+onValue(ref(db,'lastSync'), snap=>{
+  const d=snap.val();
+  if(d&&d.ts){
+    const fmt=new Date(d.ts).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+    const el=document.getElementById('last-sync-info');
+    if(el) el.textContent=`Dernière sync Airbnb : ${fmt} (${d.count} résa)`;
+  }
+});
 
 onValue(ref(db,'config'), snap=>{
   const d=snap.val();
