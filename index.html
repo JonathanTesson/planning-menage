@@ -162,7 +162,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 </div>
 
 <!-- MAIN APP -->
-<div id="main-app" style="display:none">
+<div id="main-app">
 <div class="container">
   <div class="header">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -254,8 +254,10 @@ function hashSimple(str){
 
 function checkAuth(){
   if(!S.adminConfig.authEnabled){
-    // Pas d'auth → accès direct comme admin complet
-    S.currentUser = { name:'', menage:true, admin:true, noAuth:true };
+    // Pas d'auth → accès direct
+    if(!S.currentUser){
+      S.currentUser = { name:'', menage:true, admin:true, noAuth:true };
+    }
     showApp();
     return;
   }
@@ -269,6 +271,8 @@ function checkAuth(){
       return;
     }
   }
+  // Pas de session valide → écran login
+  S.currentUser = null;
   showLogin();
 }
 
@@ -683,14 +687,12 @@ window._toggleType=t=>{
   render();
 };
 
-window.toggleSettings=()=>{}; // supprimé
+window.toggleSettings=()=>{};
 window.changeMonth=d=>{
   if(d===0){S.currentMonth=new Date().getMonth();S.currentYear=new Date().getFullYear();}
   else{S.currentMonth+=d;if(S.currentMonth>11){S.currentMonth=0;S.currentYear++;}if(S.currentMonth<0){S.currentMonth=11;S.currentYear--;}}
   render();
 };
-
-render();
 </script>
 </body>
 </html>
