@@ -209,6 +209,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
       <span id="last-sync-info" style="color:#aaa"></span>
     </div>
 
+    <!-- Logs d'activité -->
+    <div class="section">
+      <h3><span>📜</span> Logs d'activité</h3>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <select id="log-filter" onchange="renderLogs()" style="padding:6px 10px;border:1px solid #ddd;border-radius:8px;font-size:12px;color:#333;background:#fff">
+          <option value="all">Tous les événements</option>
+          <option value="login">Connexions / Déco.</option>
+          <option value="assign">Assignations</option>
+          <option value="admin_login">Accès admin</option>
+        </select>
+        <button onclick="clearLogs()" class="btn-secondary" style="font-size:12px;padding:6px 12px;color:#E24B4A;border-color:#f0c0c0;margin-left:auto">
+          🗑 Vider les logs
+        </button>
+      </div>
+      <div id="logs-list" style="font-size:12px;max-height:380px;overflow-y:auto"></div>
+    </div>
+
     <!-- Historique -->
     <div class="section">
       <h3><span>📋</span> Historique des interventions</h3>
@@ -225,7 +242,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, onValue, push as fbPush } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
@@ -241,6 +258,18 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A6E','#c0392b'];
 const MO_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+// ─── Logs d'activité ──────────────────────────────────────────────────────────
+async function logActivity(type, user, detail = '') {
+  try {
+    await fbPush(ref(db, 'activityLogs'), {
+      ts: new Date().toISOString(),
+      type,   // 'admin_login' | 'admin_logout'
+      user: user || '—',
+      detail: detail || ''
+    });
+  } catch(e) { console.warn('logActivity:', e); }
+}
 
 let A = {
   studioNames: ['Studio 1','Studio 2'],
@@ -329,12 +358,15 @@ window.checkPwd = function(){
 
 function unlock(){
   A.unlocked=true;
+  logActivity('admin_login', 'Admin');
   document.getElementById('lock-screen').style.display='none';
   document.getElementById('admin-content').style.display='';
   renderAdminContent();
+  loadLogs();
 }
 
 window.logout = function(){
+  logActivity('admin_logout', 'Admin');
   A.unlocked=false;
   document.getElementById('lock-screen').style.display='flex';
   document.getElementById('admin-content').style.display='none';
@@ -590,7 +622,67 @@ window.exportSelected = function(){
   showToast(`${label} exporté ✓`);
 };
 
-window.exportAll = function(){
+// ─── Logs d'activité ──────────────────────────────────────────────────────────
+
+let allLogs = [];
+
+const LOG_META = {
+  login:       { icon: '🟢', label: 'Connexion' },
+  logout:      { icon: '🔴', label: 'Déconnexion' },
+  assign:      { icon: '✅', label: 'Assignation' },
+  unassign:    { icon: '↩️', label: 'Retrait' },
+  admin_login: { icon: '🔒', label: 'Accès admin' },
+  admin_logout:{ icon: '🚪', label: 'Déco admin' },
+};
+
+function loadLogs() {
+  onValue(ref(db, 'activityLogs'), snap => {
+    allLogs = [];
+    snap.forEach(child => allLogs.unshift({ id: child.key, ...child.val() }));
+    renderLogs();
+  });
+}
+
+window.renderLogs = function() {
+  const filter = document.getElementById('log-filter')?.value || 'all';
+  const container = document.getElementById('logs-list');
+  if (!container) return;
+
+  const filtered = allLogs.filter(l => {
+    if (filter === 'all') return true;
+    if (filter === 'login') return l.type === 'login' || l.type === 'logout';
+    if (filter === 'assign') return l.type === 'assign' || l.type === 'unassign';
+    if (filter === 'admin_login') return l.type === 'admin_login' || l.type === 'admin_logout';
+    return l.type === filter;
+  });
+
+  if (!filtered.length) {
+    container.innerHTML = '<p style="color:#aaa;text-align:center;padding:1rem 0">Aucun log pour ce filtre.</p>';
+    return;
+  }
+
+  container.innerHTML = filtered.slice(0, 150).map(log => {
+    const d = new Date(log.ts);
+    const dateStr = d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const meta = LOG_META[log.type] || { icon: '📌', label: log.type };
+    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f0f0eb">
+      <span style="font-size:1em;flex-shrink:0">${meta.icon}</span>
+      <span style="color:#bbb;min-width:140px;flex-shrink:0">${dateStr} ${timeStr}</span>
+      <strong style="min-width:70px;flex-shrink:0;color:#333">${log.user || '—'}</strong>
+      <span style="color:#777;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${log.detail || meta.label}</span>
+    </div>`;
+  }).join('');
+};
+
+window.clearLogs = async function() {
+  if (!confirm('Supprimer tous les logs d\'activité ?')) return;
+  await set(ref(db, 'activityLogs'), null);
+  allLogs = [];
+  renderLogs();
+  showToast('Logs supprimés ✓');
+};
+
   const today=new Date(); today.setHours(0,0,0,0);
   const past=A.reservations.filter(r=>new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate())<today);
   if(!past.length){ showToast('Aucun historique'); return; }
