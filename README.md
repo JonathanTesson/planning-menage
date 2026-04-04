@@ -1,6 +1,6 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 3.1.0** — Avril 2026
+**Version : 3.1.1** — Avril 2026
 
 Application web de planning des interventions ménage pour 2 studios Airbnb, avec authentification par rôle, synchronisation temps réel Firebase, notifications Telegram et export Excel.
 
@@ -103,6 +103,7 @@ Accès protégé par mot de passe admin (indépendant de l'auth utilisateurs).
 - Tableau en bas de page : date, type d’événement, auteur, détail lisible
 - Événements enregistrés : connexions / déconnexions au planning (auth activée), assignations et retraits (ménage), modifications d’assignation par un admin, ouverture de l’admin avec mot de passe, ajout/suppression de compte, changement du mot de passe admin
 - Affichage des **200 derniers** événements ; bouton **Vider le journal** pour tout effacer dans Firebase
+- **Rotation automatique** : après chaque nouvel événement, si le journal dépasse **450** entrées en base, les plus **anciennes** (par date `ts`) sont supprimées — pas besoin de vider à la main pour limiter la taille sur le long terme
 - **Pas d’historique rétroactif** : seules les actions faites après la mise en place de cette fonction apparaissent
 - En mode **sans authentification** sur le calendrier, les lignes d’assignation admin indiquent « Mode ouvert » ; les connexions ne sont pas journalisées (pas de compte identifiable)
 
@@ -209,7 +210,7 @@ Colle ce bloc au début d'une nouvelle conversation :
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 3.1.0
+Version : 3.1.1
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
@@ -222,6 +223,9 @@ Claude peut lire le README directement depuis GitHub pour reprendre le contexte 
 ---
 
 ## Historique des versions
+
+### v3.1.1 — Avril 2026
+- Journal d’activité : rotation automatique (plafond **450** entrées en Firebase, les plus anciennes supprimées après chaque log)
 
 ### v3.1.0 — Avril 2026
 - Journal d’activité Firebase (`/activityLog`) : connexions, assignations, accès admin, gestion des comptes

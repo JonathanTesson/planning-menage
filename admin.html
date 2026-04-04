@@ -238,7 +238,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue, push } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, onValue, push, get, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
@@ -252,6 +252,8 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+/** Même plafond que index.html — rotation après chaque nouvel événement. */
+const MAX_ACTIVITY_LOG_ENTRIES = 450;
 const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A6E','#c0392b'];
 const MO_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 
@@ -284,6 +286,20 @@ function showToast(msg){
 
 function fbSet(path,data){ set(ref(db,path),data).then(()=>setSyncStatus('ok')).catch(()=>setSyncStatus('err')); }
 
+async function trimActivityLogIfNeeded(){
+  try{
+    const snap=await get(ref(db,'activityLog'));
+    const v=snap.val()||{};
+    const keys=Object.keys(v);
+    if(keys.length<=MAX_ACTIVITY_LOG_ENTRIES) return;
+    const ranked=keys.map(k=>({ k, ts:Number(v[k]?.ts)||0 })).sort((a,b)=>a.ts-b.ts);
+    const cut=keys.length-MAX_ACTIVITY_LOG_ENTRIES;
+    const updates={};
+    for(let i=0;i<cut;i++) updates['activityLog/'+ranked[i].k]=null;
+    await update(ref(db),updates);
+  }catch(_){}
+}
+
 function pushActivity(entry){
   push(ref(db,'activityLog'),{
     ts:Date.now(),
@@ -291,7 +307,7 @@ function pushActivity(entry){
     actor:entry.actor!=null?entry.actor:'',
     text:entry.text||'',
     uid:entry.uid||null
-  }).catch(()=>{});
+  }).then(()=>trimActivityLogIfNeeded()).catch(()=>{});
 }
 
 const cleanerColor = n => {
