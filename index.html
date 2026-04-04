@@ -196,7 +196,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, onValue, push } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
@@ -319,10 +319,14 @@ window.doLogin = function(){
   document.getElementById('login-error').style.display='none';
   S.currentUser={ name:acc.name, menage:acc.menage, admin:acc.admin };
   saveSession({ name:acc.name });
+  logActivity({ type:'login', actor:acc.name, text:acc.name+' s\'est connectée au planning' });
   showApp();
 };
 
 window.doLogout = function(){
+  if(S.currentUser && !S.currentUser.noAuth && S.currentUser.name){
+    logActivity({ type:'logout', actor:S.currentUser.name, text:S.currentUser.name+' s\'est déconnectée' });
+  }
   clearSession();
   S.currentUser=null;
   document.getElementById('login-pwd').value='';
@@ -342,6 +346,27 @@ function showToast(msg){
 }
 
 function fbSet(path,data){ set(ref(db,path),data).then(()=>setSyncStatus('ok')).catch(()=>setSyncStatus('err')); }
+
+function logActivity(payload){
+  push(ref(db,'activityLog'),{
+    ts:Date.now(),
+    type:payload.type||'event',
+    actor:payload.actor||'',
+    text:payload.text||'',
+    uid:payload.uid||null
+  }).catch(()=>{});
+}
+
+function resaDepartLabel(r){
+  if(!r||!r.end) return '';
+  return r.end.toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+}
+
+function assignActorLabel(){
+  const u=S.currentUser;
+  if(!u||u.noAuth) return 'Mode ouvert';
+  return u.name||'Utilisateur';
+}
 
 function checkReady(){
   // On affiche dès que les données essentielles sont là
@@ -660,10 +685,13 @@ window._oa = function(key){
 
 window._assignSelf = function(key){
   const user=S.currentUser; if(!user) return;
-  const {c1,c2,note}=getAssignment(findResa(key)||{uid:key});
+  const r=findResa(key);
+  const {c1,c2,note}=getAssignment(r||{uid:key});
   if(!c1) S.assignments[key]={c1:user.name,c2:c2||null,note};
   else if(!c2) S.assignments[key]={c1,c2:user.name,note};
   else { showToast('2 intervenantes déjà assignées'); window._cm(); return; }
+  const st=r?S.studioNames[r.studio]:'';
+  logActivity({ type:'assign', actor:user.name, uid:key, text:`${user.name} s'est assignée — ${st} — départ ${resaDepartLabel(r)}` });
   saveAssignments();
   showToast('Assignée ✓');
   window._cm(); render();
@@ -671,19 +699,35 @@ window._assignSelf = function(key){
 
 window._removeSelf = function(key){
   const user=S.currentUser; if(!user) return;
-  const {c1,c2,note}=getAssignment(findResa(key)||{uid:key});
+  const r=findResa(key);
+  const {c1,c2,note}=getAssignment(r||{uid:key});
   if(c1===user.name) S.assignments[key]={c1:c2||null,c2:null,note};
   else if(c2===user.name) S.assignments[key]={c1,c2:null,note};
   if(!S.assignments[key].c1&&!S.assignments[key].c2) delete S.assignments[key];
+  const st=r?S.studioNames[r.studio]:'';
+  logActivity({ type:'assign', actor:user.name, uid:key, text:`${user.name} s'est retirée — ${st} — départ ${resaDepartLabel(r)}` });
   saveAssignments();
   showToast('Retirée ✓');
   window._cm(); render();
 };
 
 window._sa = function(key){
+  const r=findResa(key);
+  const prev=getAssignment(r||{uid:key});
   const c1=document.getElementById('mc1').value;
   const c2=document.getElementById('mc2').value;
   const note=document.getElementById('mn').value;
+  const who=assignActorLabel();
+  const st=r?S.studioNames[r.studio]:'';
+  const dep=resaDepartLabel(r);
+  let text;
+  if(!c1&&!c2) text=`${who} a supprimé l'assignation — ${st} — départ ${dep}`;
+  else{
+    const names=[c1,c2].filter(Boolean).join(' + ');
+    const was=[prev.c1,prev.c2].filter(Boolean).join(' + ')||'personne';
+    text=`${who} a défini ${names} (avant : ${was}) — ${st} — départ ${dep}`;
+  }
+  logActivity({ type:'assign_admin', actor:who, uid:key, text });
   if(c1||c2) S.assignments[key]={c1:c1||null,c2:c2||null,note};
   else delete S.assignments[key];
   saveAssignments();
