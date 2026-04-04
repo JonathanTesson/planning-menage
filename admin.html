@@ -683,6 +683,7 @@ window.clearLogs = async function() {
   showToast('Logs supprimés ✓');
 };
 
+window.exportAll = function(){
   const today=new Date(); today.setHours(0,0,0,0);
   const past=A.reservations.filter(r=>new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate())<today);
   if(!past.length){ showToast('Aucun historique'); return; }
