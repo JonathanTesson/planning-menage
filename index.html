@@ -196,7 +196,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue, push as fbPush } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
@@ -212,18 +212,6 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A6E','#c0392b'];
 const SESSION_KEY = 'menage_session_v1';
-
-// ─── Logs d'activité ──────────────────────────────────────────────────────────
-async function logActivity(type, user, detail = '') {
-  try {
-    await fbPush(ref(db, 'activityLogs'), {
-      ts: new Date().toISOString(),
-      type,   // 'login' | 'logout' | 'assign' | 'unassign'
-      user: user || '—',
-      detail: detail || ''
-    });
-  } catch(e) { console.warn('logActivity:', e); }
-}
 
 let S = {
   cleaners: [],
@@ -331,12 +319,10 @@ window.doLogin = function(){
   document.getElementById('login-error').style.display='none';
   S.currentUser={ name:acc.name, menage:acc.menage, admin:acc.admin };
   saveSession({ name:acc.name });
-  logActivity('login', acc.name);
   showApp();
 };
 
 window.doLogout = function(){
-  logActivity('logout', S.currentUser?.name || '—');
   clearSession();
   S.currentUser=null;
   document.getElementById('login-pwd').value='';
@@ -674,13 +660,10 @@ window._oa = function(key){
 
 window._assignSelf = function(key){
   const user=S.currentUser; if(!user) return;
-  const r=findResa(key);
-  const {c1,c2,note}=getAssignment(r||{uid:key});
+  const {c1,c2,note}=getAssignment(findResa(key)||{uid:key});
   if(!c1) S.assignments[key]={c1:user.name,c2:c2||null,note};
   else if(!c2) S.assignments[key]={c1,c2:user.name,note};
   else { showToast('2 intervenantes déjà assignées'); window._cm(); return; }
-  const studioLabel = r ? `${S.studioNames[r.studio]} — départ ${r.end.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})}` : key;
-  logActivity('assign', user.name, studioLabel);
   saveAssignments();
   showToast('Assignée ✓');
   window._cm(); render();
@@ -688,13 +671,10 @@ window._assignSelf = function(key){
 
 window._removeSelf = function(key){
   const user=S.currentUser; if(!user) return;
-  const r=findResa(key);
-  const {c1,c2,note}=getAssignment(r||{uid:key});
+  const {c1,c2,note}=getAssignment(findResa(key)||{uid:key});
   if(c1===user.name) S.assignments[key]={c1:c2||null,c2:null,note};
   else if(c2===user.name) S.assignments[key]={c1,c2:null,note};
   if(!S.assignments[key].c1&&!S.assignments[key].c2) delete S.assignments[key];
-  const studioLabel = r ? `${S.studioNames[r.studio]} — départ ${r.end.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})}` : key;
-  logActivity('unassign', user.name, studioLabel);
   saveAssignments();
   showToast('Retirée ✓');
   window._cm(); render();
@@ -706,10 +686,6 @@ window._sa = function(key){
   const note=document.getElementById('mn').value;
   if(c1||c2) S.assignments[key]={c1:c1||null,c2:c2||null,note};
   else delete S.assignments[key];
-  const r=findResa(key);
-  const studioLabel = r ? `${S.studioNames[r.studio]} — départ ${r.end.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})}` : key;
-  const assignedNames=[c1,c2].filter(Boolean).join(' + ')||'—';
-  logActivity('assign', S.currentUser?.name||'Admin', `${studioLabel} → ${assignedNames}`);
   saveAssignments();
   showToast([c1,c2].filter(Boolean).join(' + ')||'Assignation supprimée');
   window._cm(); render();
