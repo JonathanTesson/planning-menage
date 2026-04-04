@@ -1,6 +1,6 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 3.0.0** — Avril 2026
+**Version : 3.1.0** — Avril 2026
 
 Application web de planning des interventions ménage pour 2 studios Airbnb, avec authentification par rôle, synchronisation temps réel Firebase, notifications Telegram et export Excel.
 
@@ -42,6 +42,7 @@ planning-menage/
 - Si activée : écran de connexion (nom + mot de passe)
 - Session stockée en localStorage (pas besoin de se reconnecter)
 - Bouton "Déco." visible quand connecté
+- Si l’auth est activée : chaque **connexion** et **déconnexion** est enregistrée dans le journal Firebase (visible dans l’admin)
 
 **Rôles**
 - 🧹 Ménage : voit le calendrier, voit tous les noms assignés, peut s'assigner/se retirer sur les départs uniquement (pas sur les arrivées)
@@ -64,6 +65,7 @@ planning-menage/
 **Assignation**
 - Admin : 2 intervenantes par réservation + note
 - Ménage : bouton "+" pour s'assigner, "✕ Me retirer" pour se retirer
+- Chaque changement d’assignation est **journalisé** (qui, studio, date de départ, avant/après pour l’admin)
 
 ### admin.html — Back-office
 
@@ -96,6 +98,13 @@ Accès protégé par mot de passe admin (indépendant de l'auth utilisateurs).
 **Historique**
 - Liste des interventions passées par mois
 - Conservé 24 mois dans Firebase
+
+**Journal d’activité**
+- Tableau en bas de page : date, type d’événement, auteur, détail lisible
+- Événements enregistrés : connexions / déconnexions au planning (auth activée), assignations et retraits (ménage), modifications d’assignation par un admin, ouverture de l’admin avec mot de passe, ajout/suppression de compte, changement du mot de passe admin
+- Affichage des **200 derniers** événements ; bouton **Vider le journal** pour tout effacer dans Firebase
+- **Pas d’historique rétroactif** : seules les actions faites après la mise en place de cette fonction apparaissent
+- En mode **sans authentification** sur le calendrier, les lignes d’assignation admin indiquent « Mode ouvert » ; les connexions ne sont pas journalisées (pas de compte identifiable)
 
 **Légende & Sync**
 - Explication des points de couleur
@@ -147,6 +156,9 @@ Structure des données :
   ts: "2026-04-03T..."
   count: 116
   notifications: 0
+
+/activityLog
+  {pushId}: { ts, type, actor, text, uid? }   ← journal append-only (push), affiché dans admin.html
 ```
 
 ### GitHub Actions — Secrets requis
@@ -197,7 +209,7 @@ Colle ce bloc au début d'une nouvelle conversation :
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 3.0.0
+Version : 3.1.0
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
@@ -210,6 +222,10 @@ Claude peut lire le README directement depuis GitHub pour reprendre le contexte 
 ---
 
 ## Historique des versions
+
+### v3.1.0 — Avril 2026
+- Journal d’activité Firebase (`/activityLog`) : connexions, assignations, accès admin, gestion des comptes
+- Section **Journal d’activité** dans admin.html (200 derniers événements, vider le journal)
 
 ### v3.0.0 — Avril 2026
 - Authentification par rôle (🧹 ménage / 👑 admin)
