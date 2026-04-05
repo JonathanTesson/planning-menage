@@ -1,6 +1,6 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 3.1.1** — Avril 2026
+**Version : 3.2.0** — Avril 2026
 
 Application web de planning des interventions ménage pour 2 studios Airbnb, avec authentification par rôle, synchronisation temps réel Firebase, notifications Telegram et export Excel.
 
@@ -11,7 +11,7 @@ Application web de planning des interventions ménage pour 2 studios Airbnb, ave
 | Lien | Description |
 |------|-------------|
 | [Calendrier](https://jonathantesson.github.io/planning-menage/) | Interface principale |
-| [Administration](https://jonathantesson.github.io/planning-menage/admin.html) | Back-office (accès protégé) |
+| [Administration](https://jonathantesson.github.io/planning-menage/admin.html) | Back-office (session + rôle admin) |
 | [GitHub Actions](https://github.com/JonathanTesson/planning-menage/actions) | Sync automatique + notifications |
 
 ---
@@ -42,11 +42,12 @@ planning-menage/
 - Si activée : écran de connexion (nom + mot de passe)
 - Session stockée en localStorage (pas besoin de se reconnecter)
 - Bouton "Déco." visible quand connecté
+- Comptes avec rôle **👑 admin** : le **badge prénom** (en-tête) est un lien vers `admin.html` ; les comptes **ménage seul** voient le prénom sans lien
 - Si l’auth est activée : chaque **connexion** et **déconnexion** est enregistrée dans le journal Firebase (visible dans l’admin)
 
 **Rôles**
 - 🧹 Ménage : voit le calendrier, voit tous les noms assignés, peut s'assigner/se retirer sur les départs uniquement (pas sur les arrivées)
-- 👑 Admin : voit tout, assigne n'importe qui, accès au 🔒 back-office
+- 👑 Admin : voit tout, assigne n'importe qui, accès au back-office via le **lien sur le prénom** (plus de bouton cadenas séparé)
 - Les deux rôles sont cumulables
 
 **Calendrier**
@@ -69,7 +70,11 @@ planning-menage/
 
 ### admin.html — Back-office
 
-Accès protégé par mot de passe admin (indépendant de l'auth utilisateurs).
+**Accès** : même session que le calendrier (`localStorage`, clé `menage_session_v1`) + vérification dans Firebase `adminConfig.accounts` :
+- Si **l’authentification planning est désactivée** : accès admin autorisé (même logique que le calendrier : tout le monde est admin).
+- Si **l’authentification est activée** : il faut une session valide (prénom enregistré à la connexion) **et** le compte doit avoir le rôle **👑 administrateur** ; sinon **redirection vers `index.html`**.
+- Écran de chargement « Vérification de l’accès » le temps de lire Firebase ; plus de mot de passe admin séparé ni d’écran de verrouillage dédié.
+- Bouton **Se déconnecter** en bas : retour au calendrier **sans** effacer la session ; pour quitter complètement le compte, utiliser **Déco.** sur `index.html`.
 
 **Statistiques**
 - Sélecteur de mois ← Avril →
@@ -91,17 +96,13 @@ Accès protégé par mot de passe admin (indépendant de l'auth utilisateurs).
 **Studios**
 - Renommer Studio 1 et Studio 2
 
-**Sécurité admin**
-- Mot de passe séparé pour accéder à admin.html
-- Toggle pour activer/désactiver la protection
-
 **Historique**
 - Liste des interventions passées par mois
 - Conservé 24 mois dans Firebase
 
 **Journal d’activité**
 - Tableau en bas de page : date, type d’événement, auteur, détail lisible
-- Événements enregistrés : connexions / déconnexions au planning (auth activée), assignations et retraits (ménage), modifications d’assignation par un admin, ouverture de l’admin avec mot de passe, ajout/suppression de compte, changement du mot de passe admin
+- Événements enregistrés : connexions / déconnexions au planning (auth activée), assignations et retraits (ménage), modifications d’assignation par un admin, ajout/suppression de compte (anciennes lignes « mot de passe admin » peuvent subsister dans l’historique)
 - Affichage des **200 derniers** événements ; bouton **Vider le journal** pour tout effacer dans Firebase
 - **Rotation automatique** : après chaque nouvel événement, si le journal dépasse **450** entrées en base, les plus **anciennes** (par date `ts`) sont supprimées — pas besoin de vider à la main pour limiter la taille sur le long terme
 - **Pas d’historique rétroactif** : seules les actions faites après la mise en place de cette fonction apparaissent
@@ -150,8 +151,7 @@ Structure des données :
 /adminConfig
   authEnabled: false
   accounts: [{ name, pwdHash, menage, admin }]
-  pwdEnabled: false
-  pwdHash: "..."
+  (les champs obsolètes pwdEnabled / pwdHash liés à l’ancien verrou admin peuvent encore exister en base ; ils sont retirés à l’enregistrement depuis l’admin)
 
 /lastSync
   ts: "2026-04-03T..."
@@ -173,7 +173,7 @@ Structure des données :
 
 ### Sécurité
 - Accès restreint au domaine de production (Google Cloud Console)
-- Authentification admin gérée dans Firebase
+- Admin : session planning + rôle `admin` sur le compte (données Firebase) ; pas de second mot de passe page admin
 - Tokens et clés dans GitHub Secrets uniquement
 
 ---
@@ -210,7 +210,7 @@ Colle ce bloc au début d'une nouvelle conversation :
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 3.1.1
+Version : 3.2.0
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
@@ -223,6 +223,10 @@ Claude peut lire le README directement depuis GitHub pour reprendre le contexte 
 ---
 
 ## Historique des versions
+
+### v3.2.0 — Avril 2026
+- Accès **admin.html** : session `menage_session_v1` + rôle 👑 dans `adminConfig.accounts` (sinon redirection vers le calendrier) ; suppression du mot de passe admin séparé et de l’écran de verrouillage
+- Calendrier : lien **admin** sur le badge prénom pour les admins uniquement ; suppression du bouton cadenas
 
 ### v3.1.1 — Avril 2026
 - Journal d’activité : rotation automatique (plafond **450** entrées en Firebase, les plus anciennes supprimées après chaque log)
