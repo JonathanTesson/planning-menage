@@ -15,7 +15,7 @@ const ORG_SYNC = [
     id: 'nade',
     label: 'Studio Nade',
     feeds: [
-      { url: 'https://https://www.airbnb.fr/calendar/ical/14100888.ics?s=8deacda46a0d8789fd490d36d2273c47', studio: 0 },
+      { url: 'https://www.airbnb.fr/calendar/ical/14100888.ics?s=8deacda46a0d8789fd490d36d2273c47', studio: 0 },
       { url: 'https://www.airbnb.fr/calendar/ical/22488935.ics?s=c29e0c53f848194fac3b0fcb136157bd', studio: 1 }
     ]
   }

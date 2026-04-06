@@ -36,6 +36,7 @@ planning-menage/
 ├── sync-ical.js         → Sync iCal → Firebase par organisation (cron)
 ├── notify-departs.js    → Notifications Telegram départs du jour (cron)
 ├── migrate.js           → Script one-shot : copie racine → /orgs/tesson/ (manuel)
+├── .gitignore           → Ignore les JSON de compte de service dans Firebase/ (local)
 ├── .github/workflows/
 │   ├── sync-ical.yml
 │   └── notify-departs.yml
@@ -58,7 +59,7 @@ Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. Ancienne rac
     /lastSync      → dernière sync iCal
     /activityLog   → journal d’activité
   /nade
-    (même structure ; vide au départ si pas encore remplie)
+    (même structure ; remplie selon sync iCal et utilisation)
 ```
 
 ### Champ optionnel `sharedWith` (comptes)
@@ -108,11 +109,13 @@ Signification prévue : l’intervenante intervient dans **plusieurs** organisat
 - Connexion : liste déroulante **Organisation** en tête, puis prénom / mot de passe.
 - Clé locale : **`menage_org_v1`** (id technique : `tesson`, `nade`, …).
 - Toutes les lectures / écritures Firebase sont préfixées par **`/orgs/{orgId}/`**.
-- Si l’utilisateur change d’organisation sur l’écran de connexion alors que Firebase était déjà initialisé pour une autre org, la page **se recharge** pour rebrancher les bons chemins.
+- Si l’utilisateur change d’organisation sur l’écran de connexion, la page **se recharge** après mise à jour du stockage, pour rebrancher Firebase sur la bonne org (évite liste de prénoms / données d’une autre org).
+- **Aucun compte** dans `adminConfig` pour cette org : écran **Organisation non configurée** avec liens vers **`admin.html`** et bouton **Changer d’organisation** (efface `menage_org_v1` + recharge). Le chargement attend aussi **`adminConfig`** avant de décider auth / écran.
+- **Auth désactivée** (`authEnabled: false`) : badge **Admin** (lien **`admin.html`**) et bouton **Accueil** (efface `menage_org_v1` + `menage_session_v1` + recharge) pour revenir au choix d’organisation ; le bouton **Déco.** reste masqué en mode ouvert.
 
-**Authentification** (inchangé par org)
+**Authentification** (par org)
 - Toggle dans l’admin de **l’org concernée** ; session **`menage_session_v1`** globale (prénom), combinée à **`menage_org_v1`** pour savoir quelle base lire.
-- Badge prénom → lien **admin** uniquement si rôle 👑 (voir section admin : même org en localStorage).
+- Badge prénom → lien **admin** si rôle 👑 ; en mode sans auth, le badge affiche **Admin** avec le même lien (même org en localStorage).
 
 **Calendrier**
 - Affichage **S1 / S2** inchangé (noms de studios viennent de `/orgs/{orgId}/config`).
@@ -127,8 +130,8 @@ Signification prévue : l’intervenante intervient dans **plusieurs** organisat
 ### sync-ical.js
 
 - Enchaîne les organisations définies dans **`ORG_SYNC`**.
-- **tesson** : URLs iCal existantes (2 studios).
-- **nade** : tableau **`feeds`** vide avec commentaire **« À compléter »** ; tant qu’il n’y a **aucune** URL, la sync pour cette org est **ignorée** (aucune écriture réservations / lastSync).
+- **tesson** et **nade** : deux flux iCal (studio 0 et 1) chacun lorsque les URLs sont renseignées dans **`feeds`**.
+- Si une org n’a **aucune** URL dans **`feeds`**, la sync pour cette org est **ignorée** (aucune écriture réservations / lastSync pour elle).
 - Écrit sous **`/orgs/{orgId}/reservations`** et **`/orgs/{orgId}/lastSync`**.
 - Notifications Telegram : préfixe avec le **libellé** de l’organisation.
 
@@ -192,7 +195,7 @@ Version : 4.0.0
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
-Fichiers : index.html, admin.html, sync-ical.js, notify-departs.js, migrate.js
+Fichiers : index.html, admin.html, sync-ical.js, notify-departs.js, migrate.js, .gitignore
 README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ```
 
@@ -202,10 +205,13 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 
 ### v4.0.0 — Avril 2026
 - **Multi-organisations** : données sous `/orgs/{orgId}/` ; orgs `tesson` (défaut) et `nade`
-- **localStorage** `menage_org_v1` ; écran organisation + liste org sur la connexion
-- **admin.html** : org obligatoire, topbar, `defaultOrgId` pour l’org affichée par défaut à la connexion
-- **sync-ical.js** / **notify-departs.js** : boucle par org ; nade sans URL iCal = sync départs ignorée côté iCal
+- **localStorage** `menage_org_v1` ; écran organisation + liste org sur la connexion ; rechargement si changement d’org au login
+- **Org sans comptes** : écran dédié + accès admin pour configuration ; attente **`adminConfig`** avant routage
+- **Mode sans auth** : badge **Admin** (lien admin), bouton **Accueil** (retour choix d’organisation)
+- **admin.html** : org obligatoire, topbar, `defaultOrgId` pour la pré-sélection login / UX
+- **sync-ical.js** / **notify-departs.js** : boucle par org ; org sans URL iCal = sync iCal ignorée pour cette org
 - **migrate.js** : copie one-shot racine → `/orgs/tesson/` sans suppression racine
+- **.gitignore** : ne pas versionner les JSON de compte de service dans `Firebase/`
 - Comptes : champ optionnel **`sharedWith`** (non utilisé en UI, documenté)
 
 ### v3.2.0 — Avril 2026
