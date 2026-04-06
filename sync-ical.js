@@ -175,11 +175,18 @@ async function syncOneOrg(org, token) {
   }
 
   let studioNames = [...STUDIO_NAMES_FALLBACK];
+  let telegramEnabled = true;
   try {
     const cfg = await firebaseGet(`${base}/config`, token);
     if (cfg?.studioNames?.length) studioNames = cfg.studioNames;
   } catch (e) {
     console.warn(`⚠️ ${org.id} config illisible, noms studios par défaut`);
+  }
+  try {
+    const ac = await firebaseGet(`${base}/adminConfig`, token);
+    if (ac) telegramEnabled = ac.telegramEnabled !== false;
+  } catch (e) {
+    /* défaut : actif */
   }
 
   let existing = {};
@@ -238,6 +245,8 @@ async function syncOneOrg(org, token) {
 
   if (notifications.length === 0) {
     console.log(`📭 [${org.id}] Aucun changement — pas de notification`);
+  } else if (!telegramEnabled) {
+    console.log(`🔕 [${org.id}] ${notifications.length} changement(s) — Telegram désactivé pour cette org (admin)`);
   } else {
     console.log(`📬 [${org.id}] ${notifications.length} notification(s)`);
     for (const msg of notifications) {

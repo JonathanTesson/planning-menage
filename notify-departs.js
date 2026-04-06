@@ -88,11 +88,14 @@ async function notifyOrg(org, token, today) {
   const base = `orgs/${org.id}`;
   let reservations = {}, assignments = {};
   let studioNames = [...STUDIO_NAMES_FALLBACK];
+  let telegramEnabled = true;
   try {
     const cfg = await firebaseGet(`${base}/config`, token);
     if (cfg?.studioNames?.length) studioNames = cfg.studioNames;
     reservations = (await firebaseGet(`${base}/reservations`, token)) || {};
     assignments = (await firebaseGet(`${base}/assignments`, token)) || {};
+    const ac = await firebaseGet(`${base}/adminConfig`, token);
+    if (ac) telegramEnabled = ac.telegramEnabled !== false;
     console.log(`📦 [${org.id}] ${Object.keys(reservations).length} réservation(s)`);
   } catch (e) {
     console.warn(`⚠️ [${org.id}] lecture Firebase:`, e.message);
@@ -137,9 +140,13 @@ async function notifyOrg(org, token, today) {
     } else msg += `\n⚠️ <b>Aucune intervenante assignée !</b>`;
     if (note) msg += `\n📝 Note : ${note}`;
 
-    console.log(`📤 [${org.id}] Notification départ ${sn}...`);
-    await sendTelegram(msg);
-    await new Promise(res => setTimeout(res, 500));
+    if (telegramEnabled) {
+      console.log(`📤 [${org.id}] Notification départ ${sn}...`);
+      await sendTelegram(msg);
+      await new Promise(res => setTimeout(res, 500));
+    } else {
+      console.log(`🔕 [${org.id}] Départ ${sn} — Telegram désactivé pour cette org (admin)`);
+    }
   }
 }
 

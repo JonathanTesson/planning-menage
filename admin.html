@@ -146,6 +146,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
         <select id="default-org-select" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:#fff" onchange="saveAdminConfig()" title="Pré-sélection sur l’écran de connexion">
         </select>
       </div>
+      <div class="field-row" style="margin-bottom:12px;align-items:center">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:12px;color:#333">Notifications Telegram</div>
+          <div style="font-size:11px;color:#aaa;margin-top:2px">Nouvelles résas (sync iCal) et départs du jour — par organisation</div>
+        </div>
+        <label class="toggle" style="flex-shrink:0">
+          <input type="checkbox" id="toggle-telegram" onchange="saveAdminConfig()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
       <div id="accounts-list"></div>
       <div class="add-account-row">
         <input type="text" id="new-name" placeholder="Prénom..." style="width:110px">
@@ -253,7 +263,7 @@ let A = {
   studioNames: ['Studio 1','Studio 2'],
   assignments: {},
   reservations: [],
-  adminConfig: { authEnabled: false, accounts: [], defaultOrgId: 'tesson' },
+  adminConfig: { authEnabled: false, accounts: [], defaultOrgId: 'tesson', telegramEnabled: true },
   unlocked: false,
   selectedMonth: new Date().getMonth(),
   selectedYear: new Date().getFullYear(),
@@ -337,7 +347,7 @@ onValue(ref(db,ob('reservations')), snap=>{
 
 onValue(ref(db,ob('adminConfig')), snap=>{
   const d=snap.val();
-  if(d) A.adminConfig={...A.adminConfig,...d, accounts: d.accounts||[], defaultOrgId:d.defaultOrgId||A.adminConfig.defaultOrgId||'tesson'};
+  if(d) A.adminConfig={...A.adminConfig,...d, accounts: d.accounts||[], defaultOrgId:d.defaultOrgId||A.adminConfig.defaultOrgId||'tesson', telegramEnabled:d.telegramEnabled!==false};
   verifyAdminAccess();
 });
 
@@ -391,6 +401,8 @@ function renderAdminContent(){
   document.getElementById('name-s1').value=A.studioNames[0];
   document.getElementById('name-s2').value=A.studioNames[1];
   document.getElementById('toggle-auth').checked=A.adminConfig.authEnabled||false;
+  const tg=document.getElementById('toggle-telegram');
+  if(tg) tg.checked=A.adminConfig.telegramEnabled!==false;
   renderHisto();
   renderActivityLog();
 }
@@ -580,6 +592,8 @@ function syncCleanersToConfig(){
 
 window.saveAdminConfig = function(){
   A.adminConfig.authEnabled=document.getElementById('toggle-auth').checked;
+  const tg=document.getElementById('toggle-telegram');
+  if(tg) A.adminConfig.telegramEnabled=!!tg.checked;
   const ds=document.getElementById('default-org-select');
   if(ds) A.adminConfig.defaultOrgId=ds.value||'tesson';
   delete A.adminConfig.pwdEnabled;
