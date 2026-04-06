@@ -39,3 +39,5 @@ Voir l’historique des commits
 
 --- Tes notes / autres commandes ---
 
+localStorage.clear()
+
