@@ -83,7 +83,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 <div class="topbar">
   <div>
     <div class="topbar-title">Administration</div>
-    <div class="topbar-sub">Planning Ménage</div>
+    <div class="topbar-sub"><span id="admin-org-label">…</span> · Planning Ménage</div>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#aaa">
@@ -140,6 +140,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
       </div>
       <div style="font-size:11px;color:#aaa;margin-bottom:0.75rem">
         🧹 = peut faire le ménage &nbsp;|&nbsp; 👑 = administrateur
+      </div>
+      <div class="field-row" style="margin-bottom:12px">
+        <label>Org. par défaut</label>
+        <select id="default-org-select" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:#fff" onchange="saveAdminConfig()" title="Pré-sélection sur l’écran de connexion">
+        </select>
       </div>
       <div id="accounts-list"></div>
       <div class="add-account-row">
@@ -223,12 +228,32 @@ const MAX_ACTIVITY_LOG_ENTRIES = 450;
 const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A6E','#c0392b'];
 const MO_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const SESSION_KEY = 'menage_session_v1';
+const ORG_STORAGE_KEY = 'menage_org_v1';
+const ORGANIZATIONS = [
+  { id: 'tesson', label: 'Studio Tesson' },
+  { id: 'nade', label: 'Studio Nade' }
+];
+
+function getStoredOrgId(){
+  try{
+    const v = localStorage.getItem(ORG_STORAGE_KEY);
+    if (v && ORGANIZATIONS.some(o => o.id === v)) return v;
+  }catch(e){}
+  return null;
+}
+
+const orgId = getStoredOrgId();
+if (!orgId || !ORGANIZATIONS.some(o => o.id === orgId)) {
+  window.location.replace('index.html');
+  throw new Error('no-org');
+}
+const ob = p => `orgs/${orgId}/${p}`;
 
 let A = {
   studioNames: ['Studio 1','Studio 2'],
   assignments: {},
   reservations: [],
-  adminConfig: { authEnabled: false, accounts: [] },
+  adminConfig: { authEnabled: false, accounts: [], defaultOrgId: 'tesson' },
   unlocked: false,
   selectedMonth: new Date().getMonth(),
   selectedYear: new Date().getFullYear(),
@@ -254,21 +279,22 @@ function showToast(msg){
 function fbSet(path,data){ set(ref(db,path),data).then(()=>setSyncStatus('ok')).catch(()=>setSyncStatus('err')); }
 
 async function trimActivityLogIfNeeded(){
+  const logRoot=ob('activityLog');
   try{
-    const snap=await get(ref(db,'activityLog'));
+    const snap=await get(ref(db,logRoot));
     const v=snap.val()||{};
     const keys=Object.keys(v);
     if(keys.length<=MAX_ACTIVITY_LOG_ENTRIES) return;
     const ranked=keys.map(k=>({ k, ts:Number(v[k]?.ts)||0 })).sort((a,b)=>a.ts-b.ts);
     const cut=keys.length-MAX_ACTIVITY_LOG_ENTRIES;
     const updates={};
-    for(let i=0;i<cut;i++) updates['activityLog/'+ranked[i].k]=null;
+    for(let i=0;i<cut;i++) updates[`${logRoot}/${ranked[i].k}`]=null;
     await update(ref(db),updates);
   }catch(_){}
 }
 
 function pushActivity(entry){
-  push(ref(db,'activityLog'),{
+  push(ref(db,ob('activityLog')),{
     ts:Date.now(),
     type:entry.type||'admin',
     actor:entry.actor!=null?entry.actor:'',
@@ -285,7 +311,7 @@ const cleanerColor = n => {
 
 // ─── Firebase listeners ───────────────────────────────────────────────────────
 
-onValue(ref(db,'lastSync'), snap=>{
+onValue(ref(db,ob('lastSync')), snap=>{
   const d=snap.val();
   if(d&&d.ts){
     const fmt=new Date(d.ts).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
@@ -294,28 +320,28 @@ onValue(ref(db,'lastSync'), snap=>{
   }
 });
 
-onValue(ref(db,'config'), snap=>{
+onValue(ref(db,ob('config')), snap=>{
   const d=snap.val();
   if(d){ A.studioNames=d.studioNames||A.studioNames; }
   setSyncStatus('ok');
   if(A.unlocked) renderAdminContent();
 });
 
-onValue(ref(db,'assignments'), snap=>{ A.assignments=snap.val()||{}; if(A.unlocked) renderStats(); });
+onValue(ref(db,ob('assignments')), snap=>{ A.assignments=snap.val()||{}; if(A.unlocked) renderStats(); });
 
-onValue(ref(db,'reservations'), snap=>{
+onValue(ref(db,ob('reservations')), snap=>{
   const data=snap.val()||{};
   A.reservations=Object.values(data).map(r=>({...r,start:new Date(r.start),end:new Date(r.end)}));
   if(A.unlocked) { renderStats(); renderHisto(); }
 });
 
-onValue(ref(db,'adminConfig'), snap=>{
+onValue(ref(db,ob('adminConfig')), snap=>{
   const d=snap.val();
-  if(d) A.adminConfig={...A.adminConfig,...d, accounts: d.accounts||[]};
+  if(d) A.adminConfig={...A.adminConfig,...d, accounts: d.accounts||[], defaultOrgId:d.defaultOrgId||A.adminConfig.defaultOrgId||'tesson'};
   verifyAdminAccess();
 });
 
-onValue(ref(db,'activityLog'), snap=>{
+onValue(ref(db,ob('activityLog')), snap=>{
   const v=snap.val()||{};
   A.activityEntries=Object.entries(v).map(([id,e])=>({id,...e}));
   if(A.unlocked) renderActivityLog();
@@ -352,6 +378,14 @@ window.logout = function(){
 // ─── Render ───────────────────────────────────────────────────────────────────
 
 function renderAdminContent(){
+  const ol=document.getElementById('admin-org-label');
+  if(ol) ol.textContent=ORGANIZATIONS.find(o=>o.id===orgId)?.label||orgId;
+  const dos=document.getElementById('default-org-select');
+  if(dos){
+    dos.innerHTML=ORGANIZATIONS.map(o=>`<option value="${o.id}">${o.label}</option>`).join('');
+    const d=A.adminConfig.defaultOrgId;
+    dos.value=(d&&ORGANIZATIONS.some(o=>o.id===d))?d:'tesson';
+  }
   renderStats();
   renderAccounts();
   document.getElementById('name-s1').value=A.studioNames[0];
@@ -392,7 +426,7 @@ function renderActivityLog(){
 
 window.clearActivityLog = function(){
   if(!confirm('Supprimer tout le journal d’activité ? Cette action est définitive.')) return;
-  set(ref(db,'activityLog'), null).then(()=>showToast('Journal vidé ✓')).catch(()=>showToast('Erreur réseau'));
+  set(ref(db,ob('activityLog')), null).then(()=>showToast('Journal vidé ✓')).catch(()=>showToast('Erreur réseau'));
 };
 
 function renderStats(){
@@ -491,7 +525,7 @@ window.addAccount = function(){
   if(!name) return;
   const accounts=A.adminConfig.accounts||[];
   if(accounts.find(a=>a.name===name)){ showToast('Ce prénom existe déjà'); return; }
-  accounts.push({ name, pwdHash: pwd?hashSimple(pwd):'', menage:true, admin:false });
+  accounts.push({ name, pwdHash: pwd?hashSimple(pwd):'', menage:true, admin:false, sharedWith: [] });
   A.adminConfig.accounts=accounts;
   saveAdminConfig();
   document.getElementById('new-name').value='';
@@ -539,16 +573,18 @@ window.saveAccountPwd = function(i){
 function syncCleanersToConfig(){
   // Synchronise la liste des ménage dans /config pour index.html
   const cleaners=(A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
-  set(ref(db,'config'), { studioNames: A.studioNames, cleaners });
+  set(ref(db,ob('config')), { studioNames: A.studioNames, cleaners });
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 window.saveAdminConfig = function(){
   A.adminConfig.authEnabled=document.getElementById('toggle-auth').checked;
+  const ds=document.getElementById('default-org-select');
+  if(ds) A.adminConfig.defaultOrgId=ds.value||'tesson';
   delete A.adminConfig.pwdEnabled;
   delete A.adminConfig.pwdHash;
-  fbSet('adminConfig', A.adminConfig);
+  fbSet(ob('adminConfig'), A.adminConfig);
 };
 
 window.saveNames = function(){

@@ -1,17 +1,30 @@
 const https = require('https');
 const http = require('http');
 
-const ICAL_URLS = [
-  'https://www.airbnb.fr/calendar/ical/23714051.ics?s=1c507a926f8f63d87b20fea875da704e',
-  'https://www.airbnb.fr/calendar/ical/846411261288811527.ics?s=998c515b74309dda07f768a2083cf270'
+/** Multi-organisations : chaque org a ses flux iCal. Flux vides = sync ignorée pour cette org. */
+const ORG_SYNC = [
+  {
+    id: 'tesson',
+    label: 'Studio Tesson',
+    feeds: [
+      { url: 'https://www.airbnb.fr/calendar/ical/23714051.ics?s=1c507a926f8f63d87b20fea875da704e', studio: 0 },
+      { url: 'https://www.airbnb.fr/calendar/ical/846411261288811527.ics?s=998c515b74309dda07f768a2083cf270', studio: 1 }
+    ]
+  },
+  {
+    id: 'nade',
+    label: 'Studio Nade',
+    feeds: [
+      // À compléter : { url: 'https://...', studio: 0 },
+      // À compléter : { url: 'https://...', studio: 1 },
+    ]
+  }
 ];
 
-const STUDIO_NAMES = ['Studio 1', 'Studio 2'];
+const STUDIO_NAMES_FALLBACK = ['Studio 1', 'Studio 2'];
 const FIREBASE_DB_URL = 'https://planning-menage-18b09-default-rtdb.firebaseio.com';
 const TELEGRAM_CHAT_ID = '-1002590523626';
 const HISTORY_MONTHS = 24;
-
-// ─── HTTP helpers ────────────────────────────────────────────────────────────
 
 function fetchUrl(url, redirectCount = 0) {
   return new Promise((resolve, reject) => {
@@ -41,8 +54,6 @@ function httpRequest(options, body) {
   });
 }
 
-// ─── iCal parser ─────────────────────────────────────────────────────────────
-
 function parseIcal(text, studioIndex) {
   const reservations = [];
   for (const ev of text.split('BEGIN:VEVENT').slice(1)) {
@@ -61,8 +72,6 @@ function parseIcal(text, studioIndex) {
   }
   return reservations;
 }
-
-// ─── Firebase helpers ─────────────────────────────────────────────────────────
 
 async function getFirebaseToken() {
   const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -110,8 +119,6 @@ async function firebasePut(path, data, token) {
   return JSON.parse(res.body);
 }
 
-// ─── Telegram ────────────────────────────────────────────────────────────────
-
 async function sendTelegram(message) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) { console.warn('⚠️ TELEGRAM_BOT_TOKEN manquant, notification ignorée'); return; }
@@ -136,31 +143,120 @@ function formatDate(dateStr) {
   return `${d}/${m}/${y}`;
 }
 
-function buildNewResaMessage(r) {
+function buildNewResaMessage(r, studioNames, orgLabel) {
   const nights = Math.round((new Date(r.end) - new Date(r.start)) / 86400000);
-  return `🏠 <b>Nouvelle réservation — ${STUDIO_NAMES[r.studio]}</b>\n` +
+  const sn = studioNames[r.studio] || STUDIO_NAMES_FALLBACK[r.studio] || `S${r.studio + 1}`;
+  return `🏠 <b>${orgLabel} — nouvelle réservation — ${sn}</b>\n` +
     `📅 Arrivée : ${formatDate(r.start)}\n` +
     `📅 Départ : ${formatDate(r.end)}\n` +
     `🌙 Durée : ${nights} nuit${nights > 1 ? 's' : ''}\n` +
     `👤 ${r.summary !== 'Réservation' ? r.summary : 'Voyageur non précisé'}`;
 }
 
-function buildCancelMessage(r, assignment) {
+function buildCancelMessage(r, assignment, studioNames, orgLabel) {
   const names = [assignment?.c1, assignment?.c2].filter(Boolean);
   const intervenantes = names.length
     ? `👷 Intervenante${names.length > 1 ? 's' : ''} prévue${names.length > 1 ? 's' : ''} : ${names.join(' + ')}\n`
     : '';
-  return `❌ <b>Réservation annulée — ${STUDIO_NAMES[r.studio]}</b>\n` +
+  const sn = studioNames[r.studio] || STUDIO_NAMES_FALLBACK[r.studio] || `S${r.studio + 1}`;
+  return `❌ <b>${orgLabel} — réservation annulée — ${sn}</b>\n` +
     `📅 Arrivée annulée : ${formatDate(r.start)}\n` +
     `📅 Départ annulé : ${formatDate(r.end)}\n` +
     `👤 ${r.summary !== 'Réservation' ? r.summary : 'Voyageur non précisé'}\n` +
     intervenantes;
 }
 
-// ─── Main ────────────────────────────────────────────────────────────────────
+async function syncOneOrg(org, token) {
+  const base = `orgs/${org.id}`;
+  const validFeeds = org.feeds.filter(f => f.url && String(f.url).trim());
+  if (!validFeeds.length) {
+    console.log(`⏭️ ${org.id} (${org.label}) : aucune URL iCal — sync ignorée (À compléter dans sync-ical.js)`);
+    return;
+  }
+
+  let studioNames = [...STUDIO_NAMES_FALLBACK];
+  try {
+    const cfg = await firebaseGet(`${base}/config`, token);
+    if (cfg?.studioNames?.length) studioNames = cfg.studioNames;
+  } catch (e) {
+    console.warn(`⚠️ ${org.id} config illisible, noms studios par défaut`);
+  }
+
+  let existing = {};
+  let assignments = {};
+  try {
+    existing = (await firebaseGet(`${base}/reservations`, token)) || {};
+    assignments = (await firebaseGet(`${base}/assignments`, token)) || {};
+    console.log(`📦 [${org.id}] ${Object.keys(existing).length} réservation(s) existantes`);
+  } catch (e) {
+    console.warn(`⚠️ [${org.id}] lecture existant:`, e.message);
+  }
+
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - HISTORY_MONTHS);
+  const cutoffStr = cutoff.toISOString().split('T')[0];
+
+  const merged = {};
+  for (const [uid, r] of Object.entries(existing)) {
+    if (r.end >= cutoffStr) merged[uid] = r;
+  }
+
+  const freshUids = new Set();
+  for (const feed of validFeeds) {
+    try {
+      console.log(`📅 [${org.id}] Chargement studio ${feed.studio}...`);
+      const text = await fetchUrl(feed.url);
+      const resas = parseIcal(text, feed.studio);
+      for (const r of resas) {
+        freshUids.add(r.uid);
+        merged[r.uid] = { ...(merged[r.uid] || {}), ...r };
+      }
+      console.log(`✅ [${org.id}] studio ${feed.studio}: ${resas.length} réservation(s) dans le flux`);
+    } catch (e) {
+      console.error(`❌ [${org.id}] studio ${feed.studio}:`, e.message);
+    }
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const notifications = [];
+
+  for (const uid of freshUids) {
+    if (!existing[uid] && merged[uid].end >= today) {
+      console.log(`🆕 [${org.id}] Nouvelle réservation : ${uid}`);
+      notifications.push(buildNewResaMessage(merged[uid], studioNames, org.label));
+    }
+  }
+
+  for (const [uid, r] of Object.entries(existing)) {
+    if (r.end >= today && !freshUids.has(uid)) {
+      console.log(`❌ [${org.id}] Annulation : ${uid}`);
+      const assignment = assignments[uid] || null;
+      notifications.push(buildCancelMessage(r, assignment, studioNames, org.label));
+      delete merged[uid];
+    }
+  }
+
+  if (notifications.length === 0) {
+    console.log(`📭 [${org.id}] Aucun changement — pas de notification`);
+  } else {
+    console.log(`📬 [${org.id}] ${notifications.length} notification(s)`);
+    for (const msg of notifications) {
+      await sendTelegram(msg);
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+
+  await firebasePut(`${base}/reservations`, merged, token);
+  await firebasePut(`${base}/lastSync`, {
+    ts: new Date().toISOString(),
+    count: Object.keys(merged).length,
+    notifications: notifications.length
+  }, token);
+  console.log(`✅ [${org.id}] Firebase mis à jour — ${Object.keys(merged).length} réservation(s)`);
+}
 
 async function main() {
-  console.log('🔄 Sync iCal → Firebase v3 (avec notifications Telegram)...');
+  console.log('🔄 Sync iCal → Firebase (multi-organisations)...');
 
   let token;
   try {
@@ -171,94 +267,14 @@ async function main() {
     process.exit(1);
   }
 
-  // Charger les réservations existantes
-  let existing = {};
-  let assignments = {};
-  try {
-    existing = (await firebaseGet('reservations', token)) || {};
-    assignments = (await firebaseGet('assignments', token)) || {};
-    console.log(`📦 ${Object.keys(existing).length} réservation(s) existantes dans Firebase`);
-  } catch (e) {
-    console.warn('⚠️ Impossible de lire les données existantes:', e.message);
-  }
-
-  // Cutoff historique
-  const cutoff = new Date();
-  cutoff.setMonth(cutoff.getMonth() - HISTORY_MONTHS);
-  const cutoffStr = cutoff.toISOString().split('T')[0];
-
-  // Garder les réservations dans la fenêtre d'historique
-  const merged = {};
-  for (const [uid, r] of Object.entries(existing)) {
-    if (r.end >= cutoffStr) merged[uid] = r;
-  }
-
-  // Fetch nouveaux iCal
-  const freshUids = new Set();
-  for (let i = 0; i < ICAL_URLS.length; i++) {
+  for (const org of ORG_SYNC) {
     try {
-      console.log(`📅 Chargement ${STUDIO_NAMES[i]}...`);
-      const text = await fetchUrl(ICAL_URLS[i]);
-      const resas = parseIcal(text, i);
-      for (const r of resas) {
-        freshUids.add(r.uid);
-        merged[r.uid] = { ...(merged[r.uid] || {}), ...r };
-      }
-      console.log(`✅ ${STUDIO_NAMES[i]}: ${resas.length} réservation(s)`);
+      await syncOneOrg(org, token);
     } catch (e) {
-      console.error(`❌ ${STUDIO_NAMES[i]} erreur:`, e.message);
+      console.error(`❌ [${org.id}] Erreur sync:`, e.message);
     }
   }
-
-  // ── Détecter les changements ──────────────────────────────────────────────
-  const today = new Date().toISOString().split('T')[0];
-  const notifications = [];
-
-  // Nouvelles réservations (dans le futur uniquement)
-  for (const uid of freshUids) {
-    if (!existing[uid] && merged[uid].end >= today) {
-      console.log(`🆕 Nouvelle réservation détectée : ${uid}`);
-      notifications.push(buildNewResaMessage(merged[uid]));
-    }
-  }
-
-  // Annulations : réservations futures qui étaient dans existing mais plus dans fresh
-  for (const [uid, r] of Object.entries(existing)) {
-    if (r.end >= today && !freshUids.has(uid)) {
-      console.log(`❌ Annulation détectée : ${uid}`);
-      const assignment = assignments[uid] || null;
-      notifications.push(buildCancelMessage(r, assignment));
-      // On supprime la réservation annulée de Firebase
-      delete merged[uid];
-    }
-  }
-
-  // Envoyer les notifications Telegram
-  if (notifications.length === 0) {
-    console.log('📭 Aucun changement détecté — pas de notification');
-  } else {
-    console.log(`📬 ${notifications.length} notification(s) à envoyer`);
-    for (const msg of notifications) {
-      await sendTelegram(msg);
-      // Petite pause entre les messages
-      await new Promise(r => setTimeout(r, 500));
-    }
-  }
-
-  // Écrire dans Firebase
-  try {
-    await firebasePut('reservations', merged, token);
-    await firebasePut('lastSync', {
-      ts: new Date().toISOString(),
-      count: Object.keys(merged).length,
-      notifications: notifications.length
-    }, token);
-    console.log(`✅ Firebase mis à jour — ${Object.keys(merged).length} réservation(s)`);
-    console.log('🎉 Synchronisation terminée !');
-  } catch (e) {
-    console.error('❌ Erreur écriture Firebase:', e.message);
-    process.exit(1);
-  }
+  console.log('🎉 Synchronisation terminée !');
 }
 
 main();

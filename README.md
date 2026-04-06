@@ -1,8 +1,8 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 3.2.0** — Avril 2026
+**Version : 4.0.0** — Avril 2026
 
-Application web de planning des interventions ménage pour 2 studios Airbnb, avec authentification par rôle, synchronisation temps réel Firebase, notifications Telegram et export Excel.
+Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram et export Excel.
 
 ---
 
@@ -11,8 +11,19 @@ Application web de planning des interventions ménage pour 2 studios Airbnb, ave
 | Lien | Description |
 |------|-------------|
 | [Calendrier](https://jonathantesson.github.io/planning-menage/) | Interface principale |
-| [Administration](https://jonathantesson.github.io/planning-menage/admin.html) | Back-office (session + rôle admin) |
+| [Administration](https://jonathantesson.github.io/planning-menage/admin.html) | Back-office (session + rôle admin + org choisie sur le calendrier) |
 | [GitHub Actions](https://github.com/JonathanTesson/planning-menage/actions) | Sync automatique + notifications |
+
+---
+
+## Organisations (orgId → libellé)
+
+| orgId   | Libellé affiché   |
+|---------|-------------------|
+| `tesson` | Studio Tesson    |
+| `nade`   | Studio Nade      |
+
+Ces paires sont définies **en dur** dans `index.html`, `admin.html`, `sync-ical.js` et `notify-departs.js`. L’**organisation par défaut** sur l’écran de connexion / premier choix est **`tesson`** ; l’admin peut fixer une autre valeur via **`defaultOrgId`** dans `adminConfig` (liste « Org. par défaut » dans l’admin).
 
 ---
 
@@ -22,13 +33,69 @@ Application web de planning des interventions ménage pour 2 studios Airbnb, ave
 planning-menage/
 ├── index.html           → Calendrier principal
 ├── admin.html           → Back-office administration
-├── sync-ical.js         → Sync iCal Airbnb → Firebase (toutes les heures)
-├── notify-departs.js    → Notifications Telegram départs du jour (10h00)
+├── sync-ical.js         → Sync iCal → Firebase par organisation (cron)
+├── notify-departs.js    → Notifications Telegram départs du jour (cron)
+├── migrate.js           → Script one-shot : copie racine → /orgs/tesson/ (manuel)
 ├── .github/workflows/
-│   ├── sync-ical.yml        → Cron toutes les heures
-│   └── notify-departs.yml   → Cron tous les jours à 10h (8h UTC)
+│   ├── sync-ical.yml
+│   └── notify-departs.yml
 └── README.md
 ```
+
+---
+
+## Firebase multi-organisations
+
+Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. Ancienne racine (`/config`, `/reservations`, …) : **ne pas supprimer** tant que la migration n’est pas validée ; utiliser **`migrate.js`** pour copier vers **`/orgs/tesson/`**.
+
+```
+/orgs
+  /tesson
+    /config        → studioNames, cleaners
+    /reservations  → réservations Airbnb
+    /assignments   → assignations
+    /adminConfig   → comptes, auth, defaultOrgId, …
+    /lastSync      → dernière sync iCal
+    /activityLog   → journal d’activité
+  /nade
+    (même structure ; vide au départ si pas encore remplie)
+```
+
+### Champ optionnel `sharedWith` (comptes)
+
+Dans **`adminConfig.accounts[]`**, chaque compte peut inclure :
+
+```json
+"sharedWith": ["tesson", "nade"]
+```
+
+Signification prévue : l’intervenante intervient dans **plusieurs** organisations. **Non utilisé par l’interface actuelle** ; les nouveaux comptes créés depuis l’admin ont `sharedWith: []`. Réservé à une évolution future (pas de bouton « voir mes autres orgs » dans cette version).
+
+---
+
+## Migration depuis la racine
+
+1. Sauvegarder / exporter Firebase si besoin.
+2. Avec la variable d’environnement **`FIREBASE_SERVICE_ACCOUNT`** (JSON du compte de service, comme pour les Actions) :
+   ```bash
+   node migrate.js
+   ```
+3. Lire le **résumé console** (chaque clé : copié / absent / erreur).
+4. Tester l’app en choisissant l’org **tesson** sur le calendrier.
+5. **Ne supprimer la racine** (`/config`, `/reservations`, …) qu’après validation manuelle.
+
+---
+
+## Ajouter une nouvelle organisation
+
+1. **Firebase** : créer les nœuds vides ou initiaux sous `/orgs/{nouvelOrgId}/` (même schéma que `tesson`).
+2. **Code** : ajouter `{ id: 'nouvelOrgId', label: '…' }` dans **`ORGANIZATIONS`** / listes équivalentes dans :
+   - `index.html`
+   - `admin.html`
+   - `notify-departs.js` (tableau `ORGS`)
+   - `sync-ical.js` (tableau `ORG_SYNC` + URLs iCal par flux `studio`)
+3. **Admin** : l’option « Org. par défaut » proposera automatiquement le nouvel id si `defaultOrgId` est synchronisé avec la liste.
+4. **Comptes** : créer les comptes et mots de passe dans l’admin **de cette org** (données séparées par organisation).
 
 ---
 
@@ -36,241 +103,137 @@ planning-menage/
 
 ### index.html — Calendrier
 
-**Authentification**
-- Toggle global dans admin.html : activée ou désactivée
-- Si désactivée : accès direct, tout le monde est admin
-- Si activée : écran de connexion (nom + mot de passe)
-- Session stockée en localStorage (pas besoin de se reconnecter)
-- Bouton "Déco." visible quand connecté
-- Comptes avec rôle **👑 admin** : le **badge prénom** (en-tête) est un lien vers `admin.html` ; les comptes **ménage seul** voient le prénom sans lien
-- Si l’auth est activée : chaque **connexion** et **déconnexion** est enregistrée dans le journal Firebase (visible dans l’admin)
+**Organisation**
+- Premier accès (pas de `menage_org_v1` dans `localStorage`) : écran **Organisation** puis **Continuer**.
+- Connexion : liste déroulante **Organisation** en tête, puis prénom / mot de passe.
+- Clé locale : **`menage_org_v1`** (id technique : `tesson`, `nade`, …).
+- Toutes les lectures / écritures Firebase sont préfixées par **`/orgs/{orgId}/`**.
+- Si l’utilisateur change d’organisation sur l’écran de connexion alors que Firebase était déjà initialisé pour une autre org, la page **se recharge** pour rebrancher les bons chemins.
 
-**Rôles**
-- 🧹 Ménage : voit le calendrier, voit tous les noms assignés, peut s'assigner/se retirer sur les départs uniquement (pas sur les arrivées)
-- 👑 Admin : voit tout, assigne n'importe qui, accès au back-office via le **lien sur le prénom** (plus de bouton cadenas séparé)
-- Les deux rôles sont cumulables
+**Authentification** (inchangé par org)
+- Toggle dans l’admin de **l’org concernée** ; session **`menage_session_v1`** globale (prénom), combinée à **`menage_org_v1`** pour savoir quelle base lire.
+- Badge prénom → lien **admin** uniquement si rôle 👑 (voir section admin : même org en localStorage).
 
 **Calendrier**
-- Vue mensuelle navigation ← Auj. →
-- Filtre 👥 par intervenante (visible par tous les rôles)
-- Blocs bleu = arrivée Studio 1, vert = arrivée Studio 2, orange = départ
-- Points de statut sur les jours de départ : 🔴 non assigné, 🟠 partiel, rien = tout assigné
-- Arrivées cliquables uniquement pour les admins
-
-**4 KPIs en haut**
-- Départs assignés/total du mois affiché
-- Non assignés restants
-- Prochain départ sans intervenante (toujours calculé depuis aujourd'hui, tous mois confondus)
-- Filtre Arrivées/Départs (par défaut : Départs uniquement)
-
-**Assignation**
-- Admin : 2 intervenantes par réservation + note
-- Ménage : bouton "+" pour s'assigner, "✕ Me retirer" pour se retirer
-- Chaque changement d’assignation est **journalisé** (qui, studio, date de départ, avant/après pour l’admin)
+- Affichage **S1 / S2** inchangé (noms de studios viennent de `/orgs/{orgId}/config`).
 
 ### admin.html — Back-office
 
-**Accès** : même session que le calendrier (`localStorage`, clé `menage_session_v1`) + vérification dans Firebase `adminConfig.accounts` :
-- Si **l’authentification planning est désactivée** : accès admin autorisé (même logique que le calendrier : tout le monde est admin).
-- Si **l’authentification est activée** : il faut une session valide (prénom enregistré à la connexion) **et** le compte doit avoir le rôle **👑 administrateur** ; sinon **redirection vers `index.html`**.
-- Écran de chargement « Vérification de l’accès » le temps de lire Firebase ; plus de mot de passe admin séparé ni d’écran de verrouillage dédié.
-- Bouton **Se déconnecter** en bas : retour au calendrier **sans** effacer la session ; pour quitter complètement le compte, utiliser **Déco.** sur `index.html`.
+- **Sans** `menage_org_v1` valide : **redirection vers `index.html`**.
+- Toutes les opérations Firebase sous **`/orgs/{orgId}/`** pour l’org choisie sur le calendrier.
+- **Topbar** : nom de l’organisation affiché.
+- **Org. par défaut** : enregistré dans **`adminConfig.defaultOrgId`** (pré-sélection sur le login / référence UX).
 
-**Statistiques**
-- Sélecteur de mois ← Avril →
-- Total départs, assignés, non assignés
-- Détail par intervenante avec couleur
+### sync-ical.js
 
-**Export Excel**
-- Sélection du mois → fichier .xlsx avec 2 onglets :
-  - Détail interventions (date, studio, arrivée, intervenante 1, intervenante 2, note)
-  - Récap par intervenante (nombre d'interventions, total, période)
-- Historique complet (tous les mois passés)
+- Enchaîne les organisations définies dans **`ORG_SYNC`**.
+- **tesson** : URLs iCal existantes (2 studios).
+- **nade** : tableau **`feeds`** vide avec commentaire **« À compléter »** ; tant qu’il n’y a **aucune** URL, la sync pour cette org est **ignorée** (aucune écriture réservations / lastSync).
+- Écrit sous **`/orgs/{orgId}/reservations`** et **`/orgs/{orgId}/lastSync`**.
+- Notifications Telegram : préfixe avec le **libellé** de l’organisation.
 
-**Gestion des comptes**
-- Toggle "Activer authentification" global
-- Chaque compte : prénom + mot de passe + rôle 🧹 et/ou 👑
-- Ajout/suppression/modification des comptes
-- Les comptes 🧹 apparaissent automatiquement dans les listes du calendrier
+### notify-departs.js
 
-**Studios**
-- Renommer Studio 1 et Studio 2
-
-**Historique**
-- Liste des interventions passées par mois
-- Conservé 24 mois dans Firebase
-
-**Journal d’activité**
-- Tableau en bas de page : date, type d’événement, auteur, détail lisible
-- Événements enregistrés : connexions / déconnexions au planning (auth activée), assignations et retraits (ménage), modifications d’assignation par un admin, ajout/suppression de compte (anciennes lignes « mot de passe admin » peuvent subsister dans l’historique)
-- Affichage des **200 derniers** événements ; bouton **Vider le journal** pour tout effacer dans Firebase
-- **Rotation automatique** : après chaque nouvel événement, si le journal dépasse **450** entrées en base, les plus **anciennes** (par date `ts`) sont supprimées — pas besoin de vider à la main pour limiter la taille sur le long terme
-- **Pas d’historique rétroactif** : seules les actions faites après la mise en place de cette fonction apparaissent
-- En mode **sans authentification** sur le calendrier, les lignes d’assignation admin indiquent « Mode ouvert » ; les connexions ne sont pas journalisées (pas de compte identifiable)
-
-**Légende & Sync**
-- Explication des points de couleur
-- Date de dernière synchronisation Airbnb
-
-### sync-ical.js — Synchronisation iCal
-
-- Tourne toutes les heures via GitHub Actions
-- Récupère les iCal Airbnb des 2 studios
-- **Mode fusion** : conserve les réservations passées 24 mois (ne les écrase pas)
-- Détecte les **nouvelles réservations** → notification Telegram
-- Détecte les **annulations** → notification Telegram avec nom(s) de l'intervenante prévue
-
-### notify-departs.js — Notifications départs
-
-- Tourne tous les jours à 10h (8h UTC = 10h heure française été)
-- Vérifie s'il y a des départs aujourd'hui dans Firebase
-- Envoie un message Telegram par départ :
-  - Studio concerné
-  - Prochaine arrivée (dans X jours)
-  - Intervenante(s) assignée(s)
-  - Note éventuelle
-  - ⚠️ Si aucune intervenante assignée
+- Parcourt **`tesson`** puis **`nade`** (liste **`ORGS`**).
+- Lit **`/orgs/{orgId}/reservations`**, **`assignments`**, **`config`**.
+- Un message Telegram par départ du jour, avec le **libellé org** dans le titre.
 
 ---
 
 ## Infrastructure technique
 
-### Firebase Realtime Database
-Structure des données :
-```
-/config
-  studioNames: ["Studio 1", "Studio 2"]
-  cleaners: ["Steffie", "Emmy", ...]   ← sync auto depuis adminConfig
-
-/reservations
-  {uid}: { uid, summary, start, end, studio }
-
-/assignments
-  {uid}: { c1, c2, note }
-
-/adminConfig
-  authEnabled: false
-  accounts: [{ name, pwdHash, menage, admin }]
-  (les champs obsolètes pwdEnabled / pwdHash liés à l’ancien verrou admin peuvent encore exister en base ; ils sont retirés à l’enregistrement depuis l’admin)
-
-/lastSync
-  ts: "2026-04-03T..."
-  count: 116
-  notifications: 0
-
-/activityLog
-  {pushId}: { ts, type, actor, text, uid? }   ← journal append-only (push), affiché dans admin.html
-```
-
 ### GitHub Actions — Secrets requis
-- `FIREBASE_SERVICE_ACCOUNT` : clé JSON compte de service Firebase
-- `TELEGRAM_BOT_TOKEN` : token du bot @TessonLocationbot
+
+- `FIREBASE_SERVICE_ACCOUNT` : clé JSON compte de service Firebase  
+- `TELEGRAM_BOT_TOKEN` : token du bot @TessonLocationbot  
 
 ### Telegram
-- Bot : @TessonLocationbot
-- Groupe : chat_id `-1002590523626`
-- 2 types de notifications : nouvelles réservations/annulations (sync-ical.js) + départs du jour (notify-departs.js)
+
+- Bot : @TessonLocationbot  
+- Groupe : chat_id `-1002590523626`  
 
 ### Sécurité
-- Accès restreint au domaine de production (Google Cloud Console)
-- Admin : session planning + rôle `admin` sur le compte (données Firebase) ; pas de second mot de passe page admin
-- Tokens et clés dans GitHub Secrets uniquement
+
+- Accès restreint au domaine de production (Google Cloud Console) quand configuré.  
+- Données sensibles : secrets uniquement côté GitHub Actions ; **`migrate.js`** en local avec la même variable `FIREBASE_SERVICE_ACCOUNT`.
 
 ---
 
-## Studios
+## Studios (affichage calendrier)
 
 | | Studio 1 | Studio 2 |
 |--|----------|----------|
 | Couleur calendrier | Bleu | Vert |
 
-*(Studio 3 en perspective — ajouter URL iCal dans sync-ical.js + adapter index.html)*
-
 ---
 
 ## Intervenantes (comptes)
 
-Gérés dans admin.html → section Comptes. Les rôles et mots de passe sont stockés dans Firebase.
+Gérées dans **admin.html** de **chaque organisation**. Structure compte : `name`, `pwdHash`, `menage`, `admin`, et optionnellement **`sharedWith`** (voir plus haut).
 
 ---
 
 ## Améliorations prévues
 
-1. **Studio 3** — quand l'URL iCal sera disponible (10 min)
-2. **Code d'accès simple** sur index.html pour sécuriser même sans auth complète
-3. **Sécurisation Firebase** — règles plus strictes (actuellement ouvert, protégé par restriction de domaine)
-4. **Multi-onglets** — page d'accueil avec navigation vers d'autres modules (planning enfants, crèche, périscolaire...)
-5. **Application mobile native** — pour notifications push (chantier important)
+1. **Studio 3** / troisième flux iCal par org  
+2. **Code d'accès simple** sur index.html  
+3. **Sécurisation Firebase** — règles RTDB plus strictes  
+4. **Exploitation de `sharedWith`** — UI et agrégation multi-org  
+5. **Hub multi-plannings** (enfants, crèche, etc.)  
+6. **Application mobile native** — notifications push  
 
 ---
 
 ## Comment reprendre le développement avec Claude
 
-Colle ce bloc au début d'une nouvelle conversation :
-
 ```
 Projet : Planning Ménage Airbnb
-Version : 3.2.0
+Version : 4.0.0
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
-Fichiers : index.html, admin.html, sync-ical.js, notify-departs.js
+Fichiers : index.html, admin.html, sync-ical.js, notify-departs.js, migrate.js
 README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ```
-
-Claude peut lire le README directement depuis GitHub pour reprendre le contexte complet.
 
 ---
 
 ## Historique des versions
 
+### v4.0.0 — Avril 2026
+- **Multi-organisations** : données sous `/orgs/{orgId}/` ; orgs `tesson` (défaut) et `nade`
+- **localStorage** `menage_org_v1` ; écran organisation + liste org sur la connexion
+- **admin.html** : org obligatoire, topbar, `defaultOrgId` pour l’org affichée par défaut à la connexion
+- **sync-ical.js** / **notify-departs.js** : boucle par org ; nade sans URL iCal = sync départs ignorée côté iCal
+- **migrate.js** : copie one-shot racine → `/orgs/tesson/` sans suppression racine
+- Comptes : champ optionnel **`sharedWith`** (non utilisé en UI, documenté)
+
 ### v3.2.0 — Avril 2026
-- Accès **admin.html** : session `menage_session_v1` + rôle 👑 dans `adminConfig.accounts` (sinon redirection vers le calendrier) ; suppression du mot de passe admin séparé et de l’écran de verrouillage
-- Calendrier : lien **admin** sur le badge prénom pour les admins uniquement ; suppression du bouton cadenas
+- Accès admin via session + rôle 👑 ; lien admin sur le badge prénom
 
 ### v3.1.1 — Avril 2026
-- Journal d’activité : rotation automatique (plafond **450** entrées en Firebase, les plus anciennes supprimées après chaque log)
+- Journal d’activité : rotation automatique (450 entrées max)
 
 ### v3.1.0 — Avril 2026
-- Journal d’activité Firebase (`/activityLog`) : connexions, assignations, accès admin, gestion des comptes
-- Section **Journal d’activité** dans admin.html (200 derniers événements, vider le journal)
+- Journal d’activité Firebase
 
 ### v3.0.0 — Avril 2026
-- Authentification par rôle (🧹 ménage / 👑 admin)
-- Session localStorage (pas de reconnexion à chaque page)
-- Vue ménage : voit tous les noms, s'assigne uniquement sur les départs
-- Gestion des comptes dans admin.html (remplace les paramètres de index.html)
-- Studios déplacés dans admin.html
-- Bouton ⚙ supprimé de index.html, légende/sync dans admin.html
-- Filtre intervenantes visible par tous les rôles
+- Authentification par rôle, admin.html, etc.
 
 ### v2.4.0 — Avril 2026
-- Bouton 🔒 vers admin.html dans l'en-tête
-- KPI "Prochain départ" figé sur aujourd'hui
-- Export Excel avec 2 onglets (détail + récap)
-- Sélecteur de mois avec flèches dans admin.html
-- sync-ical.js v3 : notifications Telegram nouvelles réservations et annulations
-- notify-departs.js : notifications Telegram départs du jour à 10h
+- Export Excel, sync iCal v3, notify départs
 
 ### v2.3.0 — Avril 2026
-- sync-ical.js v2 : mode fusion, conservation 24 mois
-- admin.html : back-office avec stats, export, historique, mot de passe
+- sync-ical mode fusion 24 mois
 
 ### v2.2.0 — Avril 2026
-- KPIs : 3 cartes métriques + carte filtre Arrivées/Départs
-- Points de statut rouge/orange sur les jours de départ
-- Filtre par défaut : Départs uniquement
+- KPIs, filtres arrivées/départs
 
 ### v2.0.0 — Mars 2026
-- Réservations stockées dans Firebase
-- GitHub Actions : sync automatique toutes les heures
-- Synchronisation temps réel Firebase
-- 2 intervenantes par réservation
+- Firebase + GitHub Actions
 
 ### v1.0.0 — Mars 2026
-- Calendrier mensuel avec réservations Airbnb
-- Stockage local (localStorage)
-- Hébergement GitHub Pages
+- Calendrier + localStorage + GitHub Pages
 
 ---
 

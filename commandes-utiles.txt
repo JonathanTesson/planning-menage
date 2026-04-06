@@ -1,0 +1,41 @@
+=== Planning ménage — commandes utiles (mémo perso) ===
+
+--- Serveur local (tester le site dans le navigateur) ---
+cd c:\Users\Jonathan\planning-menage
+python -m http.server 5173
+
+Puis ouvrir : http://127.0.0.1:5173/index.html
+Arrêter le serveur : Ctrl+C dans le terminal
+
+--- Migration Firebase (une fois, après backup — voir README) ---
+  node migrate.js
+  (nécessite la variable d’environnement FIREBASE_SERVICE_ACCOUNT)
+
+--- Prochaines commandes à apprendre (selon l’avancement du projet) ---
+
+Étape 1 — Voir où tu en es avec Git (à utiliser souvent)
+  git status
+
+Étape 2 — Préparer un commit (ajouter les fichiers modifiés)
+  git add index.html admin.html README.md
+  (ou tout d’un coup, prudence : vérifie avant avec git status)
+  git add .
+
+Étape 3 — Enregistrer un point de sauvegarde avec un message clair
+  git commit -m "Description courte de ce que tu as changé"
+
+Étape 4 — Envoyer sur GitHub (met à jour le site Pages après push)
+  git push
+
+Étape 5 — Récupérer le travail depuis GitHub (autre PC ou changements en ligne)
+  git pull
+
+Utile pour voir les différences avant de commit
+  git diff
+
+Voir l’historique des commits
+  git log --oneline -10
+
+
+--- Tes notes / autres commandes ---
+

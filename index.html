@@ -91,6 +91,8 @@ a.user-badge.user-badge-admin:hover{text-decoration:underline;background:#eef4fc
 .btn-danger:hover{background:#fde8e8}
 .btn-cancel{background:#fff;border:1px solid #ddd;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;color:#333}
 .btn-cancel:hover{background:#f5f5f0}
+.btn-secondary{background:#fff;color:#555;border:1px solid #ddd;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px}
+.btn-secondary:hover{background:#f5f5f0}
 
 /* Modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem}
@@ -115,6 +117,8 @@ a.user-badge.user-badge-admin:hover{text-decoration:underline;background:#eef4fc
 .login-input{width:100%;max-width:260px;padding:10px 14px;border:1px solid #ddd;border-radius:10px;font-size:16px;text-align:center;letter-spacing:4px}
 .login-input:focus,.login-select:focus{outline:none;border-color:#378ADD}
 .login-error{color:#E24B4A;font-size:12px}
+.login-unconfig-title{font-size:18px;font-weight:600;color:#185FA5;text-decoration:none;text-align:center;cursor:pointer;max-width:320px;line-height:1.35}
+.login-unconfig-title:hover{text-decoration:underline}
 
 /* Toast */
 .toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
@@ -146,18 +150,42 @@ a.user-badge.user-badge-admin:hover{text-decoration:underline;background:#eef4fc
   </div>
 </div>
 
+<!-- ORGANISATION (obligatoire avant chargement Firebase) -->
+<div id="org-first-screen" style="display:none">
+  <div class="login-screen">
+    <div class="login-icon">🏢</div>
+    <div class="login-title">Organisation</div>
+    <div class="login-sub">Choisissez l’organisation pour charger le planning</div>
+    <select class="login-select" id="org-first-select" aria-label="Organisation"></select>
+    <button type="button" class="btn-primary" onclick="confirmOrgFirst()">Continuer</button>
+  </div>
+</div>
+
 <!-- LOGIN SCREEN -->
 <div id="login-screen" style="display:none">
   <div class="login-screen">
     <div class="login-icon">🔑</div>
     <div class="login-title">Planning Ménage</div>
     <div class="login-sub">Identifiez-vous pour accéder<br>au planning</div>
+    <label for="login-org" style="font-size:11px;color:#aaa;max-width:260px;width:100%">Organisation</label>
+    <select class="login-select" id="login-org" aria-label="Organisation" onchange="onLoginOrgChange()"></select>
     <select class="login-select" id="login-name">
       <option value="">— Choisissez votre nom —</option>
     </select>
     <input type="password" class="login-input" id="login-pwd" placeholder="••••••" onkeydown="if(event.key==='Enter')doLogin()">
     <div class="login-error" id="login-error" style="display:none">Mot de passe incorrect</div>
     <button class="btn-primary" onclick="doLogin()">Connexion</button>
+  </div>
+</div>
+
+<!-- Org sans comptes Firebase : accès admin sans auth (admin.html avec auth désactivée par défaut) -->
+<div id="org-unconfigured-screen" style="display:none">
+  <div class="login-screen">
+    <div class="login-icon">🏢</div>
+    <a href="admin.html" class="login-unconfig-title">Organisation non configurée</a>
+    <div class="login-sub">Aucun compte n’est défini pour cette organisation. Touchez le lien ci-dessus ou le bouton pour ouvrir l’administration et créer les premiers comptes.</div>
+    <a href="admin.html" class="btn-primary" style="text-decoration:none;text-align:center;display:inline-block">Ouvrir l’administration</a>
+    <button type="button" class="btn-secondary" onclick="clearOrgChoiceAndReload()">Changer d’organisation</button>
   </div>
 </div>
 
@@ -173,8 +201,9 @@ a.user-badge.user-badge-admin:hover{text-decoration:underline;background:#eef4fc
         <button class="nav-btn" onclick="changeMonth(1)">&#8594;</button>
       </div>
     </div>
-    <div style="display:flex;gap:6px;align-items:center">
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
       <a id="current-user-badge" class="user-badge" style="display:none" href="admin.html"></a>
+      <button id="home-btn" type="button" class="nav-btn" onclick="goHomeOrgPick()" style="display:none" title="Choisir une autre organisation">Accueil</button>
       <button id="logout-btn" class="logout-btn" onclick="doLogout()" style="display:none">Déco.</button>
     </div>
   </div>
@@ -213,13 +242,30 @@ const db = getDatabase(app);
 const MAX_ACTIVITY_LOG_ENTRIES = 450;
 const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A6E','#c0392b'];
 const SESSION_KEY = 'menage_session_v1';
+const ORG_STORAGE_KEY = 'menage_org_v1';
+const ORGANIZATIONS = [
+  { id: 'tesson', label: 'Studio Tesson' },
+  { id: 'nade', label: 'Studio Nade' }
+];
+
+function getStoredOrgId(){
+  try{
+    const v = localStorage.getItem(ORG_STORAGE_KEY);
+    if (v && ORGANIZATIONS.some(o => o.id === v)) return v;
+  }catch(e){}
+  return null;
+}
+function setStoredOrgId(id){
+  try{ if(id) localStorage.setItem(ORG_STORAGE_KEY, id); }catch(e){}
+}
+function orgLabel(id){ return (ORGANIZATIONS.find(o=>o.id===id)||{}).label || id || ''; }
 
 let S = {
   cleaners: [],
   studioNames: ['Studio 1','Studio 2'],
   assignments: {},
   reservations: [],
-  adminConfig: { authEnabled: false, accounts: [] },
+  adminConfig: { authEnabled: false, accounts: [], defaultOrgId: 'tesson' },
   currentMonth: new Date().getMonth(),
   currentYear: new Date().getFullYear(),
   showSettings: false,
@@ -230,6 +276,14 @@ let S = {
 
 let fbReady = false;
 const loaded = { config: false, assignments: false, reservations: false, adminConfig: false };
+
+function essentialDataLoaded(){
+  return loaded.config && loaded.assignments && loaded.reservations && loaded.adminConfig;
+}
+/** True dès que Firebase a au moins un compte pour l’org chargée (chemin orgs/{orgId}/adminConfig). */
+function orgHasConfiguredAccounts(){
+  return (S.adminConfig.accounts||[]).length > 0;
+}
 
 // ─── Session ──────────────────────────────────────────────────────────────────
 
@@ -244,6 +298,15 @@ function loadSession(){
 function clearSession(){
   try { localStorage.removeItem(SESSION_KEY); } catch(e){}
 }
+
+/** Retour écran choix d’organisation : ne vide que les clés du planning. */
+window.goHomeOrgPick=function(){
+  try{
+    localStorage.removeItem(ORG_STORAGE_KEY);
+    localStorage.removeItem(SESSION_KEY);
+  }catch(e){}
+  location.reload();
+};
 
 function hashSimple(str){
   let h=0;
@@ -278,13 +341,23 @@ function checkAuth(){
 function el(id){ return document.getElementById(id); }
 
 function showApp(){
+  if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='none';
+  if(el('org-first-screen')) el('org-first-screen').style.display='none';
   if(el('login-screen')) el('login-screen').style.display='none';
   if(el('main-app')) el('main-app').style.display='';
   const noAuth=S.currentUser?.noAuth;
   if(el('logout-btn')) el('logout-btn').style.display=noAuth?'none':'';
+  const homeBtn=el('home-btn');
+  if(homeBtn) homeBtn.style.display=noAuth?'':'none';
   const badge=el('current-user-badge');
   if(badge){
-    if(!noAuth && S.currentUser?.name){
+    if(noAuth){
+      badge.textContent='Admin';
+      badge.style.display='';
+      badge.setAttribute('href','admin.html');
+      badge.classList.add('user-badge-admin');
+      badge.title='Ouvrir l’administration de cette organisation';
+    }else if(S.currentUser?.name){
       badge.textContent=S.currentUser.name;
       badge.style.display='';
       if(S.currentUser.admin){
@@ -296,23 +369,52 @@ function showApp(){
         badge.classList.remove('user-badge-admin');
         badge.removeAttribute('title');
       }
-    } else {
+    }else{
       badge.style.display='none';
     }
   }
   render();
 }
 
+function fillOrgSelect(selectEl){
+  if(!selectEl) return;
+  selectEl.innerHTML=ORGANIZATIONS.map(o=>`<option value="${o.id}">${o.label}</option>`).join('');
+}
 function showLogin(){
+  if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='none';
+  if(el('org-first-screen')) el('org-first-screen').style.display='none';
   if(el('login-screen')) el('login-screen').style.display='';
   if(el('main-app')) el('main-app').style.display='none';
+  const stored=getStoredOrgId();
+  const defOrg=stored||(S.adminConfig.defaultOrgId&&ORGANIZATIONS.some(o=>o.id===S.adminConfig.defaultOrgId)
+    ? S.adminConfig.defaultOrgId
+    : 'tesson');
+  const orgEl=el('login-org');
+  fillOrgSelect(orgEl);
+  if(orgEl) orgEl.value=defOrg;
   const accounts=S.adminConfig.accounts||[];
   const sel=el('login-name');
   if(sel) sel.innerHTML='<option value="">— Choisissez votre nom —</option>'+
     accounts.map(a=>`<option value="${a.name}">${a.name}</option>`).join('');
 }
 
+/** Le planning Firebase est lié à menage_org_v1 : changer l’org sur l’écran login recharge avec les bonnes données. */
+window.onLoginOrgChange=function(){
+  const sel=el('login-org');
+  if(!sel||!sel.value) return;
+  setStoredOrgId(sel.value);
+  location.reload();
+};
+
+window.clearOrgChoiceAndReload=function(){
+  try{ localStorage.removeItem(ORG_STORAGE_KEY); }catch(e){}
+  location.reload();
+};
+
 window.doLogin = function(){
+  const orgSel=document.getElementById('login-org');
+  const orgId=orgSel&&orgSel.value;
+  if(!orgId){ document.getElementById('login-error').style.display=''; document.getElementById('login-error').textContent='Choisissez une organisation'; return; }
   const name=document.getElementById('login-name').value;
   const pwd=document.getElementById('login-pwd').value;
   if(!name){ document.getElementById('login-error').style.display=''; document.getElementById('login-error').textContent='Choisissez votre nom'; return; }
@@ -325,6 +427,11 @@ window.doLogin = function(){
     return;
   }
   document.getElementById('login-error').style.display='none';
+  setStoredOrgId(orgId);
+  if(window.__menageFbInit && window.__menageActiveOrg && window.__menageActiveOrg!==orgId){
+    location.reload();
+    return;
+  }
   S.currentUser={ name:acc.name, menage:acc.menage, admin:acc.admin };
   saveSession({ name:acc.name });
   logActivity({ type:'login', actor:acc.name, text:acc.name+' s\'est connectée au planning' });
@@ -337,8 +444,10 @@ window.doLogout = function(){
   }
   clearSession();
   S.currentUser=null;
-  document.getElementById('login-pwd').value='';
-  checkAuth();
+  const pe=el('login-pwd'); if(pe) pe.value='';
+  if(!essentialDataLoaded()) return;
+  if(!orgHasConfiguredAccounts()) showOrgUnconfigured();
+  else checkAuth();
 };
 
 // ─── Firebase ─────────────────────────────────────────────────────────────────
@@ -356,21 +465,26 @@ function showToast(msg){
 function fbSet(path,data){ set(ref(db,path),data).then(()=>setSyncStatus('ok')).catch(()=>setSyncStatus('err')); }
 
 async function trimActivityLogIfNeeded(){
+  const oid=getStoredOrgId();
+  if(!oid) return;
+  const logRoot=`orgs/${oid}/activityLog`;
   try{
-    const snap=await get(ref(db,'activityLog'));
+    const snap=await get(ref(db,logRoot));
     const v=snap.val()||{};
     const keys=Object.keys(v);
     if(keys.length<=MAX_ACTIVITY_LOG_ENTRIES) return;
     const ranked=keys.map(k=>({ k, ts:Number(v[k]?.ts)||0 })).sort((a,b)=>a.ts-b.ts);
     const cut=keys.length-MAX_ACTIVITY_LOG_ENTRIES;
     const updates={};
-    for(let i=0;i<cut;i++) updates['activityLog/'+ranked[i].k]=null;
+    for(let i=0;i<cut;i++) updates[`${logRoot}/${ranked[i].k}`]=null;
     await update(ref(db),updates);
   }catch(_){/* silencieux : ne pas bloquer l'app */}
 }
 
 function logActivity(payload){
-  push(ref(db,'activityLog'),{
+  const oid=getStoredOrgId();
+  if(!oid) return;
+  push(ref(db,`orgs/${oid}/activityLog`),{
     ts:Date.now(),
     type:payload.type||'event',
     actor:payload.actor||'',
@@ -390,68 +504,142 @@ function assignActorLabel(){
   return u.name||'Utilisateur';
 }
 
-function checkReady(){
-  // On affiche dès que les données essentielles sont là
-  const essentialLoaded = loaded.config && loaded.assignments && loaded.reservations;
-  if(essentialLoaded && !fbReady){
-    fbReady=true;
-    setStatus('');
-    checkAuth();
-  } else if(fbReady){
-    render();
-  }
+function hideOrgUnconfiguredScreen(){
+  if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='none';
 }
 
-setStatus('Chargement...', true);
+function showOrgUnconfigured(){
+  if(el('org-first-screen')) el('org-first-screen').style.display='none';
+  if(el('login-screen')) el('login-screen').style.display='none';
+  if(el('main-app')) el('main-app').style.display='none';
+  if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='';
+  S.currentUser=null;
+}
 
-onValue(ref(db,'config'), snap=>{
-  const d=snap.val();
-  if(d){ S.cleaners=d.cleaners||[]; S.studioNames=d.studioNames||S.studioNames; }
-  setSyncStatus('ok'); loaded.config=true;
-  fbReady?render():checkReady();
-});
+function routeAfterFirebaseReady(){
+  if(!orgHasConfiguredAccounts()){
+    showOrgUnconfigured();
+    return;
+  }
+  hideOrgUnconfiguredScreen();
+  checkAuth();
+}
 
-onValue(ref(db,'assignments'), snap=>{
-  S.assignments=snap.val()||{}; loaded.assignments=true;
-  fbReady?render():checkReady();
-});
+/** Après le premier chargement complet, réagit aux mises à jour (ex. premier compte créé depuis l’admin). */
+function routeAfterFirebaseUpdate(){
+  if(!fbReady || !essentialDataLoaded()) return;
+  if(!orgHasConfiguredAccounts()){
+    showOrgUnconfigured();
+    return;
+  }
+  hideOrgUnconfiguredScreen();
+  if(S.adminConfig.authEnabled && S.currentUser?.noAuth){
+    checkAuth();
+    return;
+  }
+  if(S.currentUser) render();
+  else checkAuth();
+}
 
-onValue(ref(db,'reservations'), snap=>{
-  const data=snap.val()||{};
-  S.reservations=Object.values(data).map(r=>({...r,start:new Date(r.start),end:new Date(r.end)}));
-  loaded.reservations=true; fbReady?render():checkReady();
-});
+function afterFbListener(){
+  if(!fbReady) checkReady();
+  else routeAfterFirebaseUpdate();
+}
 
-onValue(ref(db,'adminConfig'), snap=>{
-  const d=snap.val();
-  if(d) S.adminConfig={...S.adminConfig,...d, accounts:d.accounts||[]};
-  loaded.adminConfig=true;
-  if(!fbReady){
-    checkReady();
-  } else {
-    // adminConfig chargé après → re-vérifier auth si auth activée
-    if(S.adminConfig.authEnabled && S.currentUser?.noAuth){
-      checkAuth();
-    } else {
-      render();
+function checkReady(){
+  if(!essentialDataLoaded() || fbReady) return;
+  fbReady=true;
+  setStatus('');
+  routeAfterFirebaseReady();
+}
+
+function initFirebaseAndApp(){
+  if(window.__menageFbInit) return;
+  const oid=getStoredOrgId();
+  if(!oid) return;
+  window.__menageFbInit=true;
+  window.__menageActiveOrg=oid;
+  const ob=p=>`orgs/${oid}/${p}`;
+  setStatus('Chargement...', true);
+
+  onValue(ref(db,ob('config')), snap=>{
+    const d=snap.val();
+    if(d){ S.cleaners=d.cleaners||[]; S.studioNames=d.studioNames||S.studioNames; }
+    setSyncStatus('ok'); loaded.config=true;
+    afterFbListener();
+  });
+
+  onValue(ref(db,ob('assignments')), snap=>{
+    S.assignments=snap.val()||{}; loaded.assignments=true;
+    afterFbListener();
+  });
+
+  onValue(ref(db,ob('reservations')), snap=>{
+    const data=snap.val()||{};
+    S.reservations=Object.values(data).map(r=>({...r,start:new Date(r.start),end:new Date(r.end)}));
+    loaded.reservations=true;
+    afterFbListener();
+  });
+
+  onValue(ref(db,ob('adminConfig')), snap=>{
+    const d=snap.val();
+    if(d){
+      S.adminConfig={...S.adminConfig,...d, accounts:d.accounts||[], defaultOrgId:d.defaultOrgId||S.adminConfig.defaultOrgId||'tesson'};
+    }else{
+      S.adminConfig={ authEnabled:false, accounts:[], defaultOrgId:getStoredOrgId()||'tesson' };
     }
-  }
-}, ()=>{
-  loaded.adminConfig=true;
-  fbReady?render():checkReady();
-});
+    loaded.adminConfig=true;
+    if(!fbReady) checkReady();
+    else routeAfterFirebaseUpdate();
+  }, ()=>{
+    loaded.adminConfig=true;
+    S.adminConfig={ authEnabled:false, accounts:[], defaultOrgId:getStoredOrgId()||'tesson' };
+    afterFbListener();
+  });
 
-onValue(ref(db,'lastSync'), snap=>{
-  const d=snap.val();
-  if(d&&d.ts){
-    const fmt=new Date(d.ts).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
-    const el=document.getElementById('last-sync-info');
-    if(el) el.textContent=`Dernière sync : ${fmt}`;
-    setSyncStatus('ok',`Sync ${fmt}`);
-  }
-});
+  onValue(ref(db,ob('lastSync')), snap=>{
+    const d=snap.val();
+    if(d&&d.ts){
+      const fmt=new Date(d.ts).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+      const el=document.getElementById('last-sync-info');
+      if(el) el.textContent=`Dernière sync : ${fmt}`;
+      setSyncStatus('ok',`Sync ${fmt}`);
+    }
+  });
+}
 
-function saveAssignments(){ fbSet('assignments', Object.keys(S.assignments).length?S.assignments:null); }
+function showOrgFirst(){
+  el('org-first-screen').style.display='';
+  el('login-screen').style.display='none';
+  el('main-app').style.display='none';
+  if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='none';
+  const s=el('org-first-select');
+  fillOrgSelect(s);
+  if(s) s.value='tesson';
+}
+
+window.confirmOrgFirst=function(){
+  const sel=el('org-first-select');
+  if(!sel||!sel.value) return;
+  setStoredOrgId(sel.value);
+  el('org-first-screen').style.display='none';
+  initFirebaseAndApp();
+};
+
+function bootstrap(){
+  if(!getStoredOrgId()){
+    showOrgFirst();
+    return;
+  }
+  initFirebaseAndApp();
+}
+bootstrap();
+
+function saveAssignments(){
+  const oid=getStoredOrgId();
+  if(!oid) return;
+  fbSet(`orgs/${oid}/assignments`, Object.keys(S.assignments).length?S.assignments:null);
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
