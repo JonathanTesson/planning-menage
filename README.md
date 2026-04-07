@@ -1,8 +1,8 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 4.0.0** — Avril 2026
+**Version : 4.1.0** — Avril 2026
 
-Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram et export Excel.
+Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés) et **export Excel** enrichi.
 
 ---
 
@@ -55,9 +55,10 @@ Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. Ancienne rac
     /config        → studioNames, cleaners
     /reservations  → réservations Airbnb
     /assignments   → assignations
-    /adminConfig   → comptes, auth, defaultOrgId, telegramEnabled, …
-    /lastSync      → dernière sync iCal
-    /activityLog   → journal d’activité
+    /adminConfig     → comptes, auth, defaultOrgId, telegramEnabled, …
+    /lastSync        → dernière sync iCal
+    /activityLog     → journal d’activité
+    /cleaningReports → comptes rendus par uid réservation (détail § v4.1 ci-dessous)
   /nade
     (même structure ; remplie selon sync iCal et utilisation)
 ```
@@ -71,6 +72,19 @@ Dans **`adminConfig.accounts[]`**, chaque compte peut inclure :
 ```
 
 Signification prévue : l’intervenante intervient dans **plusieurs** organisations. **Non utilisé par l’interface actuelle** ; les nouveaux comptes créés depuis l’admin ont `sharedWith: []`. Réservé à une évolution future (pas de bouton « voir mes autres orgs » dans cette version).
+
+### `/cleaningReports` — comptes rendus terrain (v4.1)
+
+Sous **`/orgs/{orgId}/cleaningReports/{uidRéservation}`** (même `uid` que dans les réservations / assignations) :
+
+| Champ | Rôle |
+|--------|------|
+| `comment` | Texte **commun** au départ (commentaire) ; visible et modifiable par toutes les intervenantes assignées ; dernière sauvegarde gagne. |
+| `order` | Texte **commun** (commande produits / matériel), mêmes règles. |
+| `assignSig` | Empreinte JSON de la paire `[intervenante1, intervenante2]` pour invalider les données si l’assignation ne correspond plus. |
+| `hours/{Prénom}` | `{ h, m }` — **durée personnelle** ; seule la personne concernée voit et modifie ses heures dans l’app. |
+
+**Comportement** : si une **deuxième** intervenante est ajoutée sur le même départ, les champs communs et les heures des personnes **toujours** assignées sont **conservés** ; seules les heures des personnes **retirées** du départ sont supprimées. Si la réservation disparaît (sync iCal), l’entrée correspondante est purgée côté client. Les **règles Realtime Database** doivent autoriser la lecture/écriture sur ce chemin (comme pour `assignments` / `reservations` selon votre config).
 
 ---
 
@@ -120,6 +134,8 @@ Signification prévue : l’intervenante intervient dans **plusieurs** organisat
 
 **Calendrier**
 - Affichage **S1 / S2** inchangé (noms de studios viennent de `/orgs/{orgId}/config`).
+- **Comptes rendus (rôle ménage, départ où l’on est assignée)** : modale **Mon intervention** — durée personnelle (heures + minutes), champs **communs** commande / commentaire (libellés et placeholders dans l’UI), enregistrement dans **`cleaningReports`** ; croix de fermeture en haut à droite ; fermeture automatique après **Enregistrer le compte rendu**.
+- **Badge** du prénom sous le départ : **contour noir** si des heures ont été enregistrées pour cette personne sur ce départ.
 
 ### admin.html — Back-office
 
@@ -129,6 +145,8 @@ Signification prévue : l’intervenante intervient dans **plusieurs** organisat
 - Section **Comptes** : une ligne par réglage — **authentification** et **Notifications Telegram** sont des **cases à cocher** (même style), avec texte d’aide ; **Org. par défaut** avec liste déroulante dessous. **`telegramEnabled`** dans **`adminConfig`** : si désactivé pour une org, **`sync-ical.js`** et **`notify-departs.js`** n’envoient **pas** de messages Telegram pour cette org (Firebase reste mis à jour pour la sync iCal).
 - La signification des icônes **🧹** (ménage) et **👑** (admin) sur chaque ligne de compte est rappelée dans la section **Légende & synchronisation** (plus sous la liste des comptes).
 - **Org. par défaut** : enregistré dans **`adminConfig.defaultOrgId`** (pré-sélection sur le login).
+- **Historique des interventions** : tableau avec date courte **jj/mm/aa**, studio **S1** / **S2**, intervenantes, et colonne **Heures** (somme des durées saisies pour la ligne, vide si aucune) ; mise à jour si **`cleaningReports`** change.
+- **Export Excel** — feuille **Détail interventions** : colonnes dans l’ordre **Date départ**, **Studio**, **Intervenante 1**, **Intervenante 2**, **Intervenante 1 durée**, **Intervenante 2 durée**, **Commande**, **Commentaire** (durées au format Excel `[h]:mm`). Feuille **Récap par intervenante** : colonne **Total heures** (somme sur la période exportée, même format).
 
 ### sync-ical.js
 
@@ -162,6 +180,7 @@ Signification prévue : l’intervenante intervient dans **plusieurs** organisat
 
 - Accès restreint au domaine de production (Google Cloud Console) quand configuré.  
 - Données sensibles : secrets uniquement côté GitHub Actions ; **`migrate.js`** en local avec la même variable `FIREBASE_SERVICE_ACCOUNT`.
+- Penser à inclure **`/orgs/{orgId}/cleaningReports`** dans les **règles Realtime Database** si elles ne sont pas déjà couvertes par une règle large (sinon les comptes rendus ne s’enregistrent pas).
 
 ---
 
@@ -194,7 +213,7 @@ Gérées dans **admin.html** de **chaque organisation**. Structure compte : `nam
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 4.0.0
+Version : 4.1.0
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
@@ -205,6 +224,12 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ---
 
 ## Historique des versions
+
+### v4.1.0 — Avril 2026
+- **Comptes rendus terrain** (`cleaningReports`) : durées par intervenante, commentaire et commande **communs** ; conservation des données lors de l’ajout d’une 2ᵉ intervenante ; purge si plus aucune assignation ou si la réservation disparaît
+- **Calendrier** : contour sur le badge prénom lorsque des heures sont renseignées ; modale ménage (ordre des sections, croix fermeture, fermeture après enregistrement) ; correctif `onclick` + JSON pour **M’assigner** / sauvegarde
+- **Admin** : historique avec date **jj/mm/aa**, studio **S1/S2**, colonne **Heures** (total ligne) ; export Excel détail réordonné et sans colonnes Arrivée / Note ; récap avec **Total heures** par intervenante
+- **Version affichée** : `APP_VERSION` **4.1.0** dans `index.html` et `admin.html` (aligner avec ce README à chaque release)
 
 ### v4.0.0 — Avril 2026
 - **Multi-organisations** : données sous `/orgs/{orgId}/` ; orgs `tesson` (défaut) et `nade`

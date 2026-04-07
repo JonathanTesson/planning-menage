@@ -70,6 +70,7 @@ a.user-badge.user-badge-admin:hover{text-decoration:underline;background:#eef4fc
 .resa-block.checkout{background:#fde8b0;color:#7a4a00}
 .assign-wrap{margin-top:1px;margin-bottom:2px}
 .assign-badge{display:inline-block;font-size:9px;background:#f0f0eb;border-radius:3px;padding:1px 4px;color:#555;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
+.assign-badge-hours{box-shadow:0 0 0 1px #1a1a1a}
 
 /* Legend */
 .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:0.5rem;padding:0.5rem 0;border-top:1px solid #e8e8e2;align-items:center}
@@ -97,11 +98,24 @@ a.user-badge.user-badge-admin:hover{text-decoration:underline;background:#eef4fc
 /* Modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem}
 .modal{background:#fff;border-radius:16px;padding:1.5rem;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,0.12);max-height:90vh;overflow-y:auto}
+.modal--wide{max-width:420px}
 .modal h3{font-size:16px;font-weight:600;margin-bottom:1rem}
 .modal-field{margin-bottom:0.875rem}
 .modal-field label{font-size:12px;color:#888;display:block;margin-bottom:4px;font-weight:500}
 .modal-field select,.modal-field input[type=text]{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
+.modal-field textarea{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;resize:vertical;min-height:64px;line-height:1.4}
+.modal-field input[type=number]{width:4.5rem;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
+.modal-shared-hint{font-size:11px;color:#999;line-height:1.45;margin:0 0 0.75rem}
+.modal-duration-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.modal-duration-row label{font-size:12px;color:#888;margin:0}
 .modal-btns{display:flex;gap:8px;margin-top:1.25rem;justify-content:flex-end}
+.modal-header-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:1rem}
+.modal-header-row h3{margin:0;flex:1;font-size:16px;font-weight:600;line-height:1.35;padding-right:4px}
+.modal-close-x{flex-shrink:0;width:36px;height:36px;border:none;background:transparent;border-radius:10px;font-size:26px;line-height:1;color:#888;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;margin:-6px -8px 0 0}
+.modal-close-x:hover{background:#f0f0eb;color:#333}
+.modal-btns--split{justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.modal-btns--split .btn-primary{flex-shrink:0}
+.modal-btns--split .btn-danger{flex-shrink:0}
 .modal-meta{background:#f5f5f0;border-radius:8px;padding:0.75rem;margin-bottom:1rem;font-size:12px;color:#555;line-height:1.6}
 .modal-meta strong{color:#1a1a1a;font-weight:600}
 .modal-section-title{font-size:11px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin:1rem 0 0.5rem}
@@ -292,7 +306,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.0.0';
+const APP_VERSION = '4.1.0';
 
 function getStoredOrgId(){
   try{
@@ -317,7 +331,8 @@ let S = {
   showSettings: false,
   filterCleaner: null,
   filterType: 'dep',
-  currentUser: null  // { name, menage, admin }
+  currentUser: null,  // { name, menage, admin }
+  cleaningReports: {}
 };
 
 let fbReady = false;
@@ -648,7 +663,13 @@ function initFirebaseAndApp(){
     const data=snap.val()||{};
     S.reservations=Object.values(data).map(r=>({...r,start:new Date(r.start),end:new Date(r.end)}));
     loaded.reservations=true;
+    pruneOrphanCleaningReports(oid,S.reservations);
     afterFbListener();
+  });
+
+  onValue(ref(db,ob('cleaningReports')), snap=>{
+    S.cleaningReports=snap.val()||{};
+    if(fbReady&&S.currentUser) render();
   });
 
   onValue(ref(db,ob('adminConfig')), snap=>{
@@ -712,6 +733,95 @@ function saveAssignments(){
   const oid=getStoredOrgId();
   if(!oid) return;
   fbSet(`orgs/${oid}/assignments`, Object.keys(S.assignments).length?S.assignments:null);
+}
+
+function getAssignSig(c1,c2){
+  return JSON.stringify([c1||null,c2||null]);
+}
+
+async function pruneOrphanCleaningReports(oid,reservations){
+  const valid=new Set(reservations.map(r=>r.uid));
+  try{
+    const snap=await get(ref(db,`orgs/${oid}/cleaningReports`));
+    const all=snap.val()||{};
+    const upd={};
+    for(const k of Object.keys(all)){
+      if(!valid.has(k)) upd[`orgs/${oid}/cleaningReports/${k}`]=null;
+    }
+    if(Object.keys(upd).length) await update(ref(db),upd);
+  }catch(_){}
+}
+
+function clearCleaningReport(key){
+  const oid=getStoredOrgId();
+  if(!oid||key==null||key==='') return;
+  fbSet(`orgs/${oid}/cleaningReports/${key}`,null);
+}
+
+/** Quand l’assignation change : garde commentaire & commande ; garde les heures des prénoms toujours assignés ; supprime les heures des personnes retirées ; met à jour assignSig. Si plus personne d’assigné → efface tout le rapport. */
+function syncCleaningReportAfterAssignmentChange(key,prevC1,prevC2,nextC1,nextC2){
+  const oid=getStoredOrgId();
+  if(!oid||key==null||key==='') return;
+  const path=`orgs/${oid}/cleaningReports/${key}`;
+  if(!nextC1&&!nextC2){
+    clearCleaningReport(key);
+    return;
+  }
+  if(getAssignSig(prevC1,prevC2)===getAssignSig(nextC1,nextC2)) return;
+  (async()=>{
+    try{
+      const snap=await get(ref(db,path));
+      const rep=snap.val();
+      const nextSig=getAssignSig(nextC1,nextC2);
+      const nextSet=new Set([nextC1,nextC2].filter(Boolean));
+      const hoursIn={...(rep&&rep.hours)||{}};
+      for(const name of Object.keys(hoursIn)){
+        if(!nextSet.has(name)) delete hoursIn[name];
+      }
+      const out={
+        assignSig:nextSig,
+        comment:rep&&rep.comment!=null?rep.comment:'',
+        order:rep&&rep.order!=null?rep.order:''
+      };
+      if(Object.keys(hoursIn).length) out.hours=hoursIn;
+      await set(ref(db,path),out);
+      setSyncStatus('ok');
+    }catch(_){
+      setSyncStatus('err');
+    }
+  })();
+}
+
+function escHtml(s){
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escTextarea(s){
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/** Retours terrain : champs communs + heures perso si la signature d’assignation correspond. */
+function cleaningReportViewFor(key,c1,c2,userName){
+  const sig=getAssignSig(c1,c2);
+  const rep=S.cleaningReports[key];
+  if(!rep||rep.assignSig!==sig) return { comment:'', order:'', hoursH:'', hoursM:'' };
+  const slot=userName&&rep.hours&&rep.hours[userName]!=null?rep.hours[userName]:null;
+  let hoursH='',hoursM='';
+  if(slot&&typeof slot==='object'){
+    const h=slot.h!=null?Number(slot.h):0;
+    const m=slot.m!=null?Number(slot.m):0;
+    if(!Number.isNaN(h)&&!Number.isNaN(m)) hoursH=String(h),hoursM=String(m);
+  }
+  return { comment:rep.comment||'', order:rep.order||'', hoursH, hoursM };
+}
+
+/** True si cette intervenante a une saisie d’heures enregistrée pour ce départ (assignation actuelle). */
+function cleanerHasHoursForResa(key,c1,c2,cleanerName){
+  if(!cleanerName) return false;
+  const sig=getAssignSig(c1,c2);
+  const rep=S.cleaningReports[key];
+  if(!rep||rep.assignSig!==sig) return false;
+  const hm=rep.hours&&rep.hours[cleanerName];
+  return hm!=null&&typeof hm==='object';
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -837,9 +947,12 @@ function renderCalendar(){
           inner+=`<div class="resa-block checkout" onclick="window._oa('${getKey(r)}')" title="Départ — ${S.studioNames[si]}">Départ S${si+1}</div>`;
           // Tout le monde voit les noms assignés
           if(c1||c2){
+            const rk=getKey(r);
+            const h1=c1&&cleanerHasHoursForResa(rk,c1,c2,c1);
+            const h2=c2&&cleanerHasHoursForResa(rk,c1,c2,c2);
             inner+=`<div class="assign-wrap">`;
-            if(c1) inner+=`<span class="assign-badge" style="color:${cleanerColor(c1)}">${c1}</span> `;
-            if(c2) inner+=`<span class="assign-badge" style="color:${cleanerColor(c2)}">${c2}</span>`;
+            if(c1) inner+=`<span class="assign-badge${h1?' assign-badge-hours':''}" style="color:${cleanerColor(c1)}"${h1?' title="Heures renseignées"':''}>${c1}</span> `;
+            if(c2) inner+=`<span class="assign-badge${h2?' assign-badge-hours':''}" style="color:${cleanerColor(c2)}"${h2?' title="Heures renseignées"':''}>${c2}</span>`;
             inner+=`</div>`;
           }
         }
@@ -910,26 +1023,52 @@ window._oa = function(key){
   const n=Math.round((r.end-r.start)/86400000);
 
   if(!isAdminOrNoAuth && user?.menage){
-    // Vue ménage : juste s'assigner ou se retirer
+    // Vue ménage : assignation + retours terrain (durée perso, commentaire & commande communs)
     const alreadyAssigned=c1===user.name||c2===user.name;
+    const vk=JSON.stringify(key);
+    const v=cleaningReportViewFor(key,c1,c2,user.name);
+    const hadDur=v.hoursH!==''||v.hoursM!=='';
     document.getElementById('modal-container').innerHTML=`
       <div class="modal-overlay" onclick="if(event.target===this)window._cm()">
-        <div class="modal">
-          <h3>${alreadyAssigned?'Mon intervention':'M\'assigner'}</h3>
+        <div class="modal modal--wide">
+          ${alreadyAssigned
+            ? `<div class="modal-header-row">
+                 <h3>Mon intervention</h3>
+                 <button type="button" class="modal-close-x" onclick="window._cm()" aria-label="Fermer" title="Fermer">×</button>
+               </div>`
+            : `<h3>M'assigner</h3>`}
           <div class="modal-meta">
-            <strong>${S.studioNames[r.studio]}</strong><br>
+            <strong>${escHtml(S.studioNames[r.studio])}</strong><br>
             Arrivée : ${fmt(r.start)}<br>
             Départ : ${fmt(r.end)} (${n} nuit${n>1?'s':''})</div>
           ${alreadyAssigned
-            ? `<p style="font-size:13px;color:#555;margin-bottom:1rem">Vous êtes assignée à ce départ.</p>
-               <div class="modal-btns">
-                 <button class="btn-cancel" onclick="window._cm()">Fermer</button>
-                 <button class="btn-danger" onclick="window._removeSelf('${key}')">✕ Me retirer</button>
+            ? `<p class="modal-shared-hint" style="margin-top:0.75rem">Vous êtes assignée à ce départ.</p>
+               <div class="modal-section-title">Ma durée de travail <span style="font-weight:400;color:#bbb">(personnel)</span></div>
+               <p class="modal-shared-hint">Seule vous voyez et modifiez vos heures. Laissez vide si vous ne souhaitez rien indiquer${hadDur?' ; videz les deux champs pour effacer une durée déjà enregistrée':''}.</p>
+               <div class="modal-field modal-duration-row">
+                 <label for="cb-hours-h">Heures</label>
+                 <input type="number" id="cb-hours-h" inputmode="numeric" min="0" step="1" placeholder="0" value="${escHtml(v.hoursH)}">
+                 <label for="cb-hours-m">Minutes</label>
+                 <input type="number" id="cb-hours-m" inputmode="numeric" min="0" max="59" step="1" placeholder="0" value="${escHtml(v.hoursM)}">
+               </div>
+               <div class="modal-section-title">Infos communes <span style="font-weight:400;color:#bbb">(partagées)</span></div>
+               <p class="modal-shared-hint">Visibles et modifiables par toutes les intervenantes sur ce départ. Dernière enregistrement l’emporte.</p>
+               <div class="modal-field">
+                 <label for="cb-order">Commande produits / matériel</label>
+                 <textarea id="cb-order" rows="2" placeholder="Ex. : sopalin, bonbons, café…">${escTextarea(v.order)}</textarea>
+               </div>
+               <div class="modal-field">
+                 <label for="cb-comment">Commentaire</label>
+                 <textarea id="cb-comment" rows="2" placeholder="Ex. : état du logement après départ">${escTextarea(v.comment)}</textarea>
+               </div>
+               <div class="modal-btns modal-btns--split">
+                 <button type="button" class="btn-primary" onclick='window._saveCleaningFeedback(${vk})'>Enregistrer le compte rendu</button>
+                 <button type="button" class="btn-danger" onclick='window._removeSelf(${vk})'>✕ Me retirer</button>
                </div>`
             : `<p style="font-size:13px;color:#555;margin-bottom:1rem">Cliquez sur + pour vous assigner à ce départ.</p>
                <div class="modal-btns">
                  <button class="btn-cancel" onclick="window._cm()">Annuler</button>
-                 <button class="btn-primary" onclick="window._assignSelf('${key}')">+ M'assigner</button>
+                 <button type="button" class="btn-primary" onclick='window._assignSelf(${vk})'>+ M'assigner</button>
                </div>`
           }
         </div>
@@ -970,9 +1109,12 @@ window._assignSelf = function(key){
   const user=S.currentUser; if(!user) return;
   const r=findResa(key);
   const {c1,c2,note}=getAssignment(r||{uid:key});
-  if(!c1) S.assignments[key]={c1:user.name,c2:c2||null,note};
-  else if(!c2) S.assignments[key]={c1,c2:user.name,note};
+  let n1=c1,n2=c2;
+  if(!n1) n1=user.name;
+  else if(!n2) n2=user.name;
   else { showToast('2 intervenantes déjà assignées'); window._cm(); return; }
+  syncCleaningReportAfterAssignmentChange(key,c1,c2,n1,n2);
+  S.assignments[key]={c1:n1,c2:n2,note};
   const st=r?S.studioNames[r.studio]:'';
   logActivity({ type:'assign', actor:user.name, uid:key, text:`${user.name} s'est assignée — ${st} — départ ${resaDepartLabel(r)}` });
   saveAssignments();
@@ -984,14 +1126,46 @@ window._removeSelf = function(key){
   const user=S.currentUser; if(!user) return;
   const r=findResa(key);
   const {c1,c2,note}=getAssignment(r||{uid:key});
-  if(c1===user.name) S.assignments[key]={c1:c2||null,c2:null,note};
-  else if(c2===user.name) S.assignments[key]={c1,c2:null,note};
-  if(!S.assignments[key].c1&&!S.assignments[key].c2) delete S.assignments[key];
+  let n1=c1,n2=c2;
+  if(c1===user.name){ n1=c2||null; n2=null; }
+  else if(c2===user.name){ n1=c1; n2=null; }
+  else { window._cm(); return; }
+  syncCleaningReportAfterAssignmentChange(key,c1,c2,n1,n2);
+  if(!n1&&!n2) delete S.assignments[key];
+  else S.assignments[key]={c1:n1,c2:n2,note};
   const st=r?S.studioNames[r.studio]:'';
   logActivity({ type:'assign', actor:user.name, uid:key, text:`${user.name} s'est retirée — ${st} — départ ${resaDepartLabel(r)}` });
   saveAssignments();
   showToast('Retirée ✓');
   window._cm(); render();
+};
+
+window._saveCleaningFeedback = function(key){
+  const user=S.currentUser; if(!user?.name) return;
+  const r=findResa(key); if(!r){ showToast('Réservation introuvable'); return; }
+  const {c1,c2}=getAssignment(r);
+  if(c1!==user.name&&c2!==user.name){ showToast('Non assignée à ce départ'); return; }
+  const comment=document.getElementById('cb-comment')?.value??'';
+  const order=document.getElementById('cb-order')?.value??'';
+  const hRaw=String(document.getElementById('cb-hours-h')?.value??'').trim();
+  const mRaw=String(document.getElementById('cb-hours-m')?.value??'').trim();
+  const oid=getStoredOrgId(); if(!oid) return;
+  const v=cleaningReportViewFor(key,c1,c2,user.name);
+  const hadSavedDuration=v.hoursH!==''||v.hoursM!=='';
+  const sig=getAssignSig(c1,c2);
+  const updates={ comment, order, assignSig:sig };
+  if(hRaw===''&&mRaw===''){
+    if(hadSavedDuration) updates[`hours/${user.name}`]=null;
+  }else{
+    const h=parseInt(hRaw,10);
+    const m=parseInt(mRaw,10);
+    if(Number.isNaN(m)||m<0||m>59){ showToast('Minutes : 0 à 59'); return; }
+    if(Number.isNaN(h)||h<0){ showToast('Heures invalides'); return; }
+    updates[`hours/${user.name}`]={ h, m };
+  }
+  update(ref(db,`orgs/${oid}/cleaningReports/${key}`),updates)
+    .then(()=>{ showToast('Enregistré ✓'); setSyncStatus('ok'); window._cm(); })
+    .catch(()=>showToast('Erreur enregistrement'));
 };
 
 window._sa = function(key){
@@ -1000,6 +1174,8 @@ window._sa = function(key){
   const c1=document.getElementById('mc1').value;
   const c2=document.getElementById('mc2').value;
   const note=document.getElementById('mn').value;
+  const nc1=c1||null, nc2=c2||null;
+  syncCleaningReportAfterAssignmentChange(key,prev.c1,prev.c2,nc1,nc2);
   const who=assignActorLabel();
   const st=r?S.studioNames[r.studio]:'';
   const dep=resaDepartLabel(r);
@@ -1011,7 +1187,7 @@ window._sa = function(key){
     text=`${who} a défini ${names} (avant : ${was}) — ${st} — départ ${dep}`;
   }
   logActivity({ type:'assign_admin', actor:who, uid:key, text });
-  if(c1||c2) S.assignments[key]={c1:c1||null,c2:c2||null,note};
+  if(c1||c2) S.assignments[key]={c1:nc1,c2:nc2,note};
   else delete S.assignments[key];
   saveAssignments();
   showToast([c1,c2].filter(Boolean).join(' + ')||'Assignation supprimée');

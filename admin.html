@@ -255,7 +255,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.0.0';
+const APP_VERSION = '4.1.0';
 
 function getStoredOrgId(){
   try{
@@ -276,6 +276,7 @@ let A = {
   studioNames: ['Studio 1','Studio 2'],
   assignments: {},
   reservations: [],
+  cleaningReports: {},
   adminConfig: { authEnabled: false, accounts: [], defaultOrgId: 'tesson', telegramEnabled: true },
   unlocked: false,
   selectedMonth: new Date().getMonth(),
@@ -351,6 +352,11 @@ onValue(ref(db,ob('config')), snap=>{
 });
 
 onValue(ref(db,ob('assignments')), snap=>{ A.assignments=snap.val()||{}; if(A.unlocked) renderStats(); });
+
+onValue(ref(db,ob('cleaningReports')), snap=>{
+  A.cleaningReports=snap.val()||{};
+  if(A.unlocked) renderHisto();
+});
 
 onValue(ref(db,ob('reservations')), snap=>{
   const data=snap.val()||{};
@@ -456,6 +462,13 @@ window.clearActivityLog = function(){
   set(ref(db,ob('activityLog')), null).then(()=>showToast('Journal vidé ✓')).catch(()=>showToast('Erreur réseau'));
 };
 
+function getAssignmentSlots(uid){
+  const a=A.assignments[uid];
+  if(!a) return { c1:null,c2:null,note:'' };
+  if(typeof a==='string') return { c1:a,c2:null,note:'' };
+  return { c1:a.cleaner||a.c1||null,c2:a.c2||null,note:a.note||'' };
+}
+
 function renderStats(){
   const mo=A.selectedMonth, yr=A.selectedYear;
   document.getElementById('admin-month-title').textContent=MO_FR[mo]+' '+yr;
@@ -464,15 +477,15 @@ function renderStats(){
     const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
     return e.getMonth()===mo && e.getFullYear()===yr;
   });
-  const assigned=checkouts.filter(r=>{ const a=A.assignments[r.uid]; return a&&(a.c1||a.c2); });
+  const assigned=checkouts.filter(r=>{ const sl=getAssignmentSlots(r.uid); return sl.c1||sl.c2; });
   document.getElementById('stat-total').textContent=checkouts.length;
   document.getElementById('stat-assigned').textContent=assigned.length;
   document.getElementById('stat-missing').textContent=checkouts.length-assigned.length;
   const counts={};
   for(const r of checkouts){
-    const a=A.assignments[r.uid]||{};
-    if(a.c1) counts[a.c1]=(counts[a.c1]||0)+1;
-    if(a.c2) counts[a.c2]=(counts[a.c2]||0)+1;
+    const sl=getAssignmentSlots(r.uid);
+    if(sl.c1) counts[sl.c1]=(counts[sl.c1]||0)+1;
+    if(sl.c2) counts[sl.c2]=(counts[sl.c2]||0)+1;
   }
   const cleaners=(A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
   document.getElementById('cleaner-stats').innerHTML=
@@ -507,6 +520,33 @@ function renderAccounts(){
   }).join('');
 }
 
+function fmtHistoDateShort(d){
+  const x=new Date(d);
+  const dd=String(x.getDate()).padStart(2,'0');
+  const mm=String(x.getMonth()+1).padStart(2,'0');
+  const yy=String(x.getFullYear()).slice(-2);
+  return `${dd}/${mm}/${yy}`;
+}
+
+/** Somme des durées saisies (int1 + int2) pour l’historique ; chaîne vide si rien. */
+function formatHistoDepartureHours(r){
+  const sl=getAssignmentSlots(r.uid);
+  const c1=sl.c1,c2=sl.c2;
+  const sig=assignSigExcel(c1,c2);
+  const raw=A.cleaningReports[r.uid];
+  const rep=raw&&raw.assignSig===sig?raw:null;
+  if(!rep?.hours) return '';
+  let total=0;
+  if(c1&&rep.hours[c1]!=null) total+=minutesFromHm(rep.hours[c1]);
+  if(c2&&rep.hours[c2]!=null) total+=minutesFromHm(rep.hours[c2]);
+  if(total<=0) return '';
+  const h=Math.floor(total/60);
+  const m=total%60;
+  if(h===0) return `${m} min`;
+  if(m===0) return `${h}h`;
+  return `${h}h${String(m).padStart(2,'0')}`;
+}
+
 function renderHisto(){
   const today=new Date(); today.setHours(0,0,0,0);
   const past=A.reservations.filter(r=>new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate())<today)
@@ -515,7 +555,6 @@ function renderHisto(){
     document.getElementById('histo-content').innerHTML='<p style="color:#aaa;font-size:13px">Aucun historique disponible.</p>';
     return;
   }
-  const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
   const byMonth={};
   for(const r of past){
     const key=`${r.end.getFullYear()}-${r.end.getMonth()}`;
@@ -528,14 +567,16 @@ function renderHisto(){
     html+=`<div style="margin-bottom:1rem">
       <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:6px">${label} — ${resas.length} départ(s)</div>
       <table class="histo-table">
-        <thead><tr><th>Date</th><th>Studio</th><th>Intervenante(s)</th></tr></thead>
+        <thead><tr><th>Date</th><th>Studio</th><th>Intervenante(s)</th><th style="text-align:right;white-space:nowrap">Heures</th></tr></thead>
         <tbody>${resas.map(r=>{
-          const a=A.assignments[r.uid]||{};
-          const names=[a.c1,a.c2].filter(Boolean);
+          const sl=getAssignmentSlots(r.uid);
+          const names=[sl.c1,sl.c2].filter(Boolean);
+          const dur=formatHistoDepartureHours(r);
           return `<tr>
-            <td>${fmt(r.end)}</td>
-            <td>${A.studioNames[r.studio]}</td>
-            <td>${names.length?names.map(n=>`<span style="color:${cleanerColor(n)};font-weight:500">${n}</span>`).join(' + '):'<span style="color:#E24B4A">Non assigné</span>'}</td>
+            <td style="white-space:nowrap">${fmtHistoDateShort(r.end)}</td>
+            <td style="white-space:nowrap">S${(Number(r.studio)||0)+1}</td>
+            <td>${names.length?names.map(n=>`<span style="color:${cleanerColor(n)};font-weight:500">${escHtml(n)}</span>`).join(' + '):'<span style="color:#E24B4A">Non assigné</span>'}</td>
+            <td style="text-align:right;white-space:nowrap;color:#555;font-weight:500">${dur?escHtml(dur):''}</td>
           </tr>`;
         }).join('')}</tbody>
       </table>
@@ -635,30 +676,94 @@ window.adminChangeMonth = function(dir){
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 
+function assignSigExcel(c1,c2){
+  return JSON.stringify([c1||null,c2||null]);
+}
+
+/** Durée → fraction de jour Excel (format [h]:mm). */
+function durationToExcelSerial(hm){
+  if(!hm||typeof hm!=='object') return '';
+  const h=hm.h!=null?Number(hm.h):0;
+  const m=hm.m!=null?Number(hm.m):0;
+  if(Number.isNaN(h)||Number.isNaN(m)||h<0||m<0||m>59) return '';
+  return (h*60+m)/1440;
+}
+
+function minutesFromHm(hm){
+  if(!hm||typeof hm!=='object') return 0;
+  const h=hm.h!=null?Number(hm.h):0;
+  const m=hm.m!=null?Number(hm.m):0;
+  if(Number.isNaN(h)||Number.isNaN(m)||h<0||m<0||m>59) return 0;
+  return h*60+m;
+}
+
 function buildExcel(reservations, label){
   const XLSX=window.XLSX;
   const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
   const sorted=[...reservations].sort((a,b)=>a.end-b.end);
-  const detail=[['Date départ','Studio','Arrivée','Intervenante 1','Intervenante 2','Note']];
+  const detail=[['Date départ','Studio','Intervenante 1','Intervenante 2','Intervenante 1 durée','Intervenante 2 durée','Commande','Commentaire']];
   for(const r of sorted){
-    const a=A.assignments[r.uid]||{};
-    detail.push([fmt(r.end),A.studioNames[r.studio],fmt(r.start),a.c1||'',a.c2||'',a.note||'']);
+    const a=getAssignmentSlots(r.uid);
+    const c1=a.c1,c2=a.c2;
+    const sig=assignSigExcel(c1,c2);
+    const raw=A.cleaningReports[r.uid];
+    const rep=raw&&raw.assignSig===sig?raw:null;
+    const comm=rep?(rep.comment||''):'';
+    const ord=rep?(rep.order||''):'';
+    const d1=c1&&rep?.hours?.[c1]!=null?durationToExcelSerial(rep.hours[c1]):'';
+    const d2=c2&&rep?.hours?.[c2]!=null?durationToExcelSerial(rep.hours[c2]):'';
+    detail.push([fmt(r.end),A.studioNames[r.studio],c1||'',c2||'',d1,d2,ord,comm]);
   }
   const counts={};
   for(const r of sorted){
-    const a=A.assignments[r.uid]||{};
+    const a=getAssignmentSlots(r.uid);
     if(a.c1) counts[a.c1]=(counts[a.c1]||0)+1;
     if(a.c2) counts[a.c2]=(counts[a.c2]||0)+1;
   }
-  const recap=[['Intervenante',"Nb d'interventions"]];
+  const totalMinutesByCleaner={};
+  for(const r of sorted){
+    const a=getAssignmentSlots(r.uid);
+    const c1=a.c1,c2=a.c2;
+    const sig=assignSigExcel(c1,c2);
+    const raw=A.cleaningReports[r.uid];
+    const rep=raw&&raw.assignSig===sig?raw:null;
+    if(!rep?.hours) continue;
+    if(c1&&rep.hours[c1]!=null) totalMinutesByCleaner[c1]=(totalMinutesByCleaner[c1]||0)+minutesFromHm(rep.hours[c1]);
+    if(c2&&rep.hours[c2]!=null) totalMinutesByCleaner[c2]=(totalMinutesByCleaner[c2]||0)+minutesFromHm(rep.hours[c2]);
+  }
+  const recap=[['Intervenante',"Nb d'interventions",'Total heures']];
   const cleaners=(A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
-  for(const c of cleaners){ if(counts[c]) recap.push([c,counts[c]]); }
-  recap.push(['','']);
-  recap.push(['Total',Object.values(counts).reduce((a,b)=>a+b,0)]);
-  recap.push(['Période',label]);
+  let grandMinutes=0;
+  for(const c of cleaners){
+    if(!counts[c]) continue;
+    const mins=totalMinutesByCleaner[c]||0;
+    grandMinutes+=mins;
+    recap.push([c,counts[c],mins/1440]);
+  }
+  recap.push(['','','']);
+  recap.push(['Total',Object.values(counts).reduce((a,b)=>a+b,0),grandMinutes/1440]);
+  recap.push(['Période',label,'']);
   const wb=XLSX.utils.book_new();
-  const ws1=XLSX.utils.aoa_to_sheet(detail); ws1['!cols']=[{wch:14},{wch:12},{wch:12},{wch:14},{wch:14},{wch:20}];
-  const ws2=XLSX.utils.aoa_to_sheet(recap); ws2['!cols']=[{wch:18},{wch:22}];
+  const ws1=XLSX.utils.aoa_to_sheet(detail);
+  for(let R=1;R<detail.length;R++){
+    for(const C of [4,5]){
+      const v=detail[R][C];
+      if(typeof v==='number'&&!Number.isNaN(v)){
+        const addr=XLSX.utils.encode_cell({r:R,c:C});
+        ws1[addr]={ t:'n', v, z:'[h]:mm' };
+      }
+    }
+  }
+  ws1['!cols']=[{wch:14},{wch:14},{wch:14},{wch:14},{wch:16},{wch:16},{wch:28},{wch:28}];
+  const ws2=XLSX.utils.aoa_to_sheet(recap);
+  for(let R=1;R<recap.length;R++){
+    const v=recap[R][2];
+    if(typeof v==='number'&&!Number.isNaN(v)){
+      const addr=XLSX.utils.encode_cell({r:R,c:2});
+      ws2[addr]={ t:'n', v, z:'[h]:mm' };
+    }
+  }
+  ws2['!cols']=[{wch:18},{wch:22},{wch:14}];
   XLSX.utils.book_append_sheet(wb,ws1,'Détail interventions');
   XLSX.utils.book_append_sheet(wb,ws2,'Récap par intervenante');
   return wb;
@@ -674,12 +779,16 @@ window.exportSelected = function(){
   if(!resas.length){ showToast(`Aucune intervention en ${label}`); return; }
   const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
   const counts={};
-  for(const r of resas){ const a=A.assignments[r.uid]||{}; if(a.c1) counts[a.c1]=(counts[a.c1]||0)+1; if(a.c2) counts[a.c2]=(counts[a.c2]||0)+1; }
+  for(const r of resas){
+    const sl=getAssignmentSlots(r.uid);
+    if(sl.c1) counts[sl.c1]=(counts[sl.c1]||0)+1;
+    if(sl.c2) counts[sl.c2]=(counts[sl.c2]||0)+1;
+  }
   const cleaners=(A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
   const recap=cleaners.filter(c=>counts[c]).map(c=>`  ${c} : ${counts[c]} intervention(s)`).join('\n');
   const detail=resas.sort((a,b)=>a.end-b.end).map(r=>{
-    const a=A.assignments[r.uid]||{};
-    return `${fmt(r.end)} — ${A.studioNames[r.studio]} — ${[a.c1,a.c2].filter(Boolean).join(' + ')||'Non assigné'}`;
+    const sl=getAssignmentSlots(r.uid);
+    return `${fmt(r.end)} — ${A.studioNames[r.studio]} — ${[sl.c1,sl.c2].filter(Boolean).join(' + ')||'Non assigné'}`;
   }).join('\n');
   const prev=document.getElementById('export-preview');
   prev.style.display='';
