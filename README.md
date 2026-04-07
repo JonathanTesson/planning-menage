@@ -134,7 +134,7 @@ Sous **`/orgs/{orgId}/cleaningReports/{uidRéservation}`** (même `uid` que dans
 
 **Calendrier**
 - Affichage **S1 / S2** inchangé (noms de studios viennent de `/orgs/{orgId}/config`).
-- **Comptes rendus (rôle ménage, départ où l’on est assignée)** : modale **Mon intervention** — durée personnelle (heures + minutes), champs **communs** commande / commentaire (libellés et placeholders dans l’UI), enregistrement dans **`cleaningReports`** ; croix de fermeture en haut à droite ; fermeture automatique après **Enregistrer le compte rendu**.
+- **Comptes rendus (rôle ménage, départ où l’on est assignée)** : modale **Mon intervention** — durée personnelle (heures + minutes), champs **communs** commande / commentaire (libellés et placeholders dans l’UI), enregistrement dans **`cleaningReports`** ; croix de fermeture en haut à droite ; fermeture automatique après **Enregistrer**.
 - **Badge** du prénom sous le départ : **contour noir** si des heures ont été enregistrées pour cette personne sur ce départ.
 
 ### admin.html — Back-office
