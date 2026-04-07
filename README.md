@@ -55,7 +55,7 @@ Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. Ancienne rac
     /config        → studioNames, cleaners
     /reservations  → réservations Airbnb
     /assignments   → assignations
-    /adminConfig   → comptes, auth, defaultOrgId, …
+    /adminConfig   → comptes, auth, defaultOrgId, telegramEnabled, …
     /lastSync      → dernière sync iCal
     /activityLog   → journal d’activité
   /nade
@@ -109,12 +109,13 @@ Signification prévue : l’intervenante intervient dans **plusieurs** organisat
 - Connexion : liste déroulante **Organisation** en tête, puis prénom / mot de passe.
 - Clé locale : **`menage_org_v1`** (id technique : `tesson`, `nade`, …).
 - Toutes les lectures / écritures Firebase sont préfixées par **`/orgs/{orgId}/`**.
-- Si l’utilisateur change d’organisation sur l’écran de connexion, la page **se recharge** après mise à jour du stockage, pour rebrancher Firebase sur la bonne org (évite liste de prénoms / données d’une autre org).
+- Si l’utilisateur change d’organisation sur l’écran de connexion, la page **se recharge** après mise à jour du stockage, pour rebrancher Firebase sur la bonne org (évite liste de prénoms / données d’une autre org). Pendant ce reload, un écran plein **« Changement d’organisation »** (sessionStorage `menage_org_change_gate`) évite l’éclair du calendrier ; **`#main-app`** reste masqué dans le HTML jusqu’à **`showApp()`**.
+- Écran login : libellé **Nom** au-dessus du menu déroulant des prénoms ; première option affichée **`-`** (`value` vide).
 - **Aucun compte** dans `adminConfig` pour cette org : écran **Organisation non configurée** avec liens vers **`admin.html`** et bouton **Changer d’organisation** (efface `menage_org_v1` + recharge). Le chargement attend aussi **`adminConfig`** avant de décider auth / écran.
 - **Auth désactivée** (`authEnabled: false`) : badge **Admin** (lien **`admin.html`**) et bouton **Accueil** (efface `menage_org_v1` + `menage_session_v1` + recharge) pour revenir au choix d’organisation ; le bouton **Déco.** reste masqué en mode ouvert.
 
 **Authentification** (par org)
-- Toggle dans l’admin de **l’org concernée** ; session **`menage_session_v1`** globale (prénom), combinée à **`menage_org_v1`** pour savoir quelle base lire.
+- Case à cocher **« Activer l’authentification »** dans l’admin de **l’org concernée** ; session **`menage_session_v1`** globale (prénom), combinée à **`menage_org_v1`** pour savoir quelle base lire.
 - Badge prénom → lien **admin** si rôle 👑 ; en mode sans auth, le badge affiche **Admin** avec le même lien (même org en localStorage).
 
 **Calendrier**
@@ -125,7 +126,9 @@ Signification prévue : l’intervenante intervient dans **plusieurs** organisat
 - **Sans** `menage_org_v1` valide : **redirection vers `index.html`**.
 - Toutes les opérations Firebase sous **`/orgs/{orgId}/`** pour l’org choisie sur le calendrier.
 - **Topbar** : nom de l’organisation affiché.
-- **Org. par défaut** : enregistré dans **`adminConfig.defaultOrgId`** (pré-sélection sur le login / référence UX).
+- Section **Comptes** : une ligne par réglage — **authentification** et **Notifications Telegram** sont des **cases à cocher** (même style), avec texte d’aide ; **Org. par défaut** avec liste déroulante dessous. **`telegramEnabled`** dans **`adminConfig`** : si désactivé pour une org, **`sync-ical.js`** et **`notify-departs.js`** n’envoient **pas** de messages Telegram pour cette org (Firebase reste mis à jour pour la sync iCal).
+- La signification des icônes **🧹** (ménage) et **👑** (admin) sur chaque ligne de compte est rappelée dans la section **Légende & synchronisation** (plus sous la liste des comptes).
+- **Org. par défaut** : enregistré dans **`adminConfig.defaultOrgId`** (pré-sélection sur le login).
 
 ### sync-ical.js
 
@@ -133,13 +136,13 @@ Signification prévue : l’intervenante intervient dans **plusieurs** organisat
 - **tesson** et **nade** : deux flux iCal (studio 0 et 1) chacun lorsque les URLs sont renseignées dans **`feeds`**.
 - Si une org n’a **aucune** URL dans **`feeds`**, la sync pour cette org est **ignorée** (aucune écriture réservations / lastSync pour elle).
 - Écrit sous **`/orgs/{orgId}/reservations`** et **`/orgs/{orgId}/lastSync`**.
-- Notifications Telegram : préfixe avec le **libellé** de l’organisation.
+- Notifications Telegram : préfixe avec le **libellé** de l’organisation ; **désactivables par org** via **`adminConfig.telegramEnabled`** (défaut : activé si absent).
 
 ### notify-departs.js
 
 - Parcourt **`tesson`** puis **`nade`** (liste **`ORGS`**).
-- Lit **`/orgs/{orgId}/reservations`**, **`assignments`**, **`config`**.
-- Un message Telegram par départ du jour, avec le **libellé org** dans le titre.
+- Lit **`/orgs/{orgId}/reservations`**, **`assignments`**, **`config`**, **`adminConfig`** (pour **`telegramEnabled`**).
+- Un message Telegram par départ du jour, avec le **libellé org** dans le titre (sauf si Telegram est désactivé pour cette org).
 
 ---
 
@@ -208,8 +211,9 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 - **localStorage** `menage_org_v1` ; écran organisation + liste org sur la connexion ; rechargement si changement d’org au login
 - **Org sans comptes** : écran dédié + accès admin pour configuration ; attente **`adminConfig`** avant routage
 - **Mode sans auth** : badge **Admin** (lien admin), bouton **Accueil** (retour choix d’organisation)
-- **admin.html** : org obligatoire, topbar, `defaultOrgId` pour la pré-sélection login / UX
-- **sync-ical.js** / **notify-departs.js** : boucle par org ; org sans URL iCal = sync iCal ignorée pour cette org
+- **Changement d’org au login** : écran **Changement d’organisation** + calendrier masqué par défaut jusqu’à affichage
+- **admin.html** : org obligatoire, topbar ; cases à cocher auth + Telegram, **`telegramEnabled`** ; légende 🧹/👑 dans **Légende & synchronisation**
+- **sync-ical.js** / **notify-departs.js** : boucle par org ; org sans URL iCal = sync iCal ignorée pour cette org ; respect de **`telegramEnabled`**
 - **migrate.js** : copie one-shot racine → `/orgs/tesson/` sans suppression racine
 - **.gitignore** : ne pas versionner les JSON de compte de service dans `Firebase/`
 - Comptes : champ optionnel **`sharedWith`** (non utilisé en UI, documenté)
