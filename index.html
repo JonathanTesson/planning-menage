@@ -169,8 +169,9 @@ a.user-badge.user-badge-admin:hover{text-decoration:underline;background:#eef4fc
     <div class="login-sub">Identifiez-vous pour accéder<br>au planning</div>
     <label for="login-org" style="font-size:11px;color:#aaa;max-width:260px;width:100%">Organisation</label>
     <select class="login-select" id="login-org" aria-label="Organisation" onchange="onLoginOrgChange()"></select>
-    <select class="login-select" id="login-name">
-      <option value="">— Choisissez votre nom —</option>
+    <label for="login-name" style="font-size:11px;color:#aaa;max-width:260px;width:100%">Nom</label>
+    <select class="login-select" id="login-name" aria-label="Nom">
+      <option value="">-</option>
     </select>
     <input type="password" class="login-input" id="login-pwd" placeholder="••••••" onkeydown="if(event.key==='Enter')doLogin()">
     <div class="login-error" id="login-error" style="display:none">Mot de passe incorrect</div>
@@ -394,7 +395,7 @@ function showLogin(){
   if(orgEl) orgEl.value=defOrg;
   const accounts=S.adminConfig.accounts||[];
   const sel=el('login-name');
-  if(sel) sel.innerHTML='<option value="">— Choisissez votre nom —</option>'+
+  if(sel) sel.innerHTML='<option value="">-</option>'+
     accounts.map(a=>`<option value="${a.name}">${a.name}</option>`).join('');
 }
 
