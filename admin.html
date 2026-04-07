@@ -204,6 +204,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
       Réservations mises à jour <strong style="color:#555">toutes les heures</strong> via GitHub Actions.<br>
       Assignations synchronisées en temps réel via Firebase.<br><br>
       <span id="last-sync-info" style="color:#aaa"></span>
+      <div id="admin-app-version" style="font-size:11px;color:#aaa;margin-top:10px;line-height:1.5"></div>
     </div>
 
     <!-- Historique -->
@@ -256,6 +257,8 @@ const ORGANIZATIONS = [
   { id: 'tesson', label: 'Studio Tesson' },
   { id: 'nade', label: 'Studio Nade' }
 ];
+/** Aligner avec README.md lors d’une release. */
+const APP_VERSION = '4.0.0';
 
 function getStoredOrgId(){
   try{
@@ -418,6 +421,8 @@ function renderAdminContent(){
   if(tg) tg.checked=A.adminConfig.telegramEnabled!==false;
   renderHisto();
   renderActivityLog();
+  const av=document.getElementById('admin-app-version');
+  if(av) av.textContent='Planning Ménage · version '+APP_VERSION;
 }
 
 const ACTIVITY_TYPE_LABEL={ login:'Connexion', logout:'Déconnexion', assign:'Assignation', assign_admin:'Assignation (admin)', admin:'Admin', admin_config:'Comptes', event:'Événement' };

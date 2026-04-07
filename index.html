@@ -133,6 +133,18 @@ a.user-badge.user-badge-admin:hover{text-decoration:underline;background:#eef4fc
 .org-change-gate .gate-inner{text-align:center;max-width:320px}
 html[data-menage-org-gate="1"] #main-app{display:none!important}
 
+.app-version-foot{
+  position:fixed;
+  bottom:10px;
+  left:12px;
+  font-size:10px;
+  color:#aaa;
+  z-index:60;
+  letter-spacing:0.02em;
+  user-select:none;
+  pointer-events:none;
+}
+
 @media(max-width:600px){
   .calendar-grid{gap:2px}
   .day-cell{min-height:60px;padding:3px}
@@ -251,6 +263,7 @@ html[data-menage-org-gate="1"] #main-app{display:none!important}
 
 <div id="modal-container"></div>
 <div class="toast" id="toast"></div>
+<div id="app-version-foot" class="app-version-foot" aria-hidden="true"></div>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -278,6 +291,8 @@ const ORGANIZATIONS = [
   { id: 'tesson', label: 'Studio Tesson' },
   { id: 'nade', label: 'Studio Nade' }
 ];
+/** Aligner avec README.md lors d’une release. */
+const APP_VERSION = '4.0.0';
 
 function getStoredOrgId(){
   try{
@@ -371,6 +386,15 @@ function checkAuth(){
 
 function el(id){ return document.getElementById(id); }
 
+function setVersionFootVisible(show){
+  const f=el('app-version-foot');
+  if(f) f.style.display=show?'':'none';
+}
+function syncAppVersionFootText(){
+  const f=el('app-version-foot');
+  if(f) f.textContent='Planning Ménage · v '+APP_VERSION;
+}
+
 function hideOrgChangeGate(){
   try{ sessionStorage.removeItem(ORG_CHANGE_GATE_KEY); }catch(e){}
   document.documentElement.removeAttribute('data-menage-org-gate');
@@ -380,6 +404,7 @@ function hideOrgChangeGate(){
 
 function showApp(){
   hideOrgChangeGate();
+  setVersionFootVisible(false);
   if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='none';
   if(el('org-first-screen')) el('org-first-screen').style.display='none';
   if(el('login-screen')) el('login-screen').style.display='none';
@@ -421,6 +446,7 @@ function fillOrgSelect(selectEl){
 }
 function showLogin(){
   hideOrgChangeGate();
+  setVersionFootVisible(true);
   if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='none';
   if(el('org-first-screen')) el('org-first-screen').style.display='none';
   if(el('login-screen')) el('login-screen').style.display='';
@@ -552,6 +578,7 @@ function hideOrgUnconfiguredScreen(){
 
 function showOrgUnconfigured(){
   hideOrgChangeGate();
+  setVersionFootVisible(true);
   if(el('org-first-screen')) el('org-first-screen').style.display='none';
   if(el('login-screen')) el('login-screen').style.display='none';
   if(el('main-app')) el('main-app').style.display='none';
@@ -653,6 +680,7 @@ function initFirebaseAndApp(){
 
 function showOrgFirst(){
   hideOrgChangeGate();
+  setVersionFootVisible(true);
   el('org-first-screen').style.display='';
   el('login-screen').style.display='none';
   el('main-app').style.display='none';
@@ -678,6 +706,7 @@ function bootstrap(){
   initFirebaseAndApp();
 }
 bootstrap();
+syncAppVersionFootText();
 
 function saveAssignments(){
   const oid=getStoredOrgId();
