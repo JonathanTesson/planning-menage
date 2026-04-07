@@ -78,7 +78,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .account-role.active{border-color:#ddd;background:#f0f0eb}
 .add-account-row{display:flex;gap:6px;align-items:center;margin-top:10px;flex-wrap:wrap}
 .add-account-row input{padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
-.auth-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem}
 </style>
 </head>
 <body>
@@ -131,28 +130,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
     <!-- Comptes & Authentification -->
     <div class="section">
-      <div class="auth-header">
-        <h3 style="margin-bottom:0"><span>👥</span> Comptes</h3>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:12px;color:#888">Activer authentification</span>
-          <label class="toggle">
-            <input type="checkbox" id="toggle-auth" onchange="saveAdminConfig()">
-            <span class="toggle-slider"></span>
-          </label>
+      <h3 style="margin-bottom:1rem"><span>👥</span> Comptes</h3>
+      <div class="field-row" style="margin-bottom:14px;align-items:flex-start">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:12px;color:#333">Activer l’authentification</div>
+          <div style="font-size:11px;color:#aaa;margin-top:2px;line-height:1.45">Connexion au planning avec <strong>prénom</strong> et <strong>mot de passe</strong> pour cette organisation. Si désactivé, accès direct au calendrier sans identification (bouton Admin / Accueil).</div>
+        </div>
+        <div class="telegram-check-wrap" title="Exiger prénom et mot de passe sur index.html">
+          <input type="checkbox" id="toggle-auth" class="checkbox-compact" onchange="saveAdminConfig()" aria-label="Activer l’authentification">
         </div>
       </div>
-      <div style="font-size:11px;color:#aaa;margin-bottom:0.75rem">
-        🧹 = peut faire le ménage &nbsp;|&nbsp; 👑 = administrateur
-      </div>
-      <div class="field-row" style="margin-bottom:12px">
-        <label>Org. par défaut</label>
-        <select id="default-org-select" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:#fff" onchange="saveAdminConfig()" title="Pré-sélection sur l’écran de connexion">
+      <div style="margin-bottom:14px">
+        <div style="font-size:12px;color:#333">Org. par défaut</div>
+        <div style="font-size:11px;color:#aaa;margin-top:2px;line-height:1.45">Pré-sélection dans la liste « Organisation » sur l’écran de connexion du planning.</div>
+        <select id="default-org-select" style="margin-top:8px;width:100%;max-width:320px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:#fff" onchange="saveAdminConfig()" title="Pré-sélection sur l’écran de connexion">
         </select>
       </div>
       <div class="field-row" style="margin-bottom:12px;align-items:flex-start">
         <div style="flex:1;min-width:200px">
-          <label for="toggle-telegram" style="font-size:12px;color:#333;cursor:pointer;width:auto">Notifications Telegram</label>
-          <div style="font-size:11px;color:#aaa;margin-top:2px">Nouvelles résas (sync iCal) et départs du jour — par organisation</div>
+          <div style="font-size:12px;color:#333">Notifications Telegram</div>
+          <div style="font-size:11px;color:#aaa;margin-top:2px;line-height:1.45">Alertes pour les <strong>nouvelles résas</strong> (sync iCal) et les <strong>départs du jour</strong> — propres à cette organisation.</div>
         </div>
         <div class="telegram-check-wrap" title="Activer ou désactiver les messages Telegram pour cette organisation">
           <input type="checkbox" id="toggle-telegram" class="checkbox-compact" onchange="saveAdminConfig()" aria-label="Notifications Telegram">
@@ -185,10 +182,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
     <!-- Légende & Sync -->
     <div class="section" style="font-size:12px;color:#999;line-height:1.8">
       <h3><span>ℹ️</span> Légende & Synchronisation</h3>
+      <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">Calendrier (points sous les dates)</div>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:1rem">
         <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:#E24B4A;display:inline-block"></span><span>Rouge — aucune intervenante assignée</span></div>
         <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:#F59E0B;display:inline-block"></span><span>Orange — assignation partielle</span></div>
         <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:#e0e0d8;display:inline-block"></span><span>Aucun point — tous assignés</span></div>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">Comptes (liste ci-dessus)</div>
+      <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:1rem;color:#555">
+        <div><span style="font-size:14px;vertical-align:middle">🧹</span> — peut faire le <strong>ménage</strong> (interventions, assignations côté planning)</div>
+        <div><span style="font-size:14px;vertical-align:middle">👑</span> — <strong>Administrateur</strong> (accès à cette page et lien admin sur le calendrier)</div>
       </div>
       Réservations mises à jour <strong style="color:#555">toutes les heures</strong> via GitHub Actions.<br>
       Assignations synchronisées en temps réel via Firebase.<br><br>
