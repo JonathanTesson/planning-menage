@@ -124,6 +124,15 @@ a.user-badge.user-badge-admin:hover{text-decoration:underline;background:#eef4fc
 .toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
 
+/* Plein écran pendant changement d’org (évite l’éclair du calendrier au reload) */
+.org-change-gate{
+  position:fixed;inset:0;z-index:9999;background:#f5f5f0;
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  padding:2rem;
+}
+.org-change-gate .gate-inner{text-align:center;max-width:320px}
+html[data-menage-org-gate="1"] #main-app{display:none!important}
+
 @media(max-width:600px){
   .calendar-grid{gap:2px}
   .day-cell{min-height:60px;padding:3px}
@@ -138,6 +147,26 @@ a.user-badge.user-badge-admin:hover{text-decoration:underline;background:#eef4fc
 </style>
 </head>
 <body>
+
+<div id="org-change-gate" class="org-change-gate" style="display:none" aria-busy="true">
+  <div class="gate-inner login-screen" style="min-height:auto;padding:0">
+    <div class="login-icon">🏢</div>
+    <div class="login-title">Changement d’organisation</div>
+    <div class="login-sub">Chargement du planning…</div>
+    <div style="margin-top:1rem;display:flex;justify-content:center"><span class="spinner"></span></div>
+  </div>
+</div>
+<script>
+(function(){
+  try{
+    if(sessionStorage.getItem('menage_org_change_gate')){
+      var g=document.getElementById('org-change-gate');
+      if(g) g.style.display='flex';
+      document.documentElement.setAttribute('data-menage-org-gate','1');
+    }
+  }catch(e){}
+})();
+</script>
 
 <div class="topbar">
   <div>
@@ -190,8 +219,8 @@ a.user-badge.user-badge-admin:hover{text-decoration:underline;background:#eef4fc
   </div>
 </div>
 
-<!-- MAIN APP -->
-<div id="main-app">
+<!-- MAIN APP (masqué par défaut jusqu’à showApp — évite flash au chargement Firebase) -->
+<div id="main-app" style="display:none">
 <div class="container">
   <div class="header">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -244,6 +273,7 @@ const MAX_ACTIVITY_LOG_ENTRIES = 450;
 const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A6E','#c0392b'];
 const SESSION_KEY = 'menage_session_v1';
 const ORG_STORAGE_KEY = 'menage_org_v1';
+const ORG_CHANGE_GATE_KEY = 'menage_org_change_gate';
 const ORGANIZATIONS = [
   { id: 'tesson', label: 'Studio Tesson' },
   { id: 'nade', label: 'Studio Nade' }
@@ -341,7 +371,15 @@ function checkAuth(){
 
 function el(id){ return document.getElementById(id); }
 
+function hideOrgChangeGate(){
+  try{ sessionStorage.removeItem(ORG_CHANGE_GATE_KEY); }catch(e){}
+  document.documentElement.removeAttribute('data-menage-org-gate');
+  const g=el('org-change-gate');
+  if(g){ g.style.display='none'; g.setAttribute('aria-busy','false'); }
+}
+
 function showApp(){
+  hideOrgChangeGate();
   if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='none';
   if(el('org-first-screen')) el('org-first-screen').style.display='none';
   if(el('login-screen')) el('login-screen').style.display='none';
@@ -382,6 +420,7 @@ function fillOrgSelect(selectEl){
   selectEl.innerHTML=ORGANIZATIONS.map(o=>`<option value="${o.id}">${o.label}</option>`).join('');
 }
 function showLogin(){
+  hideOrgChangeGate();
   if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='none';
   if(el('org-first-screen')) el('org-first-screen').style.display='none';
   if(el('login-screen')) el('login-screen').style.display='';
@@ -404,6 +443,7 @@ window.onLoginOrgChange=function(){
   const sel=el('login-org');
   if(!sel||!sel.value) return;
   setStoredOrgId(sel.value);
+  try{ sessionStorage.setItem(ORG_CHANGE_GATE_KEY,'1'); }catch(e){}
   location.reload();
 };
 
@@ -430,6 +470,7 @@ window.doLogin = function(){
   document.getElementById('login-error').style.display='none';
   setStoredOrgId(orgId);
   if(window.__menageFbInit && window.__menageActiveOrg && window.__menageActiveOrg!==orgId){
+    try{ sessionStorage.setItem(ORG_CHANGE_GATE_KEY,'1'); }catch(e){}
     location.reload();
     return;
   }
@@ -510,6 +551,7 @@ function hideOrgUnconfiguredScreen(){
 }
 
 function showOrgUnconfigured(){
+  hideOrgChangeGate();
   if(el('org-first-screen')) el('org-first-screen').style.display='none';
   if(el('login-screen')) el('login-screen').style.display='none';
   if(el('main-app')) el('main-app').style.display='none';
@@ -610,6 +652,7 @@ function initFirebaseAndApp(){
 }
 
 function showOrgFirst(){
+  hideOrgChangeGate();
   el('org-first-screen').style.display='';
   el('login-screen').style.display='none';
   el('main-app').style.display='none';
