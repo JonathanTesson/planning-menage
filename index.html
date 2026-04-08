@@ -27,6 +27,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .user-badge{font-size:11px;color:#888;text-decoration:none;border-radius:6px;padding:2px 6px;display:inline-block}
 a.user-badge.user-badge-admin{color:#185FA5;font-weight:500}
 a.user-badge.user-badge-admin:hover{text-decoration:underline;background:#eef4fc}
+a.user-badge.user-badge-account{color:#888;cursor:pointer}
+a.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:none}
 .status-bar{font-size:12px;color:#888;min-height:0;margin-bottom:0;display:flex;align-items:center;gap:6px}
 .spinner{width:12px;height:12px;border:2px solid #ddd;border-top-color:#378ADD;border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block;flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -102,7 +104,7 @@ a.user-badge.user-badge-admin:hover{text-decoration:underline;background:#eef4fc
 .modal h3{font-size:16px;font-weight:600;margin-bottom:1rem}
 .modal-field{margin-bottom:0.875rem}
 .modal-field label{font-size:12px;color:#888;display:block;margin-bottom:4px;font-weight:500}
-.modal-field select,.modal-field input[type=text]{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
+.modal-field select,.modal-field input[type=text],.modal-field input[type=password]{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
 .modal-field textarea{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;resize:vertical;min-height:64px;line-height:1.4}
 .modal-field input[type=number]{width:4.5rem;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
 .modal-shared-hint{font-size:11px;color:#999;line-height:1.45;margin:0 0 0.75rem}
@@ -430,11 +432,14 @@ function showApp(){
   if(homeBtn) homeBtn.style.display=noAuth?'':'none';
   const badge=el('current-user-badge');
   if(badge){
+    badge.onclick=null;
     if(noAuth){
       badge.textContent='Admin';
       badge.style.display='';
       badge.setAttribute('href','admin.html');
       badge.classList.add('user-badge-admin');
+      badge.classList.remove('user-badge-account');
+      badge.removeAttribute('role');
       badge.title='Ouvrir l’administration de cette organisation';
     }else if(S.currentUser?.name){
       badge.textContent=S.currentUser.name;
@@ -442,11 +447,16 @@ function showApp(){
       if(S.currentUser.admin){
         badge.setAttribute('href','admin.html');
         badge.classList.add('user-badge-admin');
+        badge.classList.remove('user-badge-account');
+        badge.removeAttribute('role');
         badge.title='Administration';
       }else{
-        badge.removeAttribute('href');
+        badge.setAttribute('href','#');
         badge.classList.remove('user-badge-admin');
-        badge.removeAttribute('title');
+        badge.classList.add('user-badge-account');
+        badge.setAttribute('role','button');
+        badge.title='Mon compte';
+        badge.onclick=function(e){ e.preventDefault(); window.openAccountMenu(); };
       }
     }else{
       badge.style.display='none';
@@ -531,6 +541,69 @@ window.doLogout = function(){
   if(!essentialDataLoaded()) return;
   if(!orgHasConfiguredAccounts()) showOrgUnconfigured();
   else checkAuth();
+};
+
+window.openAccountMenu=function(){
+  const u=S.currentUser;
+  if(!u?.name||u.noAuth||u.admin) return;
+  const acc=(S.adminConfig.accounts||[]).find(a=>a.name===u.name);
+  if(!acc) return;
+  const hasPwd=!!acc.pwdHash;
+  const n=escHtml(u.name);
+  document.getElementById('modal-container').innerHTML=`
+    <div class="modal-overlay" onclick="if(event.target===this)window._cm()">
+      <div class="modal modal--wide">
+        <div class="modal-header-row">
+          <h3>Mon compte</h3>
+          <button type="button" class="modal-close-x" onclick="window._cm()" aria-label="Fermer" title="Fermer">×</button>
+        </div>
+        <p class="modal-shared-hint" style="margin-top:0"><strong style="color:#555">${n}</strong></p>
+        <div class="modal-section-title">Mot de passe</div>
+        <p class="modal-shared-hint">${hasPwd?'Saisissez votre mot de passe actuel, puis le nouveau.':'Aucun mot de passe défini pour l’instant : choisissez-en un.'}</p>
+        <div class="modal-field">
+          <label for="self-pwd-current">${hasPwd?'Mot de passe actuel':'Mot de passe actuel (si déjà défini)'}</label>
+          <input type="password" id="self-pwd-current" autocomplete="current-password" placeholder="">
+        </div>
+        <div class="modal-field">
+          <label for="self-pwd-new">Nouveau mot de passe</label>
+          <input type="password" id="self-pwd-new" autocomplete="new-password" placeholder="">
+        </div>
+        <div class="modal-field">
+          <label for="self-pwd-confirm">Confirmer</label>
+          <input type="password" id="self-pwd-confirm" autocomplete="new-password" placeholder="">
+        </div>
+        <div class="modal-btns">
+          <button type="button" class="btn-cancel" onclick="window._cm()">Annuler</button>
+          <button type="button" class="btn-primary" onclick="window._saveOwnPassword()">Enregistrer</button>
+        </div>
+      </div>
+    </div>`;
+};
+
+window._saveOwnPassword=function(){
+  const u=S.currentUser;
+  if(!u?.name||u.admin||u.noAuth) return;
+  const oid=getStoredOrgId();
+  if(!oid) return;
+  const acc=(S.adminConfig.accounts||[]).find(a=>a.name===u.name);
+  if(!acc){ showToast('Compte introuvable'); return; }
+  const cur=String(el('self-pwd-current')?.value||'');
+  const nw=String(el('self-pwd-new')?.value||'');
+  const cf=String(el('self-pwd-confirm')?.value||'');
+  if(nw.length<4){ showToast('Nouveau mot de passe : au moins 4 caractères'); return; }
+  if(nw!==cf){ showToast('La confirmation ne correspond pas'); return; }
+  if(acc.pwdHash){
+    if(hashSimple(cur)!==acc.pwdHash){ showToast('Mot de passe actuel incorrect'); return; }
+  }
+  const accounts=S.adminConfig.accounts.map(a=>({...a}));
+  const i=accounts.findIndex(a=>a.name===u.name);
+  if(i<0){ showToast('Erreur'); return; }
+  accounts[i]={...accounts[i], pwdHash:hashSimple(nw)};
+  const next={...S.adminConfig, accounts};
+  fbSet(`orgs/${oid}/adminConfig`,next);
+  logActivity({ type:'admin_config', actor:u.name, text:`${u.name} a modifié son mot de passe` });
+  showToast('Mot de passe enregistré ✓');
+  window._cm();
 };
 
 // ─── Firebase ─────────────────────────────────────────────────────────────────
