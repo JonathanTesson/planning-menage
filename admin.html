@@ -133,8 +133,11 @@ body.admin-nav-ready .admin-burger{display:flex}
 <div id="admin-nav-overlay" class="admin-nav-overlay" aria-hidden="true"></div>
 <nav id="admin-nav-panel" class="admin-nav-panel" aria-label="Zones administration" aria-hidden="true">
   <div class="admin-nav-panel-inner">
-    <a href="#" class="admin-nav-link" data-admin-view="general">Général</a>
-    <a href="#" class="admin-nav-link" data-admin-view="procedures">Procédures &amp; préparation studio</a>
+    <a href="#" class="admin-nav-link" data-admin-view="dashboard">Dashboard</a>
+    <a href="#" class="admin-nav-link" data-admin-view="procedures">Procédure</a>
+    <a href="#" class="admin-nav-link" data-admin-view="comptes">Comptes</a>
+    <a href="#" class="admin-nav-link" data-admin-view="organisation">Organisation</a>
+    <a href="#" class="admin-nav-link" data-admin-view="legend">Légende</a>
   </div>
 </nav>
 
@@ -145,7 +148,7 @@ body.admin-nav-ready .admin-burger{display:flex}
     </button>
     <div style="min-width:0">
       <div class="topbar-title">Administration</div>
-      <div class="topbar-sub"><span id="admin-org-label">…</span> · Planning Ménage</div>
+      <div class="topbar-sub"><span id="admin-org-label">…</span></div>
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -168,7 +171,7 @@ body.admin-nav-ready .admin-burger{display:flex}
 
   <div id="admin-content" style="display:none">
 
-    <div id="admin-view-general" role="region" aria-label="Vue générale">
+    <div id="admin-view-dashboard" role="region" aria-label="Dashboard">
 
     <!-- Statistiques + Export -->
     <div class="section" id="section-stats">
@@ -193,6 +196,34 @@ body.admin-nav-ready .admin-burger{display:flex}
       <div id="export-preview" style="display:none;margin-top:0.75rem" class="report-preview"></div>
     </div>
 
+    <!-- Historique -->
+    <div class="section" id="section-histo">
+      <h3><span>📋</span> Historique des interventions</h3>
+      <div id="histo-content">Chargement...</div>
+    </div>
+
+    <div style="text-align:center;margin-top:1.5rem">
+      <button class="btn-secondary" onclick="logout()">Se déconnecter</button>
+    </div>
+    </div>
+
+    <div id="admin-view-procedures" role="region" aria-label="Procédures et préparation studio" style="display:none">
+    <div class="section" id="procedures-section">
+      <h3><span>📋</span> Procédures & préparation studio</h3>
+      <p style="font-size:11px;color:#aaa;margin-bottom:10px;line-height:1.5">
+        Étapes par studio (photos légères, consultables plus tard depuis le planning). Les modifications sont enregistrées tout de suite.
+      </p>
+      <div class="proc-toolbar">
+        <label for="proc-studio-select" style="font-size:12px;color:#888;white-space:nowrap">Studio</label>
+        <select id="proc-studio-select" title="Studio concerné"></select>
+        <button type="button" class="btn-primary" onclick="procedureAddStep()">+ Ajouter une étape</button>
+      </div>
+      <input type="file" id="proc-file-input" accept="image/*" capture="environment" style="display:none" tabindex="-1">
+      <div id="procedures-steps-host" class="proc-steps">Chargement…</div>
+    </div>
+    </div>
+
+    <div id="admin-view-comptes" role="region" aria-label="Comptes et journal d’activité" style="display:none">
     <!-- Comptes & Authentification -->
     <div class="section" id="section-accounts">
       <h3 style="margin-bottom:1rem"><span>👥</span> Comptes</h3>
@@ -228,6 +259,18 @@ body.admin-nav-ready .admin-burger{display:flex}
       </div>
     </div>
 
+    <!-- Journal d'activité -->
+    <div class="section" id="section-activity">
+      <h3><span>📜</span> Journal d'activité</h3>
+      <p style="font-size:11px;color:#aaa;margin-bottom:0.5rem;line-height:1.5">
+        Connexions au planning, assignations et actions sensibles dans l’admin. Affichage des 200 derniers événements (depuis la mise en place de cette fonction).
+      </p>
+      <div id="activity-log-wrap" class="activity-log-wrap">Chargement...</div>
+      <button type="button" class="btn-secondary" style="margin-top:0.75rem" onclick="clearActivityLog()">Vider le journal</button>
+    </div>
+    </div>
+
+    <div id="admin-view-organisation" role="region" aria-label="Organisation — studios" style="display:none">
     <!-- Studios -->
     <div class="section" id="section-studios">
       <h3><span>🏠</span> Studios</h3>
@@ -243,7 +286,9 @@ body.admin-nav-ready .admin-burger{display:flex}
         <button class="btn-primary" onclick="saveNames()">Enregistrer</button>
       </div>
     </div>
+    </div>
 
+    <div id="admin-view-legend" role="region" aria-label="Légende et synchronisation" style="display:none">
     <!-- Légende & Sync -->
     <div class="section" id="section-legend" style="font-size:12px;color:#999;line-height:1.8">
       <h3><span>ℹ️</span> Légende & Synchronisation</h3>
@@ -253,7 +298,7 @@ body.admin-nav-ready .admin-burger{display:flex}
         <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:#F59E0B;display:inline-block"></span><span>Orange — assignation partielle</span></div>
         <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:#e0e0d8;display:inline-block"></span><span>Aucun point — tous assignés</span></div>
       </div>
-      <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">Comptes (liste ci-dessus)</div>
+      <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">Comptes (rubrique Comptes du menu)</div>
       <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:1rem;color:#555">
         <div><span style="font-size:14px;vertical-align:middle">🧹</span> — peut faire le <strong>ménage</strong> (interventions, assignations côté planning)</div>
         <div><span style="font-size:14px;vertical-align:middle">👑</span> — <strong>Administrateur</strong> (accès à cette page et lien admin sur le calendrier)</div>
@@ -262,42 +307,6 @@ body.admin-nav-ready .admin-burger{display:flex}
       Assignations synchronisées en temps réel via Firebase.<br><br>
       <span id="last-sync-info" style="color:#aaa"></span>
       <div id="admin-app-version" style="font-size:11px;color:#aaa;margin-top:10px;line-height:1.5"></div>
-    </div>
-
-    <!-- Historique -->
-    <div class="section" id="section-histo">
-      <h3><span>📋</span> Historique des interventions</h3>
-      <div id="histo-content">Chargement...</div>
-    </div>
-
-    <!-- Journal d'activité -->
-    <div class="section" id="section-activity">
-      <h3><span>📜</span> Journal d'activité</h3>
-      <p style="font-size:11px;color:#aaa;margin-bottom:0.5rem;line-height:1.5">
-        Connexions au planning, assignations et actions sensibles dans l’admin. Affichage des 200 derniers événements (depuis la mise en place de cette fonction).
-      </p>
-      <div id="activity-log-wrap" class="activity-log-wrap">Chargement...</div>
-      <button type="button" class="btn-secondary" style="margin-top:0.75rem" onclick="clearActivityLog()">Vider le journal</button>
-    </div>
-
-    <div style="text-align:center;margin-top:1.5rem">
-      <button class="btn-secondary" onclick="logout()">Se déconnecter</button>
-    </div>
-    </div>
-
-    <div id="admin-view-procedures" role="region" aria-label="Procédures et préparation studio" style="display:none">
-    <div class="section" id="procedures-section">
-      <h3><span>📋</span> Procédures & préparation studio</h3>
-      <p style="font-size:11px;color:#aaa;margin-bottom:10px;line-height:1.5">
-        Étapes par studio (photos légères, consultables plus tard depuis le planning). Les modifications sont enregistrées tout de suite.
-      </p>
-      <div class="proc-toolbar">
-        <label for="proc-studio-select" style="font-size:12px;color:#888;white-space:nowrap">Studio</label>
-        <select id="proc-studio-select" title="Studio concerné"></select>
-        <button type="button" class="btn-primary" onclick="procedureAddStep()">+ Ajouter une étape</button>
-      </div>
-      <input type="file" id="proc-file-input" accept="image/*" capture="environment" style="display:none" tabindex="-1">
-      <div id="procedures-steps-host" class="proc-steps">Chargement…</div>
     </div>
     </div>
   </div>
@@ -510,23 +519,29 @@ window.logout = function(){
   window.location.href='index.html';
 };
 
-/** Une seule fois : ouvrir la vue Procédures si l’URL contient #procedures */
+/** Vues : dashboard (stats, export, historique, déco), procédures, comptes + journal, organisation (studios), légende */
+const ADMIN_VIEW_IDS=['dashboard','procedures','comptes','organisation','legend'];
+
+/** Une seule fois : ouvrir la vue correspondant au hash (#comptes, #legend, #procedures, …) */
 let adminUiHashApplied=false;
 
-/** Bascule entre vue « Général » (tout sauf procédures) et vue dédiée procédures. */
 window.setAdminUiView=function(view,opts){
-  const procs=view==='procedures';
-  const gen=document.getElementById('admin-view-general');
-  const proc=document.getElementById('admin-view-procedures');
-  if(!gen||!proc) return;
-  gen.style.display=procs?'none':'';
-  proc.style.display=procs?'':'none';
+  const v=ADMIN_VIEW_IDS.includes(view)?view:'dashboard';
+  let ok=false;
+  ADMIN_VIEW_IDS.forEach(id=>{
+    const el=document.getElementById('admin-view-'+id);
+    if(el){
+      el.style.display=id===v?'':'none';
+      ok=true;
+    }
+  });
+  if(!ok) return;
   try{
     const base=location.pathname+location.search;
-    history.replaceState(null,'',procs?(base+'#procedures'):base);
+    history.replaceState(null,'',v==='dashboard'?base:(base+'#'+v));
   }catch(_){}
   if(!(opts&&opts.noScroll)) window.scrollTo(0,0);
-  if(procs&&A.unlocked) renderProcedures();
+  if(v==='procedures'&&A.unlocked) renderProcedures();
 };
 
 function setAdminNavOpen(open){
@@ -559,8 +574,7 @@ function setupAdminNavOnce(){
       e.preventDefault();
       const navView=a.getAttribute('data-admin-view');
       setAdminNavOpen(false);
-      if(navView==='procedures') window.setAdminUiView('procedures');
-      else window.setAdminUiView('general');
+      window.setAdminUiView(ADMIN_VIEW_IDS.includes(navView)?navView:'dashboard');
     });
   });
   document.addEventListener('keydown',e=>{
@@ -595,7 +609,10 @@ function renderAdminContent(){
   if(av) av.textContent='Planning Ménage · version '+APP_VERSION;
   if(A.unlocked&&!adminUiHashApplied){
     adminUiHashApplied=true;
-    if(location.hash==='#procedures'||location.hash==='#procedures-section') window.setAdminUiView('procedures',{noScroll:true});
+    let h=location.hash.slice(1);
+    if(h==='procedures-section') h='procedures';
+    if(h==='general') h='dashboard';
+    if(ADMIN_VIEW_IDS.includes(h)&&h!=='dashboard') window.setAdminUiView(h,{noScroll:true});
   }
 }
 

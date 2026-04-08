@@ -97,7 +97,7 @@ Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, �
 
 **Firebase Storage** (SDK modulaire v10 dans `admin.html`) : fichiers JPEG **`orgs/{orgId}/procedures/{studioIndex}/{stepId}.jpg`**. Compression navigateur avant envoi (largeur max **640 px**, qualité **~0,48**).
 
-**Interface admin** : menu latéral (burger) avec **deux entrées** — **Général** (tout le back-office sauf cette zone) et **Procédures & préparation studio** (vue dédiée). Pas d’onglets en tête de page ; l’URL peut inclure **`#procedures`** pour ouvrir directement la vue procédures. À la fermeture du menu, le focus repasse sur le burger (accessibilité).
+**Interface admin** : la zone procédures s’ouvre via le menu latéral (burger), entrée **Procédure** (libellé court ; le titre de page reste « Procédures & préparation studio »). Pas d’onglets en tête de page. Hashes d’URL possibles : **`#procedures`**, **`#procedures-section`** (ancien lien). À la fermeture du menu, le focus repasse sur le burger (accessibilité). Voir § **admin.html** ci-dessous pour le détail des cinq vues.
 
 **Affichage côté calendrier** (`index.html`) : non prévu dans cette version ; réservé à une évolution ultérieure.
 
@@ -158,10 +158,16 @@ Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, �
 
 - **Sans** `menage_org_v1` valide : **redirection vers `index.html`**.
 - Toutes les opérations Firebase sous **`/orgs/{orgId}/`** pour l’org choisie sur le calendrier.
-- **Topbar** : nom de l’organisation affiché ; **menu burger** (deux zones : Général / Procédures & préparation) ; retour focus sur le burger à la fermeture du tiroir.
-- **Vues** : **Général** regroupe stats, comptes, studios, légende, historique, journal, déconnexion ; **Procédures** = gestion des étapes par studio (photos Storage + texte RTDB), voir § `/procedures` ci-dessus.
-- Section **Comptes** : une ligne par réglage — **authentification** et **Notifications Telegram** sont des **cases à cocher** (même style), avec texte d’aide ; **Org. par défaut** avec liste déroulante dessous. **`telegramEnabled`** dans **`adminConfig`** : si désactivé pour une org, **`sync-ical.js`** et **`notify-departs.js`** n’envoient **pas** de messages Telegram pour cette org (Firebase reste mis à jour pour la sync iCal).
-- La signification des icônes **🧹** (ménage) et **👑** (admin) sur chaque ligne de compte est rappelée dans la section **Légende & synchronisation** (plus sous la liste des comptes).
+- **Topbar** : titre **Administration** et **nom de l’organisation** uniquement (sans suffixe « Planning Ménage ») ; **menu burger** à gauche ; retour **focus** sur le burger à la fermeture du tiroir (accessibilité).
+- **Navigation latérale** (ordre du haut vers le bas) — une **vue pleine page** par entrée, sans sous-menus :
+  1. **Dashboard** — statistiques du mois, **export Excel** (aperçu optionnel), **historique des interventions**, bouton **Se déconnecter**.
+  2. **Procédure** — **Procédures & préparation studio** (étapes par studio, photos Storage + texte RTDB), voir § `/procedures` ci-dessus.
+  3. **Comptes** — authentification, **Org. par défaut**, Telegram, liste des comptes, **journal d’activité**.
+  4. **Organisation** — **Studios** (noms affichés S1 / S2 sur le calendrier).
+  5. **Légende** — **Légende & synchronisation** (points du calendrier, rôles 🧹 / 👑, sync, version affichée en bas).
+- **Hashes d’URL** (optionnels) : **`#dashboard`** (équivalent page d’accueil admin), **`#procedures`**, **`#comptes`**, **`#organisation`**, **`#legend`** ; **`#general`** est encore accepté et équivalent à **`#dashboard`** ; sans hash, la vue par défaut est le **Dashboard**.
+- Rubrique **Comptes** : une ligne par réglage — **authentification** et **Notifications Telegram** sont des **cases à cocher** (même style), avec texte d’aide ; **Org. par défaut** avec liste déroulante dessous. **`telegramEnabled`** dans **`adminConfig`** : si désactivé pour une org, **`sync-ical.js`** et **`notify-departs.js`** n’envoient **pas** de messages Telegram pour cette org (Firebase reste mis à jour pour la sync iCal).
+- La signification des icônes **🧹** (ménage) et **👑** (admin) est rappelée dans la vue **Légende** (texte du type « Comptes (rubrique Comptes du menu) » pour renvoyer vers la bonne vue).
 - **Org. par défaut** : enregistré dans **`adminConfig.defaultOrgId`** (pré-sélection sur le login).
 - **Historique des interventions** : tableau avec date courte **jj/mm/aa**, studio **S1** / **S2**, intervenantes, et colonne **Heures** (somme des durées saisies pour la ligne, vide si aucune) ; mise à jour si **`cleaningReports`** change.
 - **Export Excel** — feuille **Détail interventions** : colonnes dans l’ordre **Date départ**, **Studio**, **Intervenante 1**, **Intervenante 2**, **Intervenante 1 durée**, **Intervenante 2 durée**, **Commande**, **Commentaire** (durées au format Excel `[h]:mm`). Feuille **Récap par intervenante** : colonne **Total heures** (somme sur la période exportée, même format).
@@ -205,6 +211,8 @@ Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, �
 
 ## Studios (affichage calendrier)
 
+Les **libellés** Studio 1 / Studio 2 sont modifiables dans **admin.html** → vue **Organisation** (enregistrés dans **`/orgs/{orgId}/config`**).
+
 | | Studio 1 | Studio 2 |
 |--|----------|----------|
 | Couleur calendrier | Bleu | Vert |
@@ -213,7 +221,7 @@ Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, �
 
 ## Intervenantes (comptes)
 
-Gérées dans **admin.html** de **chaque organisation**. Structure compte : `name`, `pwdHash`, `menage`, `admin`, et optionnellement **`sharedWith`** (voir plus haut).
+Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Structure compte : `name`, `pwdHash`, `menage`, `admin`, et optionnellement **`sharedWith`** (voir plus haut).
 
 ---
 
@@ -247,7 +255,7 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 
 ### v4.2.0 — Avril 2026
 - **Admin — Procédures & préparation studio** : étapes par studio (`/orgs/{orgId}/procedures/...`), photos JPEG dans Storage (`orgs/{orgId}/procedures/{studioIndex}/{stepId}.jpg`), compression côté navigateur (max 640 px, qualité ~0,48) ; réordonnancement (glisser-déposer desktop ≥768px, flèches mobile) ; enregistrement au blur / après upload
-- **Admin — Navigation** : menu burger à deux entrées (vue **Général** vs vue **Procédures**) ; URL **`#procedures`** pour ouvrir directement la vue procédures ; gestion du focus à la fermeture du menu (accessibilité)
+- **Admin — Navigation** : menu burger avec **cinq vues** — **Dashboard** (stats, exports, historique, déconnexion), **Procédure**, **Comptes** (réglages + journal d’activité), **Organisation** (noms des studios), **Légende** (aide + sync + version) ; ordre des entrées du haut vers le bas comme ci-dessus ; libellé court **Procédure** dans le menu ; topbar sans « Planning Ménage » ; hashes **`#dashboard`**, **`#procedures`**, **`#comptes`**, **`#organisation`**, **`#legend`** (et **`#general`** → dashboard) ; focus renvoyé sur le burger à la fermeture du tiroir
 - **Index** : badge admin = lien `admin.html` ; compte non-admin = bouton ouvrant la modale « Mon compte »
 - **Versions affichées** : `APP_VERSION` **4.2.0** dans `index.html` et `admin.html` (aligner avec ce README à chaque release)
 
