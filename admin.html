@@ -105,27 +105,27 @@ body.admin-nav-ready .admin-burger{display:flex}
 .proc-step-row{display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #e8e8e2;border-radius:10px;background:#fafaf8;transition:background 0.35s ease}
 .proc-step-row.proc-flash-ok{background:#d4edda!important}
 .proc-step-row.proc-flash-err{background:#f8d7da!important}
-.proc-step-row[draggable=true]{cursor:grab}
-.proc-step-row[draggable=true]:active{cursor:grabbing}
-.proc-step-row.proc-drag-over{outline:2px dashed #378ADD;outline-offset:2px}
-.proc-photo-col{flex-shrink:0;width:80px}
-.proc-photo-thumb{width:80px;height:80px;border-radius:6px;object-fit:cover;background:#e8e8e2;display:block}
-.proc-photo-placeholder{width:80px;height:80px;border-radius:6px;background:#e8e8e2;display:flex;align-items:center;justify-content:center;font-size:11px;color:#999;text-align:center;padding:4px;line-height:1.2}
-.proc-photo-btn{margin-top:6px;width:100%;padding:4px;font-size:12px}
+.proc-photo-col{flex-shrink:0;width:80px;display:flex;flex-direction:column;align-items:stretch;gap:6px}
+.proc-copy-step-btn{width:100%;padding:4px 2px;font-size:10px;line-height:1.2;border-radius:6px;white-space:normal;word-break:break-word}
+.proc-copy-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+.proc-copy-dialog{background:#fafaf8;border:1px solid #e8e8e2;border-radius:12px;padding:16px;max-width:320px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.12)}
+.proc-copy-title{font-size:14px;font-weight:600;color:#222;margin-bottom:12px}
+.proc-copy-targets{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.proc-copy-target-btn{width:100%;justify-content:center}
+.proc-copy-cancel{width:100%}
+.proc-photo-box{width:80px;height:80px;padding:0;border:none;border-radius:6px;background:#e8e8e2;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;overflow:hidden;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.proc-photo-box:hover{background:#deded8}
+.proc-photo-box:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
+.proc-photo-box:disabled{opacity:0.65;cursor:wait}
+.proc-photo-box .proc-photo-thumb{width:100%;height:100%;object-fit:cover;display:block;border-radius:6px}
+.proc-photo-box .proc-photo-icon{font-size:26px;line-height:1;opacity:0.55}
+.proc-photo-box .proc-photo-label{font-size:10px;color:#888;line-height:1.1;font-weight:500}
+.proc-photo-box .proc-photo-uploading{font-size:11px;color:#777;text-align:center;padding:4px;line-height:1.2}
 .proc-step-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
 .proc-short-input{width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#111;background:#fff}
 .proc-long-input{width:100%;min-height:72px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:0.875em;font-style:italic;color:#666;background:#fff;resize:vertical;line-height:1.45}
-.proc-step-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap}
-.proc-order-mobile{display:none;flex-direction:column;gap:4px}
-.proc-order-desktop{display:flex;flex-direction:column;gap:4px}
-@media(max-width:767px){
-  .proc-order-mobile{display:flex}
-  .proc-order-desktop{display:none!important}
-  .proc-step-row[draggable]{-webkit-user-drag:none}
-}
-@media(min-width:768px){
-  .proc-order-mobile{display:none!important}
-}
+.proc-step-actions{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0}
+.proc-order-arrows{display:flex;flex-direction:column;gap:4px;align-items:center}
 </style>
 </head>
 <body>
@@ -317,7 +317,7 @@ body.admin-nav-ready .admin-burger{display:flex}
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, set, onValue, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL, getBytes, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 /*
  * ⚠️ RÈGLES FIREBASE — à configurer dans la console Firebase
@@ -976,21 +976,26 @@ function renderProcedures(){
   }
   const si=sel.value;
   const steps=getStepsSorted(si);
-  const useDrag=typeof matchMedia!=='undefined'&&matchMedia('(min-width:768px)').matches;
   if(!steps.length){
     host.innerHTML='<p style="font-size:12px;color:#aaa">Aucune étape — utilisez « + Ajouter une étape ».</p>';
     return;
   }
   host.innerHTML=steps.map(st=>{
     const uploading=procedureUploading.has(st.id);
-    const ph=st.photoUrl&&!uploading
-      ? `<img class="proc-photo-thumb" src="${escHtml(st.photoUrl)}" alt="">`
-      : (uploading?'<div class="proc-photo-placeholder">Upload…</div>':'<div class="proc-photo-placeholder">Photo</div>');
-    const dragAttr=useDrag?` draggable="true" ondragstart="procedureDragStart(event)" ondragover="procedureDragOver(event)" ondrop="procedureDrop(event)" ondragleave="procedureDragLeave(event)"`:'';
-    return `<div class="proc-step-row" id="proc-step-${st.id}" data-step-id="${st.id}"${dragAttr}>
+    const hasPhoto=!!(st.photoUrl&&!uploading);
+    let photoInner;
+    if(uploading) photoInner='<span class="proc-photo-uploading">Upload…</span>';
+    else if(hasPhoto) photoInner=`<img class="proc-photo-thumb" src="${escHtml(st.photoUrl)}" alt="Aperçu photo">`;
+    else photoInner='<span class="proc-photo-icon" aria-hidden="true">📷</span><span class="proc-photo-label">Photo</span>';
+    const dis=uploading?' disabled':'';
+    const title=hasPhoto?'Remplacer la photo':'Ajouter une photo';
+    const copyDis=uploading?' disabled':'';
+    return `<div class="proc-step-row" id="proc-step-${st.id}" data-step-id="${st.id}">
       <div class="proc-photo-col">
-        ${ph}
-        <button type="button" class="btn-sm proc-photo-btn" onclick="procedurePickPhoto('${si}','${st.id}')">📷</button>
+        <button type="button" class="proc-photo-box"${dis} onclick="procedurePhotoZoneClick('${si}','${st.id}',${hasPhoto})" title="${title}" aria-label="${title}">
+          ${photoInner}
+        </button>
+        <button type="button" class="btn-sm proc-copy-step-btn"${copyDis} onclick="procedureCopyStepOpen('${si}','${st.id}')" title="Copier cette étape vers un autre studio" aria-label="Copier vers un autre studio">Copier</button>
       </div>
       <div class="proc-step-body">
         <input type="text" class="proc-short-input" placeholder="Description courte" value="${escHtml(st.shortDesc)}"
@@ -998,11 +1003,11 @@ function renderProcedures(){
         <textarea class="proc-long-input" placeholder="Détails optionnels…" data-si="${si}" data-id="${st.id}" data-field="longDesc" onblur="procedureFieldBlur(this)">${escHtml(st.longDesc)}</textarea>
       </div>
       <div class="proc-step-actions">
-        <div class="proc-order-mobile">
+        <div class="proc-order-arrows">
           <button type="button" class="btn-sm" onclick="procedureMoveStep('${si}','${st.id}',-1)" title="Monter">▲</button>
           <button type="button" class="btn-sm" onclick="procedureMoveStep('${si}','${st.id}',1)" title="Descendre">▼</button>
         </div>
-        <button type="button" class="btn-danger" onclick="procedureDeleteStep('${si}','${st.id}')" title="Supprimer">🗑</button>
+        <button type="button" class="btn-danger" onclick="procedureDeleteStep('${si}','${st.id}')" title="Supprimer l’étape">🗑</button>
       </div>
     </div>`;
   }).join('');
@@ -1022,10 +1027,12 @@ window.procedureAddStep=function(){
   if(!sel) return;
   const si=sel.value;
   const arr=getStepsSorted(si);
-  const maxO=arr.reduce((m,s)=>Math.max(m,Number(s.order)||0),-1);
+  const newOrder=arr.length
+    ? Math.min(...arr.map(s=>Number(s.order)||0))-1
+    : 0;
   const newRef=push(ref(db,ob(`procedures/${si}/steps`)));
   const id=newRef.key;
-  set(newRef,{ id, order:maxO+1, shortDesc:'', longDesc:'', photoUrl:'' })
+  set(newRef,{ id, order:newOrder, shortDesc:'', longDesc:'', photoUrl:'' })
     .then(()=>{ setSyncStatus('ok'); showToast('Étape ajoutée ✓'); })
     .catch(()=>showToast('Erreur'));
 };
@@ -1039,6 +1046,15 @@ window.procedurePickPhoto=function(si,stepId){
   inp.click();
 };
 
+/** Clic sur le cadre photo : ajout, ou confirmation avant remplacement. */
+window.procedurePhotoZoneClick=function(si,stepId,hasPhoto){
+  if(procedureUploading.has(stepId)) return;
+  if(hasPhoto){
+    if(!confirm('Remplacer cette photo ?')) return;
+  }
+  window.procedurePickPhoto(si,stepId);
+};
+
 window.procedureDeleteStep=function(si,stepId){
   if(!confirm('Supprimer cette étape ?')) return;
   const path=procedureStoragePath(si,stepId);
@@ -1046,6 +1062,94 @@ window.procedureDeleteStep=function(si,stepId){
   remove(ref(db,ob(`procedures/${si}/steps/${stepId}`)))
     .then(()=>{ setSyncStatus('ok'); showToast('Étape supprimée ✓'); })
     .catch(()=>showToast('Erreur suppression'));
+};
+
+function procedureCloseCopyModal(){
+  const el=document.getElementById('proc-copy-modal');
+  if(el) el.remove();
+  document.removeEventListener('keydown',procedureCopyModalOnEscape);
+}
+function procedureCopyModalOnEscape(e){
+  if(e.key==='Escape') procedureCloseCopyModal();
+}
+
+window.procedureCopyStepOpen=function(fromSi,stepId){
+  if(procedureUploading.has(stepId)) return;
+  const names=A.studioNames||['Studio 1','Studio 2'];
+  const targets=[];
+  for(let i=0;i<names.length;i++){
+    if(String(i)===String(fromSi)) continue;
+    targets.push(i);
+  }
+  if(!targets.length){ showToast('Aucun autre studio'); return; }
+  procedureCloseCopyModal();
+  const back=document.createElement('div');
+  back.id='proc-copy-modal';
+  back.className='proc-copy-backdrop';
+  back.setAttribute('role','dialog');
+  back.setAttribute('aria-modal','true');
+  back.setAttribute('aria-label','Copier l’étape vers un autre studio');
+  back.innerHTML='<div class="proc-copy-dialog" role="document">'
+    +'<div class="proc-copy-title">Copier cette étape vers</div>'
+    +'<div class="proc-copy-targets"></div>'
+    +'<button type="button" class="btn-secondary proc-copy-cancel">Annuler</button>'
+    +'</div>';
+  const targetsHost=back.querySelector('.proc-copy-targets');
+  targets.forEach(ti=>{
+    const b=document.createElement('button');
+    b.type='button';
+    b.className='btn-primary proc-copy-target-btn';
+    b.textContent=names[ti]||('Studio '+(ti+1));
+    b.onclick=()=>{
+      procedureCloseCopyModal();
+      procedureCopyStepRun(fromSi,stepId,String(ti));
+    };
+    targetsHost.appendChild(b);
+  });
+  back.addEventListener('click',e=>{ if(e.target===back) procedureCloseCopyModal(); });
+  back.querySelector('.proc-copy-dialog').addEventListener('click',e=>e.stopPropagation());
+  back.querySelector('.proc-copy-cancel').onclick=()=>procedureCloseCopyModal();
+  document.body.appendChild(back);
+  document.addEventListener('keydown',procedureCopyModalOnEscape);
+};
+
+window.procedureCopyStepRun=async function(fromSi,stepId,toSi){
+  const arr=getStepsSorted(fromSi);
+  const st=arr.find(s=>s.id===stepId);
+  if(!st){ showToast('Étape introuvable'); return; }
+  const dest=getStepsSorted(toSi);
+  const newOrder=dest.length
+    ? Math.min(...dest.map(s=>Number(s.order)||0))-1
+    : 0;
+  const newRef=push(ref(db,ob(`procedures/${toSi}/steps`)));
+  const newId=newRef.key;
+  let photoUrl='';
+  const hadPhoto=!!(st.photoUrl&&String(st.photoUrl).trim());
+  if(hadPhoto){
+    try{
+      const bytes=await getBytes(sRef(storage,procedureStoragePath(fromSi,stepId)));
+      const destPath=procedureStoragePath(toSi,newId);
+      await uploadBytes(sRef(storage,destPath),bytes,{contentType:'image/jpeg'});
+      photoUrl=await getDownloadURL(sRef(storage,destPath));
+    }catch(_){
+      try{
+        const r=await fetch(st.photoUrl);
+        const blob=await r.blob();
+        const destPath=procedureStoragePath(toSi,newId);
+        await uploadBytes(sRef(storage,destPath),blob,{contentType:blob.type&&blob.type.startsWith('image/')?blob.type:'image/jpeg'});
+        photoUrl=await getDownloadURL(sRef(storage,destPath));
+      }catch(__){ /* garde photoUrl vide */ }
+    }
+  }
+  try{
+    await set(newRef,{ id:newId, order:newOrder, shortDesc:st.shortDesc||'', longDesc:st.longDesc||'', photoUrl:photoUrl||'' });
+    setSyncStatus('ok');
+    const nm=(A.studioNames||[])[Number(toSi)]||('Studio '+(Number(toSi)+1));
+    if(hadPhoto&&!photoUrl) showToast('Étape copiée vers '+nm+' (sans photo)');
+    else showToast('Étape copiée vers '+nm+' ✓');
+  }catch(_){
+    showToast('Erreur copie étape');
+  }
 };
 
 window.procedureMoveStep=function(si,stepId,dir){
@@ -1057,46 +1161,6 @@ window.procedureMoveStep=function(si,stepId,dir){
   [next[i],next[j]]=[next[j],next[i]];
   procedurePersistOrders(si,next);
 };
-
-window.procedureDragStart=function(e){
-  e.dataTransfer.setData('text/plain',e.currentTarget.dataset.stepId);
-  e.dataTransfer.effectAllowed='move';
-  e.currentTarget.style.opacity='0.5';
-};
-
-window.procedureDragOver=function(e){
-  e.preventDefault();
-  e.dataTransfer.dropEffect='move';
-  e.currentTarget.classList.add('proc-drag-over');
-};
-
-window.procedureDragLeave=function(e){
-  e.currentTarget.classList.remove('proc-drag-over');
-};
-
-window.procedureDrop=function(e){
-  e.preventDefault();
-  e.currentTarget.classList.remove('proc-drag-over');
-  const targetId=e.currentTarget.dataset.stepId;
-  const srcId=e.dataTransfer.getData('text/plain');
-  document.querySelectorAll('.proc-step-row').forEach(r=>{ r.style.opacity=''; });
-  if(!srcId||srcId===targetId) return;
-  const sel=document.getElementById('proc-studio-select');
-  const si=sel?sel.value:'0';
-  const arr=getStepsSorted(si);
-  const siIdx=arr.findIndex(s=>s.id===srcId);
-  const tiIdx=arr.findIndex(s=>s.id===targetId);
-  if(siIdx<0||tiIdx<0) return;
-  const next=[...arr];
-  const [item]=next.splice(siIdx,1);
-  next.splice(tiIdx,0,item);
-  procedurePersistOrders(si,next);
-};
-
-// Fin drag : réinitialiser opacité si drop hors cible
-document.addEventListener('dragend',e=>{
-  if(e.target&&e.target.classList&&e.target.classList.contains('proc-step-row')) e.target.style.opacity='';
-});
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 
