@@ -113,6 +113,14 @@ body.admin-nav-ready .admin-burger{display:flex}
 .proc-copy-targets{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
 .proc-copy-target-btn{width:100%;justify-content:center}
 .proc-copy-cancel{width:100%}
+.proc-modal-msg{font-size:13px;color:#555;line-height:1.45;margin-top:4px}
+.proc-modal-actions{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.proc-modal-ok{width:100%;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none}
+.proc-modal-ok-primary{background:#1a1a1a;color:#fff}
+.proc-modal-ok-primary:hover{filter:brightness(1.08)}
+.proc-modal-ok-danger{background:#E24B4A;color:#fff}
+.proc-modal-ok-danger:hover{filter:brightness(0.95)}
+.proc-modal-cancel{width:100%}
 .proc-photo-box{width:80px;height:80px;padding:0;border:none;border-radius:6px;background:#e8e8e2;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;overflow:hidden;flex-shrink:0;-webkit-tap-highlight-color:transparent}
 .proc-photo-box:hover{background:#deded8}
 .proc-photo-box:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
@@ -358,7 +366,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.2.0';
+const APP_VERSION = '4.2.1';
 
 /** Studio sélectionné dans la section Procédures (persiste entre re-rendus). */
 let procSelectedStudioIdx = '0';
@@ -1047,16 +1055,28 @@ window.procedurePickPhoto=function(si,stepId){
 };
 
 /** Clic sur le cadre photo : ajout, ou confirmation avant remplacement. */
-window.procedurePhotoZoneClick=function(si,stepId,hasPhoto){
+window.procedurePhotoZoneClick=async function(si,stepId,hasPhoto){
   if(procedureUploading.has(stepId)) return;
   if(hasPhoto){
-    if(!confirm('Remplacer cette photo ?')) return;
+    const ok=await procedureShowConfirmModal({
+      title:'Remplacer cette photo ?',
+      body:'La photo actuelle sera remplacée par la nouvelle.',
+      okText:'Remplacer',
+      danger:false
+    });
+    if(!ok) return;
   }
   window.procedurePickPhoto(si,stepId);
 };
 
-window.procedureDeleteStep=function(si,stepId){
-  if(!confirm('Supprimer cette étape ?')) return;
+window.procedureDeleteStep=async function(si,stepId){
+  const ok=await procedureShowConfirmModal({
+    title:'Supprimer cette étape ?',
+    body:'Les textes et la photo seront retirés de la procédure.',
+    okText:'Supprimer',
+    danger:true
+  });
+  if(!ok) return;
   const path=procedureStoragePath(si,stepId);
   deleteObject(sRef(storage,path)).catch(()=>{});
   remove(ref(db,ob(`procedures/${si}/steps/${stepId}`)))
@@ -1064,13 +1084,53 @@ window.procedureDeleteStep=function(si,stepId){
     .catch(()=>showToast('Erreur suppression'));
 };
 
-function procedureCloseCopyModal(){
-  const el=document.getElementById('proc-copy-modal');
-  if(el) el.remove();
-  document.removeEventListener('keydown',procedureCopyModalOnEscape);
+let procModalKeyHandler=null;
+function procedureCloseProcModals(){
+  document.getElementById('proc-copy-modal')?.remove();
+  document.getElementById('proc-app-modal')?.remove();
+  if(procModalKeyHandler){
+    document.removeEventListener('keydown',procModalKeyHandler);
+    procModalKeyHandler=null;
+  }
 }
-function procedureCopyModalOnEscape(e){
-  if(e.key==='Escape') procedureCloseCopyModal();
+
+/** Modale de confirmation (même style que « Copier »). Retourne true si validation. */
+function procedureShowConfirmModal({title,body='',okText,cancelText='Annuler',danger=false}){
+  return new Promise(resolve=>{
+    procedureCloseProcModals();
+    let settled=false;
+    const finish=v=>{
+      if(settled) return;
+      settled=true;
+      procedureCloseProcModals();
+      resolve(v);
+    };
+    const back=document.createElement('div');
+    back.id='proc-app-modal';
+    back.className='proc-copy-backdrop';
+    back.setAttribute('role','dialog');
+    back.setAttribute('aria-modal','true');
+    const okCls=danger?'proc-modal-ok proc-modal-ok-danger':'proc-modal-ok proc-modal-ok-primary';
+    back.innerHTML='<div class="proc-copy-dialog" role="document">'
+      +'<div class="proc-copy-title"></div>'
+      +'<p class="proc-modal-msg"></p>'
+      +'<div class="proc-modal-actions">'
+      +`<button type="button" class="${okCls} proc-modal-ok-btn"></button>`
+      +'<button type="button" class="btn-secondary proc-modal-cancel-btn proc-modal-cancel"></button>'
+      +'</div></div>';
+    back.querySelector('.proc-copy-title').textContent=title;
+    const p=back.querySelector('.proc-modal-msg');
+    if(body){ p.textContent=body; } else { p.remove(); }
+    back.querySelector('.proc-modal-ok-btn').textContent=okText;
+    back.querySelector('.proc-modal-cancel-btn').textContent=cancelText;
+    back.querySelector('.proc-modal-ok-btn').onclick=()=>finish(true);
+    back.querySelector('.proc-modal-cancel-btn').onclick=()=>finish(false);
+    back.addEventListener('click',e=>{ if(e.target===back) finish(false); });
+    back.querySelector('.proc-copy-dialog').addEventListener('click',e=>e.stopPropagation());
+    procModalKeyHandler=e=>{ if(e.key==='Escape') finish(false); };
+    document.addEventListener('keydown',procModalKeyHandler);
+    document.body.appendChild(back);
+  });
 }
 
 window.procedureCopyStepOpen=function(fromSi,stepId){
@@ -1082,7 +1142,7 @@ window.procedureCopyStepOpen=function(fromSi,stepId){
     targets.push(i);
   }
   if(!targets.length){ showToast('Aucun autre studio'); return; }
-  procedureCloseCopyModal();
+  procedureCloseProcModals();
   const back=document.createElement('div');
   back.id='proc-copy-modal';
   back.className='proc-copy-backdrop';
@@ -1101,16 +1161,17 @@ window.procedureCopyStepOpen=function(fromSi,stepId){
     b.className='btn-primary proc-copy-target-btn';
     b.textContent=names[ti]||('Studio '+(ti+1));
     b.onclick=()=>{
-      procedureCloseCopyModal();
+      procedureCloseProcModals();
       procedureCopyStepRun(fromSi,stepId,String(ti));
     };
     targetsHost.appendChild(b);
   });
-  back.addEventListener('click',e=>{ if(e.target===back) procedureCloseCopyModal(); });
+  back.addEventListener('click',e=>{ if(e.target===back) procedureCloseProcModals(); });
   back.querySelector('.proc-copy-dialog').addEventListener('click',e=>e.stopPropagation());
-  back.querySelector('.proc-copy-cancel').onclick=()=>procedureCloseCopyModal();
+  back.querySelector('.proc-copy-cancel').onclick=()=>procedureCloseProcModals();
+  procModalKeyHandler=e=>{ if(e.key==='Escape') procedureCloseProcModals(); };
+  document.addEventListener('keydown',procModalKeyHandler);
   document.body.appendChild(back);
-  document.addEventListener('keydown',procedureCopyModalOnEscape);
 };
 
 window.procedureCopyStepRun=async function(fromSi,stepId,toSi){

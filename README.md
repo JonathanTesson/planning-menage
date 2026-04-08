@@ -1,6 +1,6 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 4.2.0** — Avril 2026
+**Version : 4.2.1** — Avril 2026
 
 Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi et **procédures & préparation studio** (étapes par studio avec photos légères, côté admin).
 
@@ -98,6 +98,13 @@ Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, �
 **Firebase Storage** (SDK modulaire v10 dans `admin.html`) : fichiers JPEG **`orgs/{orgId}/procedures/{studioIndex}/{stepId}.jpg`**. Compression navigateur avant envoi (largeur max **640 px**, qualité **~0,48**).
 
 **Interface admin** : la zone procédures s’ouvre via le menu latéral (burger), entrée **Procédure** (libellé court ; le titre de page reste « Procédures & préparation studio »). Pas d’onglets en tête de page. Hashes d’URL possibles : **`#procedures`**, **`#procedures-section`** (ancien lien). À la fermeture du menu, le focus repasse sur le burger (accessibilité). Voir § **admin.html** ci-dessous pour le détail des cinq vues.
+
+**Comportement UI (procédures)** :
+- **Nouvelle étape** (`+ Ajouter une étape`) : insérée **en haut** de la liste du studio (les plus récentes en premier dans l’affichage).
+- **Ordre** : boutons **▲ / ▼** sur **tous** les écrans (pas de glisser-déposer).
+- **Photo** : une seule zone cliquable (aperçu ou icône dans le cadre) ; remplacement avec **modale intégrée** (pas de `window.confirm` du navigateur).
+- **Copier** : petit bouton **Copier** sous le cadre pour **dupliquer l’étape** vers un autre studio de la même org (textes + copie du fichier JPEG dans Storage vers le nouvel `stepId`) ; choix du studio en modale.
+- **Suppression** : confirmation via **modale intégrée**, comme pour la copie et le remplacement de photo.
 
 **Affichage côté calendrier** (`index.html`) : non prévu dans cette version ; réservé à une évolution ultérieure.
 
@@ -241,7 +248,7 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 4.2.0
+Version : 4.2.1
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
@@ -253,8 +260,12 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 
 ## Historique des versions
 
+### v4.2.1 — Avril 2026
+- **Admin — Procédures** : nouvelle étape ajoutée **en tête** de liste ; réordonnancement **uniquement** par flèches **▲▼** (tous écrans, plus de glisser-déposer) ; zone photo unifiée (cadre cliquable) ; bouton **Copier** pour dupliquer une étape vers un autre studio (RTDB + `getBytes` / réupload Storage) ; confirmations **remplacer photo** et **supprimer étape** en **modales intégrées** (même style que le choix de studio pour la copie)
+- **Versions affichées** : `APP_VERSION` **4.2.1** dans `index.html` et `admin.html` (aligner avec ce README à chaque release)
+
 ### v4.2.0 — Avril 2026
-- **Admin — Procédures & préparation studio** : étapes par studio (`/orgs/{orgId}/procedures/...`), photos JPEG dans Storage (`orgs/{orgId}/procedures/{studioIndex}/{stepId}.jpg`), compression côté navigateur (max 640 px, qualité ~0,48) ; réordonnancement (glisser-déposer desktop ≥768px, flèches mobile) ; enregistrement au blur / après upload
+- **Admin — Procédures & préparation studio** : étapes par studio (`/orgs/{orgId}/procedures/...`), photos JPEG dans Storage (`orgs/{orgId}/procedures/{studioIndex}/{stepId}.jpg`), compression côté navigateur (max 640 px, qualité ~0,48) ; enregistrement au blur / après upload
 - **Admin — Navigation** : menu burger avec **cinq vues** — **Dashboard** (stats, exports, historique, déconnexion), **Procédure**, **Comptes** (réglages + journal d’activité), **Organisation** (noms des studios), **Légende** (aide + sync + version) ; ordre des entrées du haut vers le bas comme ci-dessus ; libellé court **Procédure** dans le menu ; topbar sans « Planning Ménage » ; hashes **`#dashboard`**, **`#procedures`**, **`#comptes`**, **`#organisation`**, **`#legend`** (et **`#general`** → dashboard) ; focus renvoyé sur le burger à la fermeture du tiroir
 - **Index** : badge admin = lien `admin.html` ; compte non-admin = bouton ouvrant la modale « Mon compte »
 - **Versions affichées** : `APP_VERSION` **4.2.0** dans `index.html` et `admin.html` (aligner avec ce README à chaque release)
