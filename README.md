@@ -1,8 +1,8 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 4.1.0** — Avril 2026
+**Version : 4.2.0** — Avril 2026
 
-Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés) et **export Excel** enrichi.
+Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi et **procédures & préparation studio** (étapes par studio avec photos légères, côté admin).
 
 ---
 
@@ -59,6 +59,7 @@ Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. Ancienne rac
     /lastSync        → dernière sync iCal
     /activityLog     → journal d’activité
     /cleaningReports → comptes rendus par uid réservation (détail § v4.1 ci-dessous)
+    /procedures      → procédures ménage par studio (détail § v4.2 ci-dessous)
   /nade
     (même structure ; remplie selon sync iCal et utilisation)
 ```
@@ -85,6 +86,22 @@ Sous **`/orgs/{orgId}/cleaningReports/{uidRéservation}`** (même `uid` que dans
 | `hours/{Prénom}` | `{ h, m }` — **durée personnelle** ; seule la personne concernée voit et modifie ses heures dans l’app. |
 
 **Comportement** : si une **deuxième** intervenante est ajoutée sur le même départ, les champs communs et les heures des personnes **toujours** assignées sont **conservés** ; seules les heures des personnes **retirées** du départ sont supprimées. Si la réservation disparaît (sync iCal), l’entrée correspondante est purgée côté client. Les **règles Realtime Database** doivent autoriser la lecture/écriture sur ce chemin (comme pour `assignments` / `reservations` selon votre config).
+
+### `/procedures` — préparation studio (v4.2, admin uniquement)
+
+Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, … aligné sur les noms de studios dans `config`) :
+
+| Emplacement | Rôle |
+|-------------|------|
+| `steps/{stepId}` | Objet étape : `id`, `order`, `shortDesc`, `longDesc`, `photoUrl` (URL Firebase Storage après upload). |
+
+**Firebase Storage** (SDK modulaire v10 dans `admin.html`) : fichiers JPEG **`orgs/{orgId}/procedures/{studioIndex}/{stepId}.jpg`**. Compression navigateur avant envoi (largeur max **640 px**, qualité **~0,48**).
+
+**Interface admin** : menu latéral (burger) avec **deux entrées** — **Général** (tout le back-office sauf cette zone) et **Procédures & préparation studio** (vue dédiée). Pas d’onglets en tête de page ; l’URL peut inclure **`#procedures`** pour ouvrir directement la vue procédures. À la fermeture du menu, le focus repasse sur le burger (accessibilité).
+
+**Affichage côté calendrier** (`index.html`) : non prévu dans cette version ; réservé à une évolution ultérieure.
+
+**Règles** : l’app utilise une auth « maison » (pas Firebase Auth côté client) ; les règles RTDB / Storage doivent rester cohérentes avec ce modèle (voir commentaire en tête du script dans `admin.html`).
 
 ---
 
@@ -130,7 +147,7 @@ Sous **`/orgs/{orgId}/cleaningReports/{uidRéservation}`** (même `uid` que dans
 
 **Authentification** (par org)
 - Case à cocher **« Activer l’authentification »** dans l’admin de **l’org concernée** ; session **`menage_session_v1`** globale (prénom), combinée à **`menage_org_v1`** pour savoir quelle base lire.
-- Badge prénom → lien **admin** si rôle 👑 ; en mode sans auth, le badge affiche **Admin** avec le même lien (même org en localStorage).
+- Badge en-tête : **lien** vers **`admin.html`** si rôle 👑 ou mode sans auth (**Admin**) ; **bouton** « Mon compte » (modale mot de passe) si compte ménage sans rôle admin. Pour tester **`admin.html`** en local, le serveur statique doit rester actif (ex. `python -m http.server 5173`) : le calendrier peut sembler vivant via Firebase alors qu’une navigation vers une autre page locale échoue si le serveur est arrêté.
 
 **Calendrier**
 - Affichage **S1 / S2** inchangé (noms de studios viennent de `/orgs/{orgId}/config`).
@@ -141,7 +158,8 @@ Sous **`/orgs/{orgId}/cleaningReports/{uidRéservation}`** (même `uid` que dans
 
 - **Sans** `menage_org_v1` valide : **redirection vers `index.html`**.
 - Toutes les opérations Firebase sous **`/orgs/{orgId}/`** pour l’org choisie sur le calendrier.
-- **Topbar** : nom de l’organisation affiché.
+- **Topbar** : nom de l’organisation affiché ; **menu burger** (deux zones : Général / Procédures & préparation) ; retour focus sur le burger à la fermeture du tiroir.
+- **Vues** : **Général** regroupe stats, comptes, studios, légende, historique, journal, déconnexion ; **Procédures** = gestion des étapes par studio (photos Storage + texte RTDB), voir § `/procedures` ci-dessus.
 - Section **Comptes** : une ligne par réglage — **authentification** et **Notifications Telegram** sont des **cases à cocher** (même style), avec texte d’aide ; **Org. par défaut** avec liste déroulante dessous. **`telegramEnabled`** dans **`adminConfig`** : si désactivé pour une org, **`sync-ical.js`** et **`notify-departs.js`** n’envoient **pas** de messages Telegram pour cette org (Firebase reste mis à jour pour la sync iCal).
 - La signification des icônes **🧹** (ménage) et **👑** (admin) sur chaque ligne de compte est rappelée dans la section **Légende & synchronisation** (plus sous la liste des comptes).
 - **Org. par défaut** : enregistré dans **`adminConfig.defaultOrgId`** (pré-sélection sur le login).
@@ -181,6 +199,7 @@ Sous **`/orgs/{orgId}/cleaningReports/{uidRéservation}`** (même `uid` que dans
 - Accès restreint au domaine de production (Google Cloud Console) quand configuré.  
 - Données sensibles : secrets uniquement côté GitHub Actions ; **`migrate.js`** en local avec la même variable `FIREBASE_SERVICE_ACCOUNT`.
 - Penser à inclure **`/orgs/{orgId}/cleaningReports`** dans les **règles Realtime Database** si elles ne sont pas déjà couvertes par une règle large (sinon les comptes rendus ne s’enregistrent pas).
+- **Firebase Storage** : activer le bucket et autoriser le chemin **`orgs/{orgId}/procedures/...`** si vous utilisez les photos de procédures (voir commentaire dans `admin.html`).
 
 ---
 
@@ -204,8 +223,9 @@ Gérées dans **admin.html** de **chaque organisation**. Structure compte : `nam
 2. **Code d'accès simple** sur index.html  
 3. **Sécurisation Firebase** — règles RTDB plus strictes  
 4. **Exploitation de `sharedWith`** — UI et agrégation multi-org  
-5. **Hub multi-plannings** (enfants, crèche, etc.)  
-6. **Application mobile native** — notifications push  
+5. **Consultation des procédures** depuis le calendrier (`index.html`)  
+6. **Hub multi-plannings** (enfants, crèche, etc.)  
+7. **Application mobile native** — notifications push  
 
 ---
 
@@ -213,7 +233,7 @@ Gérées dans **admin.html** de **chaque organisation**. Structure compte : `nam
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 4.1.0
+Version : 4.2.0
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
@@ -224,6 +244,12 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ---
 
 ## Historique des versions
+
+### v4.2.0 — Avril 2026
+- **Admin — Procédures & préparation studio** : étapes par studio (`/orgs/{orgId}/procedures/...`), photos JPEG dans Storage (`orgs/{orgId}/procedures/{studioIndex}/{stepId}.jpg`), compression côté navigateur (max 640 px, qualité ~0,48) ; réordonnancement (glisser-déposer desktop ≥768px, flèches mobile) ; enregistrement au blur / après upload
+- **Admin — Navigation** : menu burger à deux entrées (vue **Général** vs vue **Procédures**) ; URL **`#procedures`** pour ouvrir directement la vue procédures ; gestion du focus à la fermeture du menu (accessibilité)
+- **Index** : badge admin = lien `admin.html` ; compte non-admin = bouton ouvrant la modale « Mon compte »
+- **Versions affichées** : `APP_VERSION` **4.2.0** dans `index.html` et `admin.html` (aligner avec ce README à chaque release)
 
 ### v4.1.0 — Avril 2026
 - **Comptes rendus terrain** (`cleaningReports`) : durées par intervenante, commentaire et commande **communs** ; conservation des données lors de l’ajout d’une 2ᵉ intervenante ; purge si plus aucune assignation ou si la réservation disparaît

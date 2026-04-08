@@ -27,8 +27,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .user-badge{font-size:11px;color:#888;text-decoration:none;border-radius:6px;padding:2px 6px;display:inline-block}
 a.user-badge.user-badge-admin{color:#185FA5;font-weight:500}
 a.user-badge.user-badge-admin:hover{text-decoration:underline;background:#eef4fc}
-a.user-badge.user-badge-account{color:#888;cursor:pointer}
-a.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:none}
+button.user-badge{font:inherit;font-size:11px;text-align:inherit;border:none;background:transparent;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.user-badge.user-badge-account{color:#888}
+button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:none}
 .status-bar{font-size:12px;color:#888;min-height:0;margin-bottom:0;display:flex;align-items:center;gap:6px}
 .spinner{width:12px;height:12px;border:2px solid #ddd;border-top-color:#378ADD;border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block;flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -260,7 +261,8 @@ html[data-menage-org-gate="1"] #main-app{display:none!important}
       </div>
     </div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-      <a id="current-user-badge" class="user-badge" style="display:none" href="admin.html"></a>
+      <a id="current-user-badge-link" class="user-badge" style="display:none" href="admin.html"></a>
+      <button type="button" id="current-user-badge-menu" class="user-badge user-badge-account" style="display:none" aria-label="Mon compte"></button>
       <button id="home-btn" type="button" class="nav-btn" onclick="goHomeOrgPick()" style="display:none" title="Choisir une autre organisation">Accueil</button>
       <button id="logout-btn" class="logout-btn" onclick="doLogout()" style="display:none">Déco.</button>
     </div>
@@ -308,7 +310,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.1.0';
+const APP_VERSION = '4.2.0';
 
 function getStoredOrgId(){
   try{
@@ -430,36 +432,37 @@ function showApp(){
   if(el('logout-btn')) el('logout-btn').style.display=noAuth?'none':'';
   const homeBtn=el('home-btn');
   if(homeBtn) homeBtn.style.display=noAuth?'':'none';
-  const badge=el('current-user-badge');
-  if(badge){
-    badge.onclick=null;
+  const badgeLink=el('current-user-badge-link');
+  const badgeMenu=el('current-user-badge-menu');
+  if(badgeLink&&badgeMenu){
+    badgeMenu.onclick=null;
+    badgeLink.style.display='none';
+    badgeMenu.style.display='none';
+    badgeLink.classList.remove('user-badge-admin','user-badge-account');
+    badgeMenu.classList.remove('user-badge-admin');
+    badgeMenu.classList.add('user-badge-account');
     if(noAuth){
-      badge.textContent='Admin';
-      badge.style.display='';
-      badge.setAttribute('href','admin.html');
-      badge.classList.add('user-badge-admin');
-      badge.classList.remove('user-badge-account');
-      badge.removeAttribute('role');
-      badge.title='Ouvrir l’administration de cette organisation';
+      badgeLink.textContent='Admin';
+      badgeLink.style.display='';
+      badgeLink.setAttribute('href','admin.html');
+      badgeLink.classList.add('user-badge-admin');
+      badgeLink.title='Ouvrir l’administration de cette organisation';
+      badgeLink.setAttribute('aria-label','Ouvrir l’administration');
     }else if(S.currentUser?.name){
-      badge.textContent=S.currentUser.name;
-      badge.style.display='';
       if(S.currentUser.admin){
-        badge.setAttribute('href','admin.html');
-        badge.classList.add('user-badge-admin');
-        badge.classList.remove('user-badge-account');
-        badge.removeAttribute('role');
-        badge.title='Administration';
+        badgeLink.textContent=S.currentUser.name;
+        badgeLink.style.display='';
+        badgeLink.setAttribute('href','admin.html');
+        badgeLink.classList.add('user-badge-admin');
+        badgeLink.title='Administration';
+        badgeLink.setAttribute('aria-label','Administration — ouvrir la page admin');
       }else{
-        badge.setAttribute('href','#');
-        badge.classList.remove('user-badge-admin');
-        badge.classList.add('user-badge-account');
-        badge.setAttribute('role','button');
-        badge.title='Mon compte';
-        badge.onclick=function(e){ e.preventDefault(); window.openAccountMenu(); };
+        badgeMenu.textContent=S.currentUser.name;
+        badgeMenu.style.display='';
+        badgeMenu.title='Mon compte';
+        badgeMenu.setAttribute('aria-label','Mon compte — '+S.currentUser.name);
+        badgeMenu.onclick=function(){ window.openAccountMenu(); };
       }
-    }else{
-      badge.style.display='none';
     }
   }
   render();

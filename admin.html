@@ -9,6 +9,22 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f5f5f0;color:#1a1a1a;padding:0 0 2rem}
 .topbar{background:#fff;border-bottom:1px solid #e0e0d8;padding:0.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar-left{display:flex;align-items:center;gap:0;min-width:0}
+.admin-burger{display:none;align-items:center;justify-content:center;width:40px;height:40px;margin-right:10px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;flex-shrink:0;padding:0;-webkit-tap-highlight-color:transparent}
+.admin-burger:hover{background:#f5f5f0}
+.admin-burger:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
+body.admin-nav-ready .admin-burger{display:flex}
+.admin-burger-icon{display:block;width:18px;height:2px;background:#1a1a1a;border-radius:1px;box-shadow:0 -6px 0 #1a1a1a,0 6px 0 #1a1a1a}
+.admin-nav-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.22);z-index:150;opacity:0;visibility:hidden;transition:opacity .2s ease,visibility .2s ease}
+.admin-nav-overlay:not(.is-open){pointer-events:none}
+.admin-nav-overlay.is-open{opacity:1;visibility:visible}
+.admin-nav-panel{position:fixed;top:0;left:0;bottom:0;width:min(272px,86vw);z-index:151;background:#fafaf8;border-right:1px solid #e0e0d8;box-shadow:4px 0 20px rgba(0,0,0,0.07);transform:translateX(-100%);transition:transform .25s ease;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.admin-nav-panel:not(.is-open){pointer-events:none}
+.admin-nav-panel.is-open{transform:translateX(0);pointer-events:auto}
+.admin-nav-panel-inner{padding:0.25rem 0.75rem 1.25rem}
+.admin-nav-link{display:block;padding:12px 12px;margin:4px 0;border-radius:8px;font-size:14px;font-weight:600;color:#333;text-decoration:none;line-height:1.35}
+.admin-nav-link:hover{background:#eeece6;color:#111}
+#admin-content .section[id]{scroll-margin-top:72px}
 .topbar-title{font-size:16px;font-weight:600}
 .topbar-sub{font-size:12px;color:#888;margin-top:1px}
 .sync-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;margin-right:5px}
@@ -114,10 +130,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 </head>
 <body>
 
+<div id="admin-nav-overlay" class="admin-nav-overlay" aria-hidden="true"></div>
+<nav id="admin-nav-panel" class="admin-nav-panel" aria-label="Zones administration" aria-hidden="true">
+  <div class="admin-nav-panel-inner">
+    <a href="#" class="admin-nav-link" data-admin-view="general">Général</a>
+    <a href="#" class="admin-nav-link" data-admin-view="procedures">Procédures &amp; préparation studio</a>
+  </div>
+</nav>
+
 <div class="topbar">
-  <div>
-    <div class="topbar-title">Administration</div>
-    <div class="topbar-sub"><span id="admin-org-label">…</span> · Planning Ménage</div>
+  <div class="topbar-left">
+    <button type="button" class="admin-burger" id="admin-burger" aria-label="Menu des sections" aria-expanded="false" aria-controls="admin-nav-panel">
+      <span class="admin-burger-icon" aria-hidden="true"></span>
+    </button>
+    <div style="min-width:0">
+      <div class="topbar-title">Administration</div>
+      <div class="topbar-sub"><span id="admin-org-label">…</span> · Planning Ménage</div>
+    </div>
   </div>
   <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
     <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#aaa;white-space:nowrap">
@@ -139,8 +168,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
   <div id="admin-content" style="display:none">
 
+    <div id="admin-view-general" role="region" aria-label="Vue générale">
+
     <!-- Statistiques + Export -->
-    <div class="section">
+    <div class="section" id="section-stats">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
         <h3 style="margin-bottom:0"><span>📊</span> <span id="admin-month-title">...</span></h3>
         <div style="display:flex;align-items:center;gap:6px">
@@ -163,7 +194,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
     </div>
 
     <!-- Comptes & Authentification -->
-    <div class="section">
+    <div class="section" id="section-accounts">
       <h3 style="margin-bottom:1rem"><span>👥</span> Comptes</h3>
       <div class="field-row" style="margin-bottom:14px;align-items:flex-start">
         <div style="flex:1;min-width:200px">
@@ -198,7 +229,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
     </div>
 
     <!-- Studios -->
-    <div class="section">
+    <div class="section" id="section-studios">
       <h3><span>🏠</span> Studios</h3>
       <div class="field-row">
         <label>Studio 1</label>
@@ -213,23 +244,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
       </div>
     </div>
 
-    <!-- Procédures & préparation studio -->
-    <div class="section" id="procedures-section">
-      <h3><span>📋</span> Procédures & préparation studio</h3>
-      <p style="font-size:11px;color:#aaa;margin-bottom:10px;line-height:1.5">
-        Étapes par studio (photos légères, consultables plus tard depuis le planning). Les modifications sont enregistrées tout de suite.
-      </p>
-      <div class="proc-toolbar">
-        <label for="proc-studio-select" style="font-size:12px;color:#888;white-space:nowrap">Studio</label>
-        <select id="proc-studio-select" title="Studio concerné"></select>
-        <button type="button" class="btn-primary" onclick="procedureAddStep()">+ Ajouter une étape</button>
-      </div>
-      <input type="file" id="proc-file-input" accept="image/*" capture="environment" style="display:none" tabindex="-1">
-      <div id="procedures-steps-host" class="proc-steps">Chargement…</div>
-    </div>
-
     <!-- Légende & Sync -->
-    <div class="section" style="font-size:12px;color:#999;line-height:1.8">
+    <div class="section" id="section-legend" style="font-size:12px;color:#999;line-height:1.8">
       <h3><span>ℹ️</span> Légende & Synchronisation</h3>
       <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">Calendrier (points sous les dates)</div>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:1rem">
@@ -249,13 +265,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
     </div>
 
     <!-- Historique -->
-    <div class="section">
+    <div class="section" id="section-histo">
       <h3><span>📋</span> Historique des interventions</h3>
       <div id="histo-content">Chargement...</div>
     </div>
 
     <!-- Journal d'activité -->
-    <div class="section">
+    <div class="section" id="section-activity">
       <h3><span>📜</span> Journal d'activité</h3>
       <p style="font-size:11px;color:#aaa;margin-bottom:0.5rem;line-height:1.5">
         Connexions au planning, assignations et actions sensibles dans l’admin. Affichage des 200 derniers événements (depuis la mise en place de cette fonction).
@@ -266,6 +282,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
     <div style="text-align:center;margin-top:1.5rem">
       <button class="btn-secondary" onclick="logout()">Se déconnecter</button>
+    </div>
+    </div>
+
+    <div id="admin-view-procedures" role="region" aria-label="Procédures et préparation studio" style="display:none">
+    <div class="section" id="procedures-section">
+      <h3><span>📋</span> Procédures & préparation studio</h3>
+      <p style="font-size:11px;color:#aaa;margin-bottom:10px;line-height:1.5">
+        Étapes par studio (photos légères, consultables plus tard depuis le planning). Les modifications sont enregistrées tout de suite.
+      </p>
+      <div class="proc-toolbar">
+        <label for="proc-studio-select" style="font-size:12px;color:#888;white-space:nowrap">Studio</label>
+        <select id="proc-studio-select" title="Studio concerné"></select>
+        <button type="button" class="btn-primary" onclick="procedureAddStep()">+ Ajouter une étape</button>
+      </div>
+      <input type="file" id="proc-file-input" accept="image/*" capture="environment" style="display:none" tabindex="-1">
+      <div id="procedures-steps-host" class="proc-steps">Chargement…</div>
+    </div>
     </div>
   </div>
 </div>
@@ -468,6 +501,7 @@ function verifyAdminAccess(){
   const contentEl=document.getElementById('admin-content');
   if(waitEl) waitEl.style.display='none';
   if(contentEl) contentEl.style.display='';
+  document.body.classList.add('admin-nav-ready');
   A.unlocked=true;
   renderAdminContent();
 }
@@ -475,6 +509,65 @@ function verifyAdminAccess(){
 window.logout = function(){
   window.location.href='index.html';
 };
+
+/** Une seule fois : ouvrir la vue Procédures si l’URL contient #procedures */
+let adminUiHashApplied=false;
+
+/** Bascule entre vue « Général » (tout sauf procédures) et vue dédiée procédures. */
+window.setAdminUiView=function(view,opts){
+  const procs=view==='procedures';
+  const gen=document.getElementById('admin-view-general');
+  const proc=document.getElementById('admin-view-procedures');
+  if(!gen||!proc) return;
+  gen.style.display=procs?'none':'';
+  proc.style.display=procs?'':'none';
+  try{
+    const base=location.pathname+location.search;
+    history.replaceState(null,'',procs?(base+'#procedures'):base);
+  }catch(_){}
+  if(!(opts&&opts.noScroll)) window.scrollTo(0,0);
+  if(procs&&A.unlocked) renderProcedures();
+};
+
+function setAdminNavOpen(open){
+  const o=document.getElementById('admin-nav-overlay');
+  const p=document.getElementById('admin-nav-panel');
+  const b=document.getElementById('admin-burger');
+  if(!o||!p) return;
+  if(!open&&b&&p.contains(document.activeElement)) b.focus();
+  o.classList.toggle('is-open',open);
+  p.classList.toggle('is-open',open);
+  o.setAttribute('aria-hidden','true');
+  p.setAttribute('aria-hidden',open?'false':'true');
+  if(b){
+    b.setAttribute('aria-expanded',open?'true':'false');
+    b.setAttribute('aria-label',open?'Fermer le menu des sections':'Menu des sections');
+  }
+  document.body.classList.toggle('admin-nav-open',open);
+}
+
+function setupAdminNavOnce(){
+  const o=document.getElementById('admin-nav-overlay');
+  const p=document.getElementById('admin-nav-panel');
+  const b=document.getElementById('admin-burger');
+  if(!o||!p||!b||b.dataset.navBound) return;
+  b.dataset.navBound='1';
+  b.addEventListener('click',()=>setAdminNavOpen(!p.classList.contains('is-open')));
+  o.addEventListener('click',()=>setAdminNavOpen(false));
+  p.querySelectorAll('.admin-nav-link').forEach(a=>{
+    a.addEventListener('click',e=>{
+      e.preventDefault();
+      const navView=a.getAttribute('data-admin-view');
+      setAdminNavOpen(false);
+      if(navView==='procedures') window.setAdminUiView('procedures');
+      else window.setAdminUiView('general');
+    });
+  });
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'&&p.classList.contains('is-open')) setAdminNavOpen(false);
+  });
+}
+setupAdminNavOnce();
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 
@@ -500,6 +593,10 @@ function renderAdminContent(){
   bindProcedureFileInputOnce();
   const av=document.getElementById('admin-app-version');
   if(av) av.textContent='Planning Ménage · version '+APP_VERSION;
+  if(A.unlocked&&!adminUiHashApplied){
+    adminUiHashApplied=true;
+    if(location.hash==='#procedures'||location.hash==='#procedures-section') window.setAdminUiView('procedures',{noScroll:true});
+  }
 }
 
 const ACTIVITY_TYPE_LABEL={ login:'Connexion', logout:'Déconnexion', assign:'Assignation', assign_admin:'Assignation (admin)', admin:'Admin', admin_config:'Comptes', event:'Événement' };
