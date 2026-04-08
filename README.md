@@ -33,6 +33,7 @@ Ces paires sont définies **en dur** dans `index.html`, `admin.html`, `sync-ical
 planning-menage/
 ├── index.html           → Calendrier principal
 ├── admin.html           → Back-office administration
+├── storage-cors.example.json → Exemple CORS bucket Storage (optionnel, si uploads / SDK bloqués en local)
 ├── sync-ical.js         → Sync iCal → Firebase par organisation (cron)
 ├── notify-departs.js    → Notifications Telegram départs du jour (cron)
 ├── migrate.js           → Script one-shot : copie racine → /orgs/tesson/ (manuel)
@@ -103,8 +104,10 @@ Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, �
 - **Nouvelle étape** (`+ Ajouter une étape`) : insérée **en haut** de la liste du studio (les plus récentes en premier dans l’affichage).
 - **Ordre** : boutons **▲ / ▼** sur **tous** les écrans (pas de glisser-déposer).
 - **Photo** : une seule zone cliquable (aperçu ou icône dans le cadre) ; remplacement avec **modale intégrée** (pas de `window.confirm` du navigateur).
-- **Copier** : petit bouton **Copier** sous le cadre pour **dupliquer l’étape** vers un autre studio de la même org (textes + copie du fichier JPEG dans Storage vers le nouvel `stepId`) ; choix du studio en modale.
-- **Suppression** : confirmation via **modale intégrée**, comme pour la copie et le remplacement de photo.
+- **Copier** : duplique **description courte et détails** vers un autre studio ; **pas de photo** (`photoUrl` vide) — la modale l’indique ; ajouter une image sur la nouvelle étape au besoin. Le menu **Studio** reste sur le studio en cours d’édition.
+- **Remplacer la photo** : enregistrement sur le chemin `…/procedures/{studio}/{stepId}.jpg` de l’étape concernée.
+- **Suppression** : modale intégrée ; retrait de l’étape en base et tentative de suppression du fichier image associé à cette étape dans Storage.
+- **Liste des étapes** : lorsque le studio affiché ne change pas, le rendu est **incrémental** (mise à jour des champs texte sans recréer les vignettes) pour éviter de **recharger** les images à chaque enregistrement des descriptions.
 
 **Affichage côté calendrier** (`index.html`) : non prévu dans cette version ; réservé à une évolution ultérieure.
 
@@ -214,6 +217,14 @@ Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, �
 - Penser à inclure **`/orgs/{orgId}/cleaningReports`** dans les **règles Realtime Database** si elles ne sont pas déjà couvertes par une règle large (sinon les comptes rendus ne s’enregistrent pas).
 - **Firebase Storage** : activer le bucket et autoriser le chemin **`orgs/{orgId}/procedures/...`** si vous utilisez les photos de procédures (voir commentaire dans `admin.html`).
 
+### CORS — Firebase Storage (optionnel, dépannage local)
+
+Si des **uploads** ou appels Storage depuis l’admin échouent en local (`http://127.0.0.1:…`) avec *blocked by CORS policy*, vous pouvez configurer le bucket :
+
+1. **Nom du bucket** : Firebase Console → **Storage**.
+2. Adapter **`storage-cors.example.json`** (origines).
+3. `gsutil cors set storage-cors.example.json gs://planning-menage-18b09.firebasestorage.app` (voir bucket réel dans la console).
+
 ---
 
 ## Studios (affichage calendrier)
@@ -261,7 +272,7 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ## Historique des versions
 
 ### v4.2.1 — Avril 2026
-- **Admin — Procédures** : nouvelle étape ajoutée **en tête** de liste ; réordonnancement **uniquement** par flèches **▲▼** (tous écrans, plus de glisser-déposer) ; zone photo unifiée (cadre cliquable) ; bouton **Copier** pour dupliquer une étape vers un autre studio (RTDB + `getBytes` / réupload Storage) ; confirmations **remplacer photo** et **supprimer étape** en **modales intégrées** (même style que le choix de studio pour la copie)
+- **Admin — Procédures** : nouvelle étape **en tête** ; flèches **▲▼** ; zone photo unifiée ; **Copier** les **textes seulement** (pas de photo, phrase dans la modale) ; après copie, le menu **Studio** reste sur le studio en cours ; **rendu incrémental** de la liste pour ne pas recharger les images quand seules les descriptions changent ; suppression d’étape + fichier Storage `…/{studio}/{stepId}.jpg` ; modales intégrées **remplacer photo** / **supprimer** / **copier** ; code nettoyé (plus de logique copie / partage de photo ni `getBytes` pour les procédures)
 - **Versions affichées** : `APP_VERSION` **4.2.1** dans `index.html` et `admin.html` (aligner avec ce README à chaque release)
 
 ### v4.2.0 — Avril 2026

@@ -113,6 +113,7 @@ body.admin-nav-ready .admin-burger{display:flex}
 .proc-copy-targets{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
 .proc-copy-target-btn{width:100%;justify-content:center}
 .proc-copy-cancel{width:100%}
+.proc-copy-note{font-size:12px;color:#666;line-height:1.4;margin:0 0 12px}
 .proc-modal-msg{font-size:13px;color:#555;line-height:1.45;margin-top:4px}
 .proc-modal-actions{display:flex;flex-direction:column;gap:8px;margin-top:14px}
 .proc-modal-ok{width:100%;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none}
@@ -325,7 +326,7 @@ body.admin-nav-ready .admin-burger{display:flex}
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, set, onValue, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import { getStorage, ref as sRef, uploadBytes, getDownloadURL, getBytes, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 /*
  * ⚠️ RÈGLES FIREBASE — à configurer dans la console Firebase
@@ -338,6 +339,8 @@ import { getStorage, ref as sRef, uploadBytes, getDownloadURL, getBytes, deleteO
  * Realtime Database : autoriser read/write sur orgs/{orgId}/procedures (ex. .read/.write true sous orgs)
  * Storage : match /orgs/{orgId}/procedures/{allPaths=**} { allow read, write: if true; }
  * — restreindre par domaine dans Google Cloud Console si possible.
+ * Copie d’étape : textes seulement (pas de photo). Chaque photo est stockée sous
+ *   orgs/{orgId}/procedures/{studio}/{stepId}.jpg ; suppression d’étape → deleteObject sur ce chemin.
  *
  * Sécurisation future : Firebase Auth ou App Check pour des règles strictes.
  */
@@ -372,6 +375,12 @@ const APP_VERSION = '4.2.1';
 let procSelectedStudioIdx = '0';
 /** Étapes en cours d’upload photo (affichage « Upload… »). */
 const procedureUploading = new Set();
+/** Studio dont la liste procédures a été rendue (permet un rendu incrémental sans recharger les images). */
+let procLastRenderedStudioIdx=null;
+
+function procAttrEsc(s){
+  return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+}
 
 function getStoredOrgId(){
   try{
@@ -938,6 +947,91 @@ async function procedurePersistOrders(studioIdx, sortedArr){
   }
 }
 
+function buildProcStepRowHtml(si, st){
+  const uploading=procedureUploading.has(st.id);
+  const hasPhoto=!!(st.photoUrl&&!uploading);
+  let photoInner;
+  if(uploading) photoInner='<span class="proc-photo-uploading">Upload…</span>';
+  else if(hasPhoto){
+    const u=String(st.photoUrl).trim();
+    photoInner='<img class="proc-photo-thumb" src="'+escHtml(u)+'" alt="Aperçu photo" data-proc-photo="'+procAttrEsc(u)+'">';
+  } else photoInner='<span class="proc-photo-icon" aria-hidden="true">📷</span><span class="proc-photo-label">Photo</span>';
+  const dis=uploading?' disabled':'';
+  const title=hasPhoto?'Remplacer la photo':'Ajouter une photo';
+  const copyDis=uploading?' disabled':'';
+  return `<div class="proc-step-row" id="proc-step-${st.id}" data-step-id="${st.id}">
+      <div class="proc-photo-col">
+        <button type="button" class="proc-photo-box"${dis} onclick="procedurePhotoZoneClick('${si}','${st.id}',${hasPhoto})" title="${title}" aria-label="${title}">
+          ${photoInner}
+        </button>
+        <button type="button" class="btn-sm proc-copy-step-btn"${copyDis} onclick="procedureCopyStepOpen('${si}','${st.id}')" title="Copier les textes vers un autre studio (sans photo)" aria-label="Copier les descriptions vers un autre studio, sans la photo">Copier</button>
+      </div>
+      <div class="proc-step-body">
+        <input type="text" class="proc-short-input" placeholder="Description courte" value="${escHtml(st.shortDesc)}"
+          data-si="${si}" data-id="${st.id}" data-field="shortDesc" onblur="procedureFieldBlur(this)">
+        <textarea class="proc-long-input" placeholder="Détails optionnels…" data-si="${si}" data-id="${st.id}" data-field="longDesc" onblur="procedureFieldBlur(this)">${escHtml(st.longDesc)}</textarea>
+      </div>
+      <div class="proc-step-actions">
+        <div class="proc-order-arrows">
+          <button type="button" class="btn-sm" onclick="procedureMoveStep('${si}','${st.id}',-1)" title="Monter">▲</button>
+          <button type="button" class="btn-sm" onclick="procedureMoveStep('${si}','${st.id}',1)" title="Descendre">▼</button>
+        </div>
+        <button type="button" class="btn-danger" onclick="procedureDeleteStep('${si}','${st.id}')" title="Supprimer l’étape">🗑</button>
+      </div>
+    </div>`;
+}
+
+function procPhotoColumnUnchanged(row, st, uploading, hasPhoto){
+  if(procedureUploading.has(st.id)){
+    return !!row.querySelector('.proc-photo-uploading');
+  }
+  if(row.querySelector('.proc-photo-uploading')) return false;
+  const ph=(st.photoUrl&&String(st.photoUrl).trim())||'';
+  const img=row.querySelector('.proc-photo-thumb');
+  if(ph){
+    if(!img) return false;
+    return img.dataset.procPhoto===ph;
+  }
+  return !img && !!row.querySelector('.proc-photo-icon');
+}
+
+function procPatchProcedureRow(row, si, st, hasPhoto, uploading){
+  const title=hasPhoto?'Remplacer la photo':'Ajouter une photo';
+  const box=row.querySelector('.proc-photo-box');
+  if(box){
+    if(uploading) box.setAttribute('disabled','');
+    else box.removeAttribute('disabled');
+    box.title=title;
+    box.setAttribute('aria-label',title);
+    box.setAttribute('onclick',`procedurePhotoZoneClick('${si}','${st.id}',${hasPhoto})`);
+  }
+  const copyBtn=row.querySelector('.proc-copy-step-btn');
+  if(copyBtn){
+    if(uploading) copyBtn.setAttribute('disabled','');
+    else copyBtn.removeAttribute('disabled');
+    copyBtn.setAttribute('onclick',`procedureCopyStepOpen('${si}','${st.id}')`);
+  }
+  const inp=row.querySelector('.proc-short-input');
+  if(inp){
+    inp.dataset.si=si;
+    inp.dataset.id=st.id;
+    if(document.activeElement!==inp) inp.value=st.shortDesc;
+  }
+  const ta=row.querySelector('.proc-long-input');
+  if(ta){
+    ta.dataset.si=si;
+    ta.dataset.id=st.id;
+    if(document.activeElement!==ta) ta.value=st.longDesc;
+  }
+  const ar=row.querySelectorAll('.proc-order-arrows .btn-sm');
+  if(ar.length>=2){
+    ar[0].setAttribute('onclick',`procedureMoveStep('${si}','${st.id}',-1)`);
+    ar[1].setAttribute('onclick',`procedureMoveStep('${si}','${st.id}',1)`);
+  }
+  const del=row.querySelector('.btn-danger');
+  if(del) del.setAttribute('onclick',`procedureDeleteStep('${si}','${st.id}')`);
+}
+
 function bindProcedureFileInputOnce(){
   if(window._procFileInputBound) return;
   const inp=document.getElementById('proc-file-input');
@@ -985,40 +1079,32 @@ function renderProcedures(){
   const si=sel.value;
   const steps=getStepsSorted(si);
   if(!steps.length){
+    procLastRenderedStudioIdx=si;
     host.innerHTML='<p style="font-size:12px;color:#aaa">Aucune étape — utilisez « + Ajouter une étape ».</p>';
     return;
   }
-  host.innerHTML=steps.map(st=>{
+  const canIncremental=String(procLastRenderedStudioIdx)===String(si)&&host.querySelector('.proc-step-row')!==null;
+  if(!canIncremental){
+    host.innerHTML=steps.map(st=>buildProcStepRowHtml(si,st)).join('');
+    procLastRenderedStudioIdx=si;
+    return;
+  }
+  const newRows=[];
+  for(const st of steps){
     const uploading=procedureUploading.has(st.id);
     const hasPhoto=!!(st.photoUrl&&!uploading);
-    let photoInner;
-    if(uploading) photoInner='<span class="proc-photo-uploading">Upload…</span>';
-    else if(hasPhoto) photoInner=`<img class="proc-photo-thumb" src="${escHtml(st.photoUrl)}" alt="Aperçu photo">`;
-    else photoInner='<span class="proc-photo-icon" aria-hidden="true">📷</span><span class="proc-photo-label">Photo</span>';
-    const dis=uploading?' disabled':'';
-    const title=hasPhoto?'Remplacer la photo':'Ajouter une photo';
-    const copyDis=uploading?' disabled':'';
-    return `<div class="proc-step-row" id="proc-step-${st.id}" data-step-id="${st.id}">
-      <div class="proc-photo-col">
-        <button type="button" class="proc-photo-box"${dis} onclick="procedurePhotoZoneClick('${si}','${st.id}',${hasPhoto})" title="${title}" aria-label="${title}">
-          ${photoInner}
-        </button>
-        <button type="button" class="btn-sm proc-copy-step-btn"${copyDis} onclick="procedureCopyStepOpen('${si}','${st.id}')" title="Copier cette étape vers un autre studio" aria-label="Copier vers un autre studio">Copier</button>
-      </div>
-      <div class="proc-step-body">
-        <input type="text" class="proc-short-input" placeholder="Description courte" value="${escHtml(st.shortDesc)}"
-          data-si="${si}" data-id="${st.id}" data-field="shortDesc" onblur="procedureFieldBlur(this)">
-        <textarea class="proc-long-input" placeholder="Détails optionnels…" data-si="${si}" data-id="${st.id}" data-field="longDesc" onblur="procedureFieldBlur(this)">${escHtml(st.longDesc)}</textarea>
-      </div>
-      <div class="proc-step-actions">
-        <div class="proc-order-arrows">
-          <button type="button" class="btn-sm" onclick="procedureMoveStep('${si}','${st.id}',-1)" title="Monter">▲</button>
-          <button type="button" class="btn-sm" onclick="procedureMoveStep('${si}','${st.id}',1)" title="Descendre">▼</button>
-        </div>
-        <button type="button" class="btn-danger" onclick="procedureDeleteStep('${si}','${st.id}')" title="Supprimer l’étape">🗑</button>
-      </div>
-    </div>`;
-  }).join('');
+    let row=host.querySelector(`[data-step-id="${CSS.escape(st.id)}"]`);
+    if(row&&procPhotoColumnUnchanged(row,st,uploading,hasPhoto)){
+      procPatchProcedureRow(row,si,st,hasPhoto,uploading);
+      newRows.push(row);
+    }else{
+      if(row) row.remove();
+      const tpl=document.createElement('template');
+      tpl.innerHTML=buildProcStepRowHtml(si,st).trim();
+      newRows.push(tpl.content.firstElementChild);
+    }
+  }
+  host.replaceChildren(...newRows);
 }
 
 window.procedureFieldBlur=function(el){
@@ -1072,16 +1158,24 @@ window.procedurePhotoZoneClick=async function(si,stepId,hasPhoto){
 window.procedureDeleteStep=async function(si,stepId){
   const ok=await procedureShowConfirmModal({
     title:'Supprimer cette étape ?',
-    body:'Les textes et la photo seront retirés de la procédure.',
+    body:'Les textes et le fichier photo de cette étape seront retirés.',
     okText:'Supprimer',
     danger:true
   });
   if(!ok) return;
-  const path=procedureStoragePath(si,stepId);
-  deleteObject(sRef(storage,path)).catch(()=>{});
-  remove(ref(db,ob(`procedures/${si}/steps/${stepId}`)))
-    .then(()=>{ setSyncStatus('ok'); showToast('Étape supprimée ✓'); })
-    .catch(()=>showToast('Erreur suppression'));
+  try{
+    const sik=String(si);
+    const raw=A.procedures[sik]?.steps ?? A.procedures[si]?.steps ?? {};
+    const hadPhoto=!!(((raw[stepId]?.photoUrl??'').toString()).trim());
+    await remove(ref(db,ob(`procedures/${si}/steps/${stepId}`)));
+    if(hadPhoto){
+      await deleteObject(sRef(storage,procedureStoragePath(si,stepId))).catch(()=>{});
+    }
+    setSyncStatus('ok');
+    showToast('Étape supprimée ✓');
+  }catch(_){
+    showToast('Erreur suppression');
+  }
 };
 
 let procModalKeyHandler=null;
@@ -1151,6 +1245,7 @@ window.procedureCopyStepOpen=function(fromSi,stepId){
   back.setAttribute('aria-label','Copier l’étape vers un autre studio');
   back.innerHTML='<div class="proc-copy-dialog" role="document">'
     +'<div class="proc-copy-title">Copier cette étape vers</div>'
+    +'<p class="proc-copy-note">Seules les descriptions sont copiées — la photo ne l’est pas ; ajoutez une image sur la nouvelle étape si besoin.</p>'
     +'<div class="proc-copy-targets"></div>'
     +'<button type="button" class="btn-secondary proc-copy-cancel">Annuler</button>'
     +'</div>';
@@ -1184,32 +1279,20 @@ window.procedureCopyStepRun=async function(fromSi,stepId,toSi){
     : 0;
   const newRef=push(ref(db,ob(`procedures/${toSi}/steps`)));
   const newId=newRef.key;
-  let photoUrl='';
-  const hadPhoto=!!(st.photoUrl&&String(st.photoUrl).trim());
-  if(hadPhoto){
-    try{
-      const bytes=await getBytes(sRef(storage,procedureStoragePath(fromSi,stepId)));
-      const destPath=procedureStoragePath(toSi,newId);
-      await uploadBytes(sRef(storage,destPath),bytes,{contentType:'image/jpeg'});
-      photoUrl=await getDownloadURL(sRef(storage,destPath));
-    }catch(_){
-      try{
-        const r=await fetch(st.photoUrl);
-        const blob=await r.blob();
-        const destPath=procedureStoragePath(toSi,newId);
-        await uploadBytes(sRef(storage,destPath),blob,{contentType:blob.type&&blob.type.startsWith('image/')?blob.type:'image/jpeg'});
-        photoUrl=await getDownloadURL(sRef(storage,destPath));
-      }catch(__){ /* garde photoUrl vide */ }
-    }
-  }
+  const payload={ id:newId, order:newOrder, shortDesc:st.shortDesc||'', longDesc:st.longDesc||'', photoUrl:'' };
   try{
-    await set(newRef,{ id:newId, order:newOrder, shortDesc:st.shortDesc||'', longDesc:st.longDesc||'', photoUrl:photoUrl||'' });
+    await set(newRef,payload);
     setSyncStatus('ok');
+    const toKey=String(toSi);
+    if(!A.procedures[toKey]) A.procedures[toKey]={};
+    if(!A.procedures[toKey].steps) A.procedures[toKey].steps={};
+    A.procedures[toKey].steps[newId]={ ...payload };
     const nm=(A.studioNames||[])[Number(toSi)]||('Studio '+(Number(toSi)+1));
-    if(hadPhoto&&!photoUrl) showToast('Étape copiée vers '+nm+' (sans photo)');
-    else showToast('Étape copiée vers '+nm+' ✓');
-  }catch(_){
-    showToast('Erreur copie étape');
+    showToast('Étape copiée vers '+nm+' ✓');
+  }catch(err){
+    console.error('procedureCopyStepRun',err);
+    const msg=(err&&err.message)||'';
+    showToast(msg.includes('permission')||msg.includes('Permission')?'Copie refusée (règles Firebase)':'Erreur copie étape');
   }
 };
 
