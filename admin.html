@@ -81,6 +81,35 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .account-role.active{border-color:#ddd;background:#f0f0eb}
 .add-account-row{display:flex;gap:6px;align-items:center;margin-top:10px;flex-wrap:wrap}
 .add-account-row input{padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
+
+/* Procédures ménage */
+.proc-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.proc-toolbar select{flex:1;min-width:160px;max-width:280px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:#fff}
+.proc-steps{display:flex;flex-direction:column;gap:10px}
+.proc-step-row{display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #e8e8e2;border-radius:10px;background:#fafaf8;transition:background 0.35s ease}
+.proc-step-row.proc-flash-ok{background:#d4edda!important}
+.proc-step-row.proc-flash-err{background:#f8d7da!important}
+.proc-step-row[draggable=true]{cursor:grab}
+.proc-step-row[draggable=true]:active{cursor:grabbing}
+.proc-step-row.proc-drag-over{outline:2px dashed #378ADD;outline-offset:2px}
+.proc-photo-col{flex-shrink:0;width:80px}
+.proc-photo-thumb{width:80px;height:80px;border-radius:6px;object-fit:cover;background:#e8e8e2;display:block}
+.proc-photo-placeholder{width:80px;height:80px;border-radius:6px;background:#e8e8e2;display:flex;align-items:center;justify-content:center;font-size:11px;color:#999;text-align:center;padding:4px;line-height:1.2}
+.proc-photo-btn{margin-top:6px;width:100%;padding:4px;font-size:12px}
+.proc-step-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.proc-short-input{width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#111;background:#fff}
+.proc-long-input{width:100%;min-height:72px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:0.875em;font-style:italic;color:#666;background:#fff;resize:vertical;line-height:1.45}
+.proc-step-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap}
+.proc-order-mobile{display:none;flex-direction:column;gap:4px}
+.proc-order-desktop{display:flex;flex-direction:column;gap:4px}
+@media(max-width:767px){
+  .proc-order-mobile{display:flex}
+  .proc-order-desktop{display:none!important}
+  .proc-step-row[draggable]{-webkit-user-drag:none}
+}
+@media(min-width:768px){
+  .proc-order-mobile{display:none!important}
+}
 </style>
 </head>
 <body>
@@ -184,6 +213,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
       </div>
     </div>
 
+    <!-- Procédures & préparation studio -->
+    <div class="section" id="procedures-section">
+      <h3><span>📋</span> Procédures & préparation studio</h3>
+      <p style="font-size:11px;color:#aaa;margin-bottom:10px;line-height:1.5">
+        Étapes par studio (photos légères, consultables plus tard depuis le planning). Les modifications sont enregistrées tout de suite.
+      </p>
+      <div class="proc-toolbar">
+        <label for="proc-studio-select" style="font-size:12px;color:#888;white-space:nowrap">Studio</label>
+        <select id="proc-studio-select" title="Studio concerné"></select>
+        <button type="button" class="btn-primary" onclick="procedureAddStep()">+ Ajouter une étape</button>
+      </div>
+      <input type="file" id="proc-file-input" accept="image/*" capture="environment" style="display:none" tabindex="-1">
+      <div id="procedures-steps-host" class="proc-steps">Chargement…</div>
+    </div>
+
     <!-- Légende & Sync -->
     <div class="section" style="font-size:12px;color:#999;line-height:1.8">
       <h3><span>ℹ️</span> Légende & Synchronisation</h3>
@@ -230,7 +274,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue, push, get, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, onValue, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+
+/*
+ * ⚠️ RÈGLES FIREBASE — à configurer dans la console Firebase
+ *
+ * Cette app utilise une auth maison (localStorage), PAS Firebase Authentication.
+ * request.auth est donc null côté navigateur → ne pas utiliser auth != null dans les règles,
+ * ça bloquerait tous les accès depuis le site.
+ *
+ * Option actuelle (petite app, accès restreint par domaine dans Google Cloud) :
+ * Realtime Database : autoriser read/write sur orgs/{orgId}/procedures (ex. .read/.write true sous orgs)
+ * Storage : match /orgs/{orgId}/procedures/{allPaths=**} { allow read, write: if true; }
+ * — restreindre par domaine dans Google Cloud Console si possible.
+ *
+ * Sécurisation future : Firebase Auth ou App Check pour des règles strictes.
+ */
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
@@ -244,6 +304,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const storage = getStorage(app);
 /** Même plafond que index.html — rotation après chaque nouvel événement. */
 const MAX_ACTIVITY_LOG_ENTRIES = 450;
 const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A6E','#c0392b'];
@@ -255,7 +316,12 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.1.0';
+const APP_VERSION = '4.2.0';
+
+/** Studio sélectionné dans la section Procédures (persiste entre re-rendus). */
+let procSelectedStudioIdx = '0';
+/** Étapes en cours d’upload photo (affichage « Upload… »). */
+const procedureUploading = new Set();
 
 function getStoredOrgId(){
   try{
@@ -281,7 +347,8 @@ let A = {
   unlocked: false,
   selectedMonth: new Date().getMonth(),
   selectedYear: new Date().getFullYear(),
-  activityEntries: []
+  activityEntries: [],
+  procedures: {}
 };
 
 function hashSimple(str){
@@ -376,6 +443,11 @@ onValue(ref(db,ob('activityLog')), snap=>{
   if(A.unlocked) renderActivityLog();
 });
 
+onValue(ref(db,ob('procedures')), snap=>{
+  A.procedures=snap.val()||{};
+  if(A.unlocked) renderProcedures();
+});
+
 // ─── Accès admin (session calendrier + rôle 👑) ────────────────────────────────
 
 function verifyAdminAccess(){
@@ -424,6 +496,8 @@ function renderAdminContent(){
   if(tg) tg.checked=A.adminConfig.telegramEnabled!==false;
   renderHisto();
   renderActivityLog();
+  renderProcedures();
+  bindProcedureFileInputOnce();
   const av=document.getElementById('admin-app-version');
   if(av) av.textContent='Planning Ménage · version '+APP_VERSION;
 }
@@ -673,6 +747,242 @@ window.adminChangeMonth = function(dir){
   }
   renderStats();
 };
+
+// ─── Procédures ménage (RTDB + Storage) ───────────────────────────────────────
+
+const PROC_IMG_MAX_W = 640;
+const PROC_JPEG_QUALITY = 0.48;
+
+function procedureStoragePath(studioIdx, stepId){
+  return `orgs/${orgId}/procedures/${studioIdx}/${stepId}.jpg`;
+}
+
+function getStepsSorted(studioIdx){
+  const si=String(studioIdx);
+  const raw=A.procedures[si]?.steps ?? A.procedures[studioIdx]?.steps ?? {};
+  return Object.entries(raw).map(([id,v])=>({
+    id,
+    order:Number(v?.order)||0,
+    shortDesc:v?.shortDesc??'',
+    longDesc:v?.longDesc??'',
+    photoUrl:v?.photoUrl??''
+  })).sort((a,b)=>a.order-b.order);
+}
+
+function procedureFlashRow(stepId, kind){
+  const row=document.getElementById('proc-step-'+stepId);
+  if(!row) return;
+  row.classList.remove('proc-flash-ok','proc-flash-err');
+  void row.offsetWidth;
+  row.classList.add(kind==='ok'?'proc-flash-ok':'proc-flash-err');
+  setTimeout(()=>row.classList.remove('proc-flash-ok','proc-flash-err'),500);
+}
+
+function compressImageToJpegBlob(file){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let w=img.naturalWidth,h=img.naturalHeight;
+      if(w>PROC_IMG_MAX_W){ h=(h*PROC_IMG_MAX_W)/w; w=PROC_IMG_MAX_W; }
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.round(w);
+      canvas.height=Math.round(h);
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      canvas.toBlob(b=>{
+        if(b) resolve(b);
+        else reject(new Error('blob'));
+      },'image/jpeg',PROC_JPEG_QUALITY);
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); reject(new Error('image')); };
+    img.src=url;
+  });
+}
+
+async function procedurePersistOrders(studioIdx, sortedArr){
+  const u={};
+  sortedArr.forEach((st,i)=>{
+    u[`orgs/${orgId}/procedures/${studioIdx}/steps/${st.id}/order`]=i;
+  });
+  try{
+    await update(ref(db),u);
+    setSyncStatus('ok');
+    showToast('Ordre enregistré ✓');
+  }catch(_){
+    setSyncStatus('err');
+    showToast('Erreur enregistrement ordre');
+  }
+}
+
+function bindProcedureFileInputOnce(){
+  if(window._procFileInputBound) return;
+  const inp=document.getElementById('proc-file-input');
+  if(!inp) return;
+  window._procFileInputBound=true;
+  inp.addEventListener('change',async()=>{
+    const si=inp.dataset.studioIdx;
+    const stepId=inp.dataset.stepId;
+    const file=inp.files&&inp.files[0];
+    inp.value='';
+    if(!si||!stepId||!file||!file.type.startsWith('image/')) return;
+    procedureUploading.add(stepId);
+    renderProcedures();
+    try{
+      const blob=await compressImageToJpegBlob(file);
+      const path=procedureStoragePath(si,stepId);
+      await uploadBytes(sRef(storage,path),blob,{contentType:'image/jpeg'});
+      const url=await getDownloadURL(sRef(storage,path));
+      await set(ref(db,ob(`procedures/${si}/steps/${stepId}/photoUrl`)),url);
+      procedureFlashRow(stepId,'ok');
+      setSyncStatus('ok');
+    }catch(_){
+      procedureFlashRow(stepId,'err');
+      setSyncStatus('err');
+      showToast('Erreur envoi photo');
+    }finally{
+      procedureUploading.delete(stepId);
+      renderProcedures();
+    }
+  });
+}
+
+function renderProcedures(){
+  const host=document.getElementById('procedures-steps-host');
+  const sel=document.getElementById('proc-studio-select');
+  if(!host||!sel) return;
+  const names=A.studioNames||['Studio 1','Studio 2'];
+  sel.innerHTML=names.map((n,i)=>`<option value="${i}">${escHtml(n||'Studio '+(i+1))}</option>`).join('');
+  if(![...sel.options].some(o=>o.value===procSelectedStudioIdx)) procSelectedStudioIdx='0';
+  sel.value=procSelectedStudioIdx;
+  if(!sel._procChangeBound){
+    sel._procChangeBound=true;
+    sel.addEventListener('change',()=>{ procSelectedStudioIdx=sel.value; renderProcedures(); });
+  }
+  const si=sel.value;
+  const steps=getStepsSorted(si);
+  const useDrag=typeof matchMedia!=='undefined'&&matchMedia('(min-width:768px)').matches;
+  if(!steps.length){
+    host.innerHTML='<p style="font-size:12px;color:#aaa">Aucune étape — utilisez « + Ajouter une étape ».</p>';
+    return;
+  }
+  host.innerHTML=steps.map(st=>{
+    const uploading=procedureUploading.has(st.id);
+    const ph=st.photoUrl&&!uploading
+      ? `<img class="proc-photo-thumb" src="${escHtml(st.photoUrl)}" alt="">`
+      : (uploading?'<div class="proc-photo-placeholder">Upload…</div>':'<div class="proc-photo-placeholder">Photo</div>');
+    const dragAttr=useDrag?` draggable="true" ondragstart="procedureDragStart(event)" ondragover="procedureDragOver(event)" ondrop="procedureDrop(event)" ondragleave="procedureDragLeave(event)"`:'';
+    return `<div class="proc-step-row" id="proc-step-${st.id}" data-step-id="${st.id}"${dragAttr}>
+      <div class="proc-photo-col">
+        ${ph}
+        <button type="button" class="btn-sm proc-photo-btn" onclick="procedurePickPhoto('${si}','${st.id}')">📷</button>
+      </div>
+      <div class="proc-step-body">
+        <input type="text" class="proc-short-input" placeholder="Description courte" value="${escHtml(st.shortDesc)}"
+          data-si="${si}" data-id="${st.id}" data-field="shortDesc" onblur="procedureFieldBlur(this)">
+        <textarea class="proc-long-input" placeholder="Détails optionnels…" data-si="${si}" data-id="${st.id}" data-field="longDesc" onblur="procedureFieldBlur(this)">${escHtml(st.longDesc)}</textarea>
+      </div>
+      <div class="proc-step-actions">
+        <div class="proc-order-mobile">
+          <button type="button" class="btn-sm" onclick="procedureMoveStep('${si}','${st.id}',-1)" title="Monter">▲</button>
+          <button type="button" class="btn-sm" onclick="procedureMoveStep('${si}','${st.id}',1)" title="Descendre">▼</button>
+        </div>
+        <button type="button" class="btn-danger" onclick="procedureDeleteStep('${si}','${st.id}')" title="Supprimer">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.procedureFieldBlur=function(el){
+  const si=el.dataset.si, id=el.dataset.id, field=el.dataset.field;
+  if(!si||!id||!field) return;
+  const v=field==='longDesc'?el.value:el.value.trim();
+  set(ref(db,ob(`procedures/${si}/steps/${id}/${field}`)),v)
+    .then(()=>{ procedureFlashRow(id,'ok'); setSyncStatus('ok'); })
+    .catch(()=>{ procedureFlashRow(id,'err'); setSyncStatus('err'); });
+};
+
+window.procedureAddStep=function(){
+  const sel=document.getElementById('proc-studio-select');
+  if(!sel) return;
+  const si=sel.value;
+  const arr=getStepsSorted(si);
+  const maxO=arr.reduce((m,s)=>Math.max(m,Number(s.order)||0),-1);
+  const newRef=push(ref(db,ob(`procedures/${si}/steps`)));
+  const id=newRef.key;
+  set(newRef,{ id, order:maxO+1, shortDesc:'', longDesc:'', photoUrl:'' })
+    .then(()=>{ setSyncStatus('ok'); showToast('Étape ajoutée ✓'); })
+    .catch(()=>showToast('Erreur'));
+};
+
+window.procedurePickPhoto=function(si,stepId){
+  const inp=document.getElementById('proc-file-input');
+  if(!inp) return;
+  inp.dataset.studioIdx=si;
+  inp.dataset.stepId=stepId;
+  inp.value='';
+  inp.click();
+};
+
+window.procedureDeleteStep=function(si,stepId){
+  if(!confirm('Supprimer cette étape ?')) return;
+  const path=procedureStoragePath(si,stepId);
+  deleteObject(sRef(storage,path)).catch(()=>{});
+  remove(ref(db,ob(`procedures/${si}/steps/${stepId}`)))
+    .then(()=>{ setSyncStatus('ok'); showToast('Étape supprimée ✓'); })
+    .catch(()=>showToast('Erreur suppression'));
+};
+
+window.procedureMoveStep=function(si,stepId,dir){
+  const arr=getStepsSorted(si);
+  const i=arr.findIndex(s=>s.id===stepId);
+  const j=i+dir;
+  if(i<0||j<0||j>=arr.length) return;
+  const next=[...arr];
+  [next[i],next[j]]=[next[j],next[i]];
+  procedurePersistOrders(si,next);
+};
+
+window.procedureDragStart=function(e){
+  e.dataTransfer.setData('text/plain',e.currentTarget.dataset.stepId);
+  e.dataTransfer.effectAllowed='move';
+  e.currentTarget.style.opacity='0.5';
+};
+
+window.procedureDragOver=function(e){
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  e.currentTarget.classList.add('proc-drag-over');
+};
+
+window.procedureDragLeave=function(e){
+  e.currentTarget.classList.remove('proc-drag-over');
+};
+
+window.procedureDrop=function(e){
+  e.preventDefault();
+  e.currentTarget.classList.remove('proc-drag-over');
+  const targetId=e.currentTarget.dataset.stepId;
+  const srcId=e.dataTransfer.getData('text/plain');
+  document.querySelectorAll('.proc-step-row').forEach(r=>{ r.style.opacity=''; });
+  if(!srcId||srcId===targetId) return;
+  const sel=document.getElementById('proc-studio-select');
+  const si=sel?sel.value:'0';
+  const arr=getStepsSorted(si);
+  const siIdx=arr.findIndex(s=>s.id===srcId);
+  const tiIdx=arr.findIndex(s=>s.id===targetId);
+  if(siIdx<0||tiIdx<0) return;
+  const next=[...arr];
+  const [item]=next.splice(siIdx,1);
+  next.splice(tiIdx,0,item);
+  procedurePersistOrders(si,next);
+};
+
+// Fin drag : réinitialiser opacité si drop hors cible
+document.addEventListener('dragend',e=>{
+  if(e.target&&e.target.classList&&e.target.classList.contains('proc-step-row')) e.target.style.opacity='';
+});
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 
