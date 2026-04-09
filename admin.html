@@ -342,7 +342,7 @@ body.admin-nav-ready .admin-burger{display:flex}
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, set, onValue, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, getBytes } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 /*
  * ⚠️ RÈGLES FIREBASE — à configurer dans la console Firebase
@@ -362,7 +362,7 @@ import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } fr
  *   match /orgs/{orgId}/procedureSuggestions/{fileName} { allow read, write: if true; }
  * — restreindre par domaine dans Google Cloud Console si possible.
  * Photos procédures : orgs/{orgId}/procedures/{studio}/{stepId}.jpg
- * Photos suggestions : orgs/{orgId}/procedureSuggestions/{suggestionId}.jpg
+ * Photos suggestions (file d’attente) : orgs/{orgId}/procedureSuggestions/{suggestionId}.jpg
  *
  * Snippets à coller (si règles fines par enfant) — voir README § Sécurité v4.3.0 pour l’exemple JSON complet.
  *
@@ -951,11 +951,15 @@ function procedureAvgStarsHtml(si, stepId){
 }
 
 function buildProcSuggestionRowHtml(id,s){
+  const shortDesc=s.shortDesc||'';
+  const longDesc=s.longDesc||'';
+  const photoUrl=s.photoUrl||'';
+  const who=s.suggestedBy||'—';
   return `<div class="proc-suggestion-row" id="proc-sug-${id}">
-      <div class="proc-suggestion-meta">Suggestion — ${escHtml(s.suggestedBy||'—')}</div>
-      ${s.photoUrl&&String(s.photoUrl).trim()?`<img class="proc-suggestion-photo" src="${escHtml(String(s.photoUrl).trim())}" alt="">`:''}
-      <div class="proc-suggestion-short">${escHtml(s.shortDesc||'')}</div>
-      ${s.longDesc?`<div class="proc-suggestion-long">${escHtml(s.longDesc)}</div>`:''}
+      <div class="proc-suggestion-meta">Suggestion — ${escHtml(who)}</div>
+      ${photoUrl&&String(photoUrl).trim()?`<img class="proc-suggestion-photo" src="${escHtml(String(photoUrl).trim())}" alt="">`:''}
+      <div class="proc-suggestion-short">${escHtml(shortDesc)}</div>
+      ${longDesc?`<div class="proc-suggestion-long">${escHtml(longDesc)}</div>`:''}
       <div class="proc-suggestion-actions">
         <button type="button" class="btn-primary btn-sm" onclick='procedureValidateSuggestion(${JSON.stringify(id)})'>Valider</button>
         <button type="button" class="btn-danger" onclick='procedureRejectSuggestionOpen(${JSON.stringify(id)})'>Supprimer</button>
@@ -1242,6 +1246,24 @@ window.procedurePhotoZoneClick=async function(si,stepId,hasPhoto){
   window.procedurePickPhoto(si,stepId);
 };
 
+/** Supprime l’étape RTDB, le JPEG `procedures/.../stepId.jpg` si présent, et les stepFeedback associés. */
+async function procedureRemoveStepCompletely(si,stepId){
+  const sik=String(si);
+  const raw=A.procedures[sik]?.steps ?? A.procedures[si]?.steps ?? {};
+  const hadPhoto=!!(((raw[stepId]?.photoUrl??'').toString()).trim());
+  await remove(ref(db,ob(`procedures/${si}/steps/${stepId}`)));
+  if(hadPhoto){
+    await deleteObject(sRef(storage,procedureStoragePath(si,stepId))).catch(()=>{});
+  }
+  const crSnap=await get(ref(db,ob('cleaningReports')));
+  const all=crSnap.val()||{};
+  const upd={};
+  for(const uid of Object.keys(all)){
+    upd[`orgs/${orgId}/cleaningReports/${uid}/stepFeedback/${stepId}`]=null;
+  }
+  if(Object.keys(upd).length) await update(ref(db),upd);
+}
+
 window.procedureDeleteStep=async function(si,stepId){
   const ok=await procedureShowConfirmModal({
     title:'Supprimer cette étape ?',
@@ -1251,20 +1273,7 @@ window.procedureDeleteStep=async function(si,stepId){
   });
   if(!ok) return;
   try{
-    const sik=String(si);
-    const raw=A.procedures[sik]?.steps ?? A.procedures[si]?.steps ?? {};
-    const hadPhoto=!!(((raw[stepId]?.photoUrl??'').toString()).trim());
-    await remove(ref(db,ob(`procedures/${si}/steps/${stepId}`)));
-    if(hadPhoto){
-      await deleteObject(sRef(storage,procedureStoragePath(si,stepId))).catch(()=>{});
-    }
-    const crSnap=await get(ref(db,ob('cleaningReports')));
-    const all=crSnap.val()||{};
-    const upd={};
-    for(const uid of Object.keys(all)){
-      upd[`orgs/${orgId}/cleaningReports/${uid}/stepFeedback/${stepId}`]=null;
-    }
-    if(Object.keys(upd).length) await update(ref(db),upd);
+    await procedureRemoveStepCompletely(si,stepId);
     setSyncStatus('ok');
     showToast('Étape supprimée ✓');
   }catch(_){
@@ -1276,29 +1285,42 @@ window.procedureValidateSuggestion=async function(suggestionId){
   const s=A.procedureSuggestions?.[suggestionId];
   if(!s){ showToast('Suggestion introuvable'); return; }
   const si=String(s.studioIndex??0);
-  const arr=getStepsSorted(si);
-  const newOrder=arr.length
-    ? Math.min(...arr.map(x=>Number(x.order)||0))-1
-    : 0;
-  const newRef=push(ref(db,ob(`procedures/${si}/steps`)));
-  const stepId=newRef.key;
-  let photoWarn=false;
   try{
+    if(s.stepId){
+      const base=ob(`procedures/${si}/steps/${s.stepId}`);
+      await update(ref(db),{
+        [`${base}/pendingSuggestion`]:null,
+        [`${base}/suggestedBy`]:null,
+        [`${base}/suggestionCreatedAt`]:null
+      });
+      await remove(ref(db,ob(`procedureSuggestions/${suggestionId}`)));
+      pushActivity({ type:'admin', text:`Brouillon hérité promu — étape ${s.stepId} studio ${si}` });
+      showToast('Suggestion intégrée ✓');
+      setSyncStatus('ok');
+      return;
+    }
+    const arr=getStepsSorted(si);
+    const newOrder=arr.length
+      ? Math.min(...arr.map(x=>Number(x.order)||0))-1
+      : 0;
+    const newRef=push(ref(db,ob(`procedures/${si}/steps`)));
+    const stepId=newRef.key;
     await set(newRef,{ id:stepId, order:newOrder, shortDesc:s.shortDesc||'', longDesc:s.longDesc||'', photoUrl:'' });
-    const url=String(s.photoUrl||'').trim();
-    if(url){
+    if(String(s.photoUrl||'').trim()){
       try{
-        const res=await fetch(url);
-        const blob=await res.blob();
-        await uploadBytes(sRef(storage,procedureStoragePath(si,stepId)),blob,{contentType:'image/jpeg'});
-        const dl=await getDownloadURL(sRef(storage,procedureStoragePath(si,stepId)));
+        const sugRef=sRef(storage,procedureSuggestionStoragePath(suggestionId));
+        const bytes=await getBytes(sugRef);
+        const destRef=sRef(storage,procedureStoragePath(si,stepId));
+        await uploadBytes(destRef,bytes,{contentType:'image/jpeg'});
+        const dl=await getDownloadURL(destRef);
         await set(ref(db,ob(`procedures/${si}/steps/${stepId}/photoUrl`)),dl);
-      }catch(_){ photoWarn=true; }
+        await deleteObject(sugRef).catch(()=>{});
+      }catch(_){/* fichier absent ou erreur : étape sans photo, pas de toast bloquant */}
     }
     await remove(ref(db,ob(`procedureSuggestions/${suggestionId}`)));
     await deleteObject(sRef(storage,procedureSuggestionStoragePath(suggestionId))).catch(()=>{});
     pushActivity({ type:'admin', text:`Suggestion validée — nouvelle étape studio ${si}` });
-    showToast(photoWarn?'Étape créée — photo non copiée':'Suggestion intégrée ✓');
+    showToast('Suggestion intégrée ✓');
     setSyncStatus('ok');
   }catch(_){
     showToast('Erreur validation suggestion');
@@ -1315,8 +1337,16 @@ window.procedureRejectSuggestionOpen=async function(suggestionId){
   });
   if(!ok) return;
   try{
-    await remove(ref(db,ob(`procedureSuggestions/${suggestionId}`)));
-    await deleteObject(sRef(storage,procedureSuggestionStoragePath(suggestionId))).catch(()=>{});
+    const s=A.procedureSuggestions?.[suggestionId];
+    if(!s){ showToast('Suggestion introuvable'); return; }
+    const si=String(s.studioIndex??0);
+    if(s.stepId){
+      await procedureRemoveStepCompletely(si,s.stepId);
+      await remove(ref(db,ob(`procedureSuggestions/${suggestionId}`)));
+    }else{
+      await remove(ref(db,ob(`procedureSuggestions/${suggestionId}`)));
+      await deleteObject(sRef(storage,procedureSuggestionStoragePath(suggestionId))).catch(()=>{});
+    }
     showToast('Suggestion supprimée ✓');
     setSyncStatus('ok');
   }catch(_){

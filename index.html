@@ -356,8 +356,7 @@ const storage = getStorage(app);
  *   }
  * (Souvent déjà couvert par une règle .read/.write sur orgs/{orgId}/**.)
  *
- * Storage :
- *   match /orgs/{orgId}/procedureSuggestions/{fileName} { allow read, write: if true; }
+ * Storage : JPEG des suggestions `orgs/{orgId}/procedureSuggestions/{suggestionId}.jpg`.
  */
 
 /** Garde-fou taille Firebase : au-delà, les entrées les plus anciennes sont supprimées (même valeur que admin.html). */
@@ -1388,9 +1387,10 @@ window._submitMenageSuggest=async function(){
   const shortDesc=(shortEl?.value??'').trim();
   if(!shortDesc){ showToast('Description courte requise'); return; }
   const longDesc=String(longEl?.value??'').trim();
+  const si=String(ctx.r.studio??0);
   try{
-    const newRef=push(ref(db,`orgs/${oid}/procedureSuggestions`));
-    const suggestionId=newRef.key;
+    const sugRef=push(ref(db,`orgs/${oid}/procedureSuggestions`));
+    const suggestionId=sugRef.key;
     let photoUrl='';
     const file=fileInp?.files?.[0];
     if(file&&file.type.startsWith('image/')){
@@ -1399,8 +1399,8 @@ window._submitMenageSuggest=async function(){
       await uploadBytes(sRef(storage,spath),blob,{contentType:'image/jpeg'});
       photoUrl=await getDownloadURL(sRef(storage,spath));
     }
-    await set(newRef,{
-      studioIndex:Number(ctx.r.studio)===1?1:0,
+    await set(sugRef,{
+      studioIndex:Number(si)===1?1:0,
       shortDesc,
       longDesc:longDesc||'',
       photoUrl,

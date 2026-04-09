@@ -110,7 +110,7 @@ Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, �
 - **Copier** : duplique **description courte et détails** vers un autre studio ; **pas de photo** (`photoUrl` vide) — la modale l’indique ; ajouter une image sur la nouvelle étape au besoin. Le menu **Studio** reste sur le studio en cours d’édition.
 - **Remplacer la photo** : enregistrement sur le chemin `…/procedures/{studio}/{stepId}.jpg` de l’étape concernée.
 - **Suppression** : modale intégrée ; retrait de l’étape en base (y compris les **ratings** de l’étape), suppression du fichier image procédure, et **nettoyage multi-chemin** de tous les `cleaningReports/*/stepFeedback/{stepId}` pour cette étape.
-- **Suggestions (v4.3)** : en tête de liste par studio, cartes **orange** avec prénom de la suggérante ; **Valider** crée une étape en tête (photo copiée si possible) et supprime la suggestion ; **Supprimer** ouvre une **modale intégrée** puis retire la suggestion et le fichier Storage **`procedureSuggestions/{id}.jpg`**.
+- **Suggestions (v4.3)** : en tête de liste par studio, cartes **orange**. Les suggestions sont **uniquement** dans **`procedureSuggestions/`** (texte + `photoUrl` + métadonnées) ; JPEG **`procedureSuggestions/{suggestionId}.jpg`**. **Valider** : `push` d’une étape dans **`procedures/{studio}/steps/`**, migration de la photo avec **`getBytes`** → **`uploadBytes`** vers **`procedures/{studio}/{stepId}.jpg`**, suppression RTDB + fichier suggestion. **Supprimer** : RTDB suggestion + `deleteObject` sur le JPG suggestion. **Héritage** : si une entrée contient encore **`stepId`** (ancien brouillon dans `procedures/`), la validation enlève `pendingSuggestion` / champs liés via **`update` multi-chemin à la racine** puis supprime le nœud suggestion ; le refus appelle **`procedureRemoveStepCompletely`** + suppression suggestion.
 - **Moyenne des notes** : sous le bouton corbeille, trois étoiles non cliquables (demi-étoiles, gris si aucune note).
 - **Liste des étapes** : lorsque le studio affiché ne change pas **et** qu’il n’y a **pas** de suggestion en attente pour ce studio, le rendu reste **incrémental** (mise à jour des champs texte sans recréer les vignettes) pour éviter de **recharger** les images à chaque enregistrement des descriptions.
 
@@ -123,13 +123,15 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
 | Champ | Rôle |
 |--------|------|
 | `studioIndex` | `0` ou `1` (studio cible). |
-| `shortDesc` | Description courte (requis à la création). |
-| `longDesc` | Détails optionnels. |
-| `photoUrl` | URL après upload Storage, ou chaîne vide. |
+| `shortDesc` | Description courte. |
+| `longDesc` | Détails (peut être vide). |
+| `photoUrl` | URL après upload, ou chaîne vide. |
 | `suggestedBy` | Prénom (compte). |
 | `createdAt` | Horodatage ms. |
 
-**Storage** : **`orgs/{orgId}/procedureSuggestions/{suggestionId}.jpg`** (JPEG compressé depuis `index.html`).
+**Storage** : **`orgs/{orgId}/procedureSuggestions/{suggestionId}.jpg`** (JPEG depuis le calendrier, même compression que l’admin).
+
+**Héritage** : anciennes entrées avec **`stepId`** + brouillon sous **`procedures/`** — encore gérées à la validation / au refus (voir comportement admin ci-dessus).
 
 **Règles** : l’app utilise une auth « maison » (pas Firebase Auth côté client) ; les règles RTDB / Storage doivent rester cohérentes avec ce modèle (voir commentaire en tête du script dans `admin.html` et § **Sécurité v4.3.0** ci-dessous).
 
@@ -359,7 +361,7 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ## Historique des versions
 
 ### v4.3.0 — Avril 2026
-- **Calendrier (`index.html`)** : onglet **Procédure** dans la modale ménage (intervenante assignée, auth activée) — liste des étapes du studio, coches **Fait** partagées (`cleaningReports/{uid}/stepFeedback/{stepId}/checked`, un seul `onValue` sur `stepFeedback`), notes 1–3 persistantes (`procedures/.../ratings/{Prénom}`), sous-modale **+** pour **procedureSuggestions** + upload JPEG `procedureSuggestions/{id}.jpg` (compression identique à l’admin)
+- **Calendrier (`index.html`)** : onglet **Procédure** dans la modale ménage (intervenante assignée, auth activée) — coches **Fait**, notes **ratings**, sous-modale **+** : écriture uniquement dans **`procedureSuggestions/`** + JPEG **`procedureSuggestions/{id}.jpg`** (pas d’étape brouillon dans **`procedures/`**)
 - **Admin (`admin.html`)** : suggestions filtrées par studio (encadré orange), **Valider** / **Supprimer** (modale intégrée), moyenne des notes en demi-étoiles sous la corbeille, suppression d’étape étendue (nettoyage `stepFeedback` sur tous les rapports via `update` multi-chemin)
 - **Données** : conservation de **`stepFeedback`** lors des changements d’assignation (`syncCleaningReportAfterAssignmentChange`, comme les heures)
 - **Docs** : README (schéma, sécurité v4.3.0, comportement index/admin) ; commentaire règles en tête de `admin.html` ; `APP_VERSION` **4.3.0** dans `index.html` et `admin.html`
