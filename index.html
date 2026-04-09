@@ -372,7 +372,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.3.2';
+const APP_VERSION = '4.3.3';
 
 function getStoredOrgId(){
   try{
@@ -1036,6 +1036,10 @@ function escHtml(s){
 function escTextarea(s){
   return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+/** Attribut HTML (ex. data-*) pour URL ou id d’étape. */
+function menageAttrEsc(s){
+  return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+}
 
 /** Retours terrain : champs communs + heures perso si la signature d’assignation correspond. */
 function cleaningReportViewFor(key,c1,c2,userName){
@@ -1258,6 +1262,77 @@ function getUserProcedureRating(si, stepId, userName){
 /** Index → id d’étape pendant l’affichage de l’onglet Procédure (onclick fiable). */
 window._menageProcedureStepIdsForModal = null;
 
+function buildMenageProcStepHtml(st,idx,done,cur){
+  const ph=(st.photoUrl&&String(st.photoUrl).trim())||'';
+  const photo=ph
+    ? `<div class="menage-proc-photo"><img src="${escHtml(ph)}" alt="" data-menage-photo="${menageAttrEsc(ph)}"></div>`
+    : '';
+  const stars=[1,2,3].map(n=>{
+    const on=cur>=n;
+    const t=n===1?'Pas pertinente':n===2?'Pertinente':'Obligatoire';
+    return `<button type="button" class="menage-proc-star-btn${on?' menage-proc-star-btn--on':''}" onclick="window._menageProcStarIdx(${idx},${n})" title="${t}" aria-label="${n} sur 3">${on?'★':'☆'}</button>`;
+  }).join('');
+  const idCh=`mp-ch-${idx}`;
+  return `<div class="menage-proc-step${done?' menage-proc-step--done':''}" data-step-id="${menageAttrEsc(st.id)}">
+      ${photo}
+      <div class="menage-proc-body">
+        <div class="menage-proc-short">${escHtml(st.shortDesc||'Étape')}</div>
+        ${st.longDesc?`<div class="menage-proc-long">${escHtml(st.longDesc)}</div>`:''}
+        <div class="menage-proc-done-row">
+          <input type="checkbox" id="${idCh}"${done?' checked':''} onchange="window._menageProcCheckIdx(${idx},this.checked)">
+          <label for="${idCh}">Fait</label>
+        </div>
+        <div class="menage-proc-stars">${stars}</div>
+      </div>
+    </div>`;
+}
+
+function menageProcPhotoUnchanged(row,st){
+  const ph=(st.photoUrl&&String(st.photoUrl).trim())||'';
+  const wrap=row.querySelector('.menage-proc-photo');
+  if(ph){
+    const img=wrap?.querySelector('img');
+    return !!(img&&img.dataset.menagePhoto===ph);
+  }
+  return !wrap;
+}
+
+function menagePatchMenageProcRow(row,st,idx,done,cur){
+  row.classList.toggle('menage-proc-step--done',!!done);
+  const shortEl=row.querySelector('.menage-proc-short');
+  if(shortEl) shortEl.textContent=st.shortDesc||'Étape';
+  const body=row.querySelector('.menage-proc-body');
+  const doneRow=row.querySelector('.menage-proc-done-row');
+  let longEl=row.querySelector('.menage-proc-long');
+  const longTxt=st.longDesc||'';
+  if(longTxt){
+    if(longEl) longEl.textContent=longTxt;
+    else if(body&&doneRow){
+      const div=document.createElement('div');
+      div.className='menage-proc-long';
+      div.textContent=longTxt;
+      body.insertBefore(div,doneRow);
+    }
+  } else longEl?.remove();
+  const idCh=`mp-ch-${idx}`;
+  const ch=row.querySelector('.menage-proc-done-row input[type=checkbox]');
+  if(ch){
+    ch.checked=!!done;
+    ch.id=idCh;
+    ch.setAttribute('onchange',`window._menageProcCheckIdx(${idx},this.checked)`);
+  }
+  const lab=row.querySelector('.menage-proc-done-row label');
+  if(lab) lab.setAttribute('for',idCh);
+  const starsHost=row.querySelector('.menage-proc-stars');
+  if(starsHost){
+    const titles=['Pas pertinente','Pertinente','Obligatoire'];
+    starsHost.innerHTML=[1,2,3].map(n=>{
+      const on=cur>=n;
+      return `<button type="button" class="menage-proc-star-btn${on?' menage-proc-star-btn--on':''}" onclick="window._menageProcStarIdx(${idx},${n})" title="${titles[n-1]}" aria-label="${n} sur 3">${on?'★':'☆'}</button>`;
+    }).join('');
+  }
+}
+
 window._renderMenageProcedureList=function(){
   const ctx=window._menageModalCtx;
   const host=document.getElementById('menage-procedure-list');
@@ -1270,30 +1345,37 @@ window._renderMenageProcedureList=function(){
     return;
   }
   const uname=ctx.userName;
-  host.innerHTML=steps.map((st,idx)=>{
-    const done=!!(menageStepFeedbackLive[st.id]&&menageStepFeedbackLive[st.id].checked===true);
-    const photo=st.photoUrl&&String(st.photoUrl).trim()
-      ? `<div class="menage-proc-photo"><img src="${escHtml(String(st.photoUrl).trim())}" alt=""></div>`
-      : '';
-    const cur=getUserProcedureRating(si,st.id,uname);
-    const stars=[1,2,3].map(n=>{
-      const on=cur>=n;
-      return `<button type="button" class="menage-proc-star-btn${on?' menage-proc-star-btn--on':''}" onclick="window._menageProcStarIdx(${idx},${n})" title="${n===1?'Pas pertinente':n===2?'Pertinente':'Obligatoire'}" aria-label="${n} sur 3">${on?'★':'☆'}</button>`;
+  const stepIds=steps.map(s=>s.id);
+  const prevRows=[...host.querySelectorAll('.menage-proc-step')];
+  const prevIds=prevRows.map(r=>r.dataset.stepId||'');
+  const sameOrder=prevRows.length===stepIds.length&&stepIds.every((id,i)=>id===prevIds[i]);
+
+  if(!sameOrder){
+    host.innerHTML=steps.map((st,idx)=>{
+      const done=!!(menageStepFeedbackLive[st.id]&&menageStepFeedbackLive[st.id].checked===true);
+      const cur=getUserProcedureRating(si,st.id,uname);
+      return buildMenageProcStepHtml(st,idx,done,cur);
     }).join('');
-    const idCh=`mp-ch-${idx}`;
-    return `<div class="menage-proc-step${done?' menage-proc-step--done':''}">
-      ${photo}
-      <div class="menage-proc-body">
-        <div class="menage-proc-short">${escHtml(st.shortDesc||'Étape')}</div>
-        ${st.longDesc?`<div class="menage-proc-long">${escHtml(st.longDesc)}</div>`:''}
-        <div class="menage-proc-done-row">
-          <input type="checkbox" id="${idCh}"${done?' checked':''} onchange="window._menageProcCheckIdx(${idx},this.checked)">
-          <label for="${idCh}">Fait</label>
-        </div>
-        <div class="menage-proc-stars">${stars}</div>
-      </div>
-    </div>`;
-  }).join('');
+    return;
+  }
+
+  const newRows=[];
+  for(let idx=0;idx<steps.length;idx++){
+    const st=steps[idx];
+    const done=!!(menageStepFeedbackLive[st.id]&&menageStepFeedbackLive[st.id].checked===true);
+    const cur=getUserProcedureRating(si,st.id,uname);
+    const row=prevRows[idx];
+    if(row&&menageProcPhotoUnchanged(row,st)){
+      menagePatchMenageProcRow(row,st,idx,done,cur);
+      newRows.push(row);
+    }else{
+      const tpl=document.createElement('template');
+      tpl.innerHTML=buildMenageProcStepHtml(st,idx,done,cur).trim();
+      const el=tpl.content.firstElementChild;
+      if(el) newRows.push(el);
+    }
+  }
+  host.replaceChildren(...newRows);
 };
 
 window._menageTab=function(which){

@@ -102,10 +102,10 @@ body.admin-nav-ready .admin-burger{display:flex}
 .proc-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
 .proc-toolbar select{flex:1;min-width:160px;max-width:280px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:#fff}
 .proc-steps{display:flex;flex-direction:column;gap:10px}
-.proc-step-row{display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #e8e8e2;border-radius:10px;background:#fafaf8;transition:background 0.35s ease}
+.proc-step-row{display:flex;gap:10px;align-items:stretch;padding:10px;border:1px solid #e8e8e2;border-radius:10px;background:#fafaf8;transition:background 0.35s ease}
 .proc-step-row.proc-flash-ok{background:#d4edda!important}
 .proc-step-row.proc-flash-err{background:#f8d7da!important}
-.proc-photo-col{flex-shrink:0;width:80px;display:flex;flex-direction:column;align-items:stretch;gap:6px}
+.proc-photo-col{flex-shrink:0;width:80px;display:flex;flex-direction:column;align-items:stretch;gap:6px;align-self:flex-start}
 .proc-copy-step-btn{width:100%;padding:4px 2px;font-size:10px;line-height:1.2;border-radius:6px;white-space:normal;word-break:break-word}
 .proc-copy-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
 .proc-copy-dialog{background:#fafaf8;border:1px solid #e8e8e2;border-radius:12px;padding:16px;max-width:320px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.12)}
@@ -133,7 +133,9 @@ body.admin-nav-ready .admin-burger{display:flex}
 .proc-step-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
 .proc-short-input{width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#111;background:#fff}
 .proc-long-input{width:100%;min-height:72px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:0.875em;font-style:italic;color:#666;background:#fff;resize:vertical;line-height:1.45}
-.proc-step-actions{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0}
+.proc-step-actions{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;align-self:stretch;min-width:44px}
+.proc-step-actions-tail{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:auto;width:100%}
+.proc-step-actions-tail .proc-avg-stars-wrap{margin-top:0;min-height:0;justify-content:center}
 .proc-order-arrows{display:flex;flex-direction:column;gap:4px;align-items:center}
 .proc-suggestions-block{margin-bottom:14px;display:flex;flex-direction:column;gap:10px}
 .proc-suggestion-row{border:2px solid #fdba74;background:#fff7ed;border-radius:10px;padding:10px}
@@ -392,7 +394,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.3.2';
+const APP_VERSION = '4.3.3';
 
 /** Studio sélectionné dans la section Procédures (persiste entre re-rendus). */
 let procSelectedStudioIdx = '0';
@@ -400,6 +402,8 @@ let procSelectedStudioIdx = '0';
 const procedureUploading = new Set();
 /** Studio dont la liste procédures a été rendue (permet un rendu incrémental sans recharger les images). */
 let procLastRenderedStudioIdx=null;
+/** Signature JSON des suggestions du studio courant : évite de refaire innerHTML du bloc orange si seules les étapes officielles changent. */
+let procSuggestionsRenderSig=null;
 
 function procAttrEsc(s){
   return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
@@ -1050,8 +1054,10 @@ function buildProcStepRowHtml(si, st){
           <button type="button" class="btn-sm" onclick="procedureMoveStep('${si}','${st.id}',-1)" title="Monter">▲</button>
           <button type="button" class="btn-sm" onclick="procedureMoveStep('${si}','${st.id}',1)" title="Descendre">▼</button>
         </div>
-        <button type="button" class="btn-danger" onclick="procedureDeleteStep('${si}','${st.id}')" title="Supprimer l’étape">🗑</button>
-        ${procedureAvgStarsHtml(si, st.id)}
+        <div class="proc-step-actions-tail">
+          ${procedureAvgStarsHtml(si, st.id)}
+          <button type="button" class="btn-danger" onclick="procedureDeleteStep('${si}','${st.id}')" title="Supprimer l’étape">🗑</button>
+        </div>
       </div>
     </div>`;
 }
@@ -1159,17 +1165,25 @@ function renderProcedures(){
     sel.addEventListener('change',()=>{ procSelectedStudioIdx=sel.value; renderProcedures(); });
   }
   const si=sel.value;
-  const sugs=Object.entries(A.procedureSuggestions||{}).filter(([_,s])=>s&&String(s.studioIndex)===String(si));
-  if(sugBlock) sugBlock.innerHTML=sugs.length?sugs.map(([id,s])=>buildProcSuggestionRowHtml(id,s)).join(''):'';
+  const sugs=Object.entries(A.procedureSuggestions||{}).filter(([_,s])=>s&&String(s.studioIndex)===String(si))
+    .sort(([a],[b])=>String(a).localeCompare(String(b)));
+  const nextSugSig=JSON.stringify({
+    o:orgId,
+    si,
+    rows:sugs.map(([id,v])=>[id,v.stepId??null,v.shortDesc??'',v.longDesc??'',v.photoUrl??'',v.suggestedBy??'',v.createdAt??0])
+  });
+  if(sugBlock&&procSuggestionsRenderSig!==nextSugSig){
+    procSuggestionsRenderSig=nextSugSig;
+    sugBlock.innerHTML=sugs.length?sugs.map(([id,s])=>buildProcSuggestionRowHtml(id,s)).join(''):'';
+  }
 
   const steps=getStepsSorted(si);
-  const forceFullRebuild=sugs.length>0;
   if(!steps.length){
     procLastRenderedStudioIdx=si;
     host.innerHTML='<p style="font-size:12px;color:#aaa">Aucune étape — utilisez « + Ajouter une étape ».</p>';
     return;
   }
-  const canIncremental=!forceFullRebuild&&String(procLastRenderedStudioIdx)===String(si)&&host.querySelector('.proc-step-row')!==null;
+  const canIncremental=String(procLastRenderedStudioIdx)===String(si)&&host.querySelector('.proc-step-row')!==null;
   if(!canIncremental){
     host.innerHTML=steps.map(st=>buildProcStepRowHtml(si,st)).join('');
     procLastRenderedStudioIdx=si;

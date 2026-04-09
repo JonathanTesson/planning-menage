@@ -1,6 +1,6 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 4.3.2** — Avril 2026
+**Version : 4.3.3** — Avril 2026
 
 Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin.
 
@@ -112,7 +112,7 @@ Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, �
 - **Suppression** : modale intégrée ; retrait de l’étape en base (y compris les **ratings** de l’étape), suppression du fichier image procédure, et **nettoyage multi-chemin** de tous les `cleaningReports/*/stepFeedback/{stepId}` pour cette étape.
 - **Suggestions (v4.3)** : en tête de liste par studio, cartes **orange**. Métadonnées dans **`procedureSuggestions/`** ; **même fichier Storage que les étapes** : **`orgs/{orgId}/procedures/{studio}/{suggestionId}.jpg`**. **Valider** : l’étape est créée avec **`id` = `suggestionId`** (pas de nouveau `push`) pour garder le même chemin JPEG ; **`photoUrl`** repris depuis la suggestion ; suppression du nœud **`procedureSuggestions`**. **Supprimer** : RTDB + `deleteObject` sur ce même chemin si besoin. **Héritage** : **`stepId`** → **`update`** puis suppression suggestion ; refus → **`procedureRemoveStepCompletely`** + suggestion.
 - **Moyenne des notes** : sous le bouton corbeille, trois étoiles non cliquables (demi-étoiles, gris si aucune note).
-- **Liste des étapes** : lorsque le studio affiché ne change pas **et** qu’il n’y a **pas** de suggestion en attente pour ce studio, le rendu reste **incrémental** (mise à jour des champs texte sans recréer les vignettes) pour éviter de **recharger** les images à chaque enregistrement des descriptions.
+- **Liste des étapes** : lorsque le studio affiché ne change pas, le rendu des lignes d’étapes reste **incrémental** (mise à jour des champs sans recréer les vignettes photo) pour éviter de **recharger** les images à chaque enregistrement des descriptions. Les **suggestions** (encadré orange) sont dans un bloc **à part** : leur **HTML** n’est régénéré que lorsque les données des suggestions affichées changent (signature), pas à chaque mise à jour des étapes officielles.
 
 **Affichage côté calendrier** (`index.html`, **v4.3+**) : **uniquement** pour une **intervenante connectée** (compte ménage, auth activée) **déjà assignée** au départ. La modale **Mon intervention** comporte un second onglet **Procédure** : liste des étapes du studio, case **Fait** (temps réel via un seul `onValue` sur `stepFeedback`), étoiles 1–3 (persistantes, clic sur la note active la retire ; pas de bloc d’aide textuel sur la signification des notes — interface allégée **v4.3.2**). Bouton **+** : sous-modale **suggérer une étape** (photo optionnelle, même compression que l’admin) avec **état « Envoi en cours… »** (champs et boutons désactivés, message d’attente, anti double-clic) et toast court **« Suggestion envoyée. »** après succès. **Pas** d’onglet procédure si la ménagère n’est pas assignée ; en **mode sans auth** (vue admin sur le calendrier), comportement inchangé — pas d’onglet procédure.
 
@@ -357,7 +357,7 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 4.3.2
+Version : 4.3.3
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
@@ -368,6 +368,11 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ---
 
 ## Historique des versions
+
+### v4.3.3 — Avril 2026
+- **Admin (`admin.html`)** : **Procédure** — (1) suppression de **`forceFullRebuild=sugs.length>0`** qui empêchait le rendu incrémental des **étapes officielles** dès qu’une suggestion existait ; (2) **cause principale** du rechargement des **photos orange** : à **chaque** appel de **`renderProcedures()`** (y compris après un blur sur une étape officielle), le bloc **`proc-suggestions-block`** était entièrement refait en **`innerHTML`**, ce qui **recréait** les vignettes suggestion. Désormais une **signature** (ids + champs affichés) évite de toucher au DOM des suggestions si leurs données n’ont pas changé.
+- **Calendrier (`index.html`)** : onglet **Procédure** — rendu **incrémental** des étapes (coches **Fait** / notes **étoiles**) pour ne pas recréer les **`<img>`** à chaque sync Firebase, sur le même principe que l’admin.
+- **`APP_VERSION` : 4.3.3** dans `index.html` et `admin.html`.
 
 ### v4.3.2 — Avril 2026
 - **Calendrier (`index.html`)** : suggestion d’étape — interface d’envoi **bloquée pendant** compression / upload / RTDB (libellé **Envoi en cours…**, texte d’attente, pas de double clic, fond modal inactif) ; toast de succès court **« Suggestion envoyée. »** ; suppression du paragraphe d’aide sur la signification des **étoiles** dans l’onglet Procédure (gain de place).
