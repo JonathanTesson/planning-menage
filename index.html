@@ -137,7 +137,6 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 .menage-proc-stars{display:flex;align-items:center;gap:3px;margin-top:4px}
 .menage-proc-star-btn{background:none;border:none;padding:0 2px;font-size:18px;line-height:1;cursor:pointer;color:#ddd;-webkit-tap-highlight-color:transparent}
 .menage-proc-star-btn--on{color:#F59E0B}
-.menage-proc-legend-stars{font-size:11px;color:#999;line-height:1.45;margin:6px 0 10px}
 .menage-suggest-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:350;display:flex;align-items:center;justify-content:center;padding:1rem}
 .menage-suggest-modal{background:#fff;border-radius:14px;padding:1.1rem;width:100%;max-width:340px;box-shadow:0 12px 40px rgba(0,0,0,.15);max-height:88vh;overflow-y:auto}
 .menage-suggest-modal h4{margin:0 0 10px;font-size:15px;font-weight:600}
@@ -149,6 +148,9 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 .menage-suggest-photo-label{font-size:11px;color:#888;font-weight:500}
 .menage-suggest-photo-hint{font-size:10px;color:#aaa;text-align:center;line-height:1.35;max-width:260px}
 .menage-suggest-photo-thumb{width:100%;max-height:160px;object-fit:cover;display:block;border-radius:8px}
+.menage-suggest-modal--submitting{cursor:progress}
+.menage-suggest-busy-hint{font-size:11px;color:#555;text-align:center;margin:10px 0 0;line-height:1.4}
+.menage-suggest-photo-box:disabled{opacity:0.65;cursor:not-allowed}
 .modal-btns--split{justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
 .modal-btns--split .btn-primary{flex-shrink:0}
 .modal-btns--split .btn-danger{flex-shrink:0}
@@ -336,7 +338,7 @@ const db = getDatabase(app);
 const storage = getStorage(app);
 
 /*
- * Snippets règles Firebase (console) — alignés sur admin.html ; voir aussi README § Sécurité v4.3.0.
+ * Snippets règles Firebase (console) — alignés sur admin.html ; voir README § Sécurité v4.3.0 et § suggestions (rétrospective v4.3.1).
  *
  * Realtime Database (exemple si règle large par org) :
  *   "procedureSuggestions": { ".read": true, ".write": true },
@@ -356,7 +358,7 @@ const storage = getStorage(app);
  *   }
  * (Souvent déjà couvert par une règle .read/.write sur orgs/{orgId}/**.)
  *
- * Storage : JPEG des suggestions `orgs/{orgId}/procedureSuggestions/{suggestionId}.jpg`.
+ * Storage : même chemin que l’admin — `orgs/{orgId}/procedures/{studio}/{suggestionId}.jpg`.
  */
 
 /** Garde-fou taille Firebase : au-delà, les entrées les plus anciennes sont supprimées (même valeur que admin.html). */
@@ -370,7 +372,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.3.0';
+const APP_VERSION = '4.3.2';
 
 function getStoredOrgId(){
   try{
@@ -416,6 +418,44 @@ function clearMenageModalUnsubs(){
 window._menageModalCtx = null;
 /** Aperçu suggestion : URL objet à révoquer à la fermeture. */
 let menageSuggestPreviewUrl = null;
+/** True pendant compression + upload + écriture RTDB (évite double envoi). */
+let menageSuggestSubmitting = false;
+
+function menageSuggestSetBusy(on){
+  const root=document.getElementById('menage-suggest-root');
+  if(!root) return;
+  const modal=root.querySelector('.menage-suggest-modal');
+  modal?.classList.toggle('menage-suggest-modal--submitting',on);
+  const submit=root.querySelector('#ms-submit');
+  const cancel=root.querySelector('#ms-cancel');
+  const closeBtn=root.querySelector('#ms-suggest-close');
+  const photoBox=root.querySelector('.menage-suggest-photo-box');
+  const shortEl=document.getElementById('ms-short');
+  const longEl=document.getElementById('ms-long');
+  const fileInp=document.getElementById('ms-photo');
+  const hint=root.querySelector('#ms-busy-hint');
+  if(submit){
+    submit.disabled=on;
+    submit.textContent=on?'Envoi en cours…':'Valider';
+    submit.setAttribute('aria-busy',on?'true':'false');
+  }
+  if(cancel) cancel.disabled=on;
+  if(closeBtn){
+    closeBtn.disabled=on;
+    closeBtn.setAttribute('aria-disabled',on?'true':'false');
+  }
+  if(photoBox){
+    photoBox.disabled=on;
+    photoBox.style.opacity=on?'0.65':'';
+  }
+  if(shortEl) shortEl.disabled=on;
+  if(longEl) longEl.disabled=on;
+  if(fileInp) fileInp.disabled=on;
+  if(hint){
+    hint.hidden=!on;
+    if(on) hint.textContent='Préparation de la photo et envoi… Merci de patienter.';
+  }
+}
 
 const PROC_IMG_MAX_W = 640;
 const PROC_JPEG_QUALITY = 0.48;
@@ -1192,11 +1232,6 @@ function renderLegend(){
     <div class="legend-item"><span class="legend-pip" style="background:#F59E0B"></span>Partiel</div>`;
 }
 
-function renderSettings(){
-  document.getElementById('name-s1') && (document.getElementById('name-s1').value=S.studioNames[0]);
-  document.getElementById('name-s2') && (document.getElementById('name-s2').value=S.studioNames[1]);
-}
-
 function render(){
   if(!S.currentUser) return;
   const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
@@ -1308,10 +1343,12 @@ function menageSuggestRevokePreview(){
 }
 
 window._menageSuggestPickPhoto=function(){
+  if(menageSuggestSubmitting) return;
   document.getElementById('ms-photo')?.click();
 };
 
 window._menageSuggestPhotoChange=function(inp){
+  if(menageSuggestSubmitting) return;
   const inner=document.getElementById('menage-suggest-photo-inner');
   if(!inner) return;
   menageSuggestRevokePreview();
@@ -1333,6 +1370,7 @@ window._menageSuggestPhotoChange=function(inp){
 window._openMenageSuggest=function(){
   if(!window._menageModalCtx) return;
   if(document.getElementById('menage-suggest-root')) return;
+  menageSuggestSubmitting=false;
   const root=document.createElement('div');
   root.id='menage-suggest-root';
   root.className='menage-suggest-overlay';
@@ -1342,7 +1380,7 @@ window._openMenageSuggest=function(){
   root.innerHTML=`<div class="menage-suggest-modal" role="document" onclick="event.stopPropagation()">
     <div class="modal-header-row" style="margin-bottom:10px">
       <h4 style="margin:0;font-size:15px;font-weight:600">Suggérer une étape</h4>
-      <button type="button" class="modal-close-x" onclick="window._closeMenageSuggest()" aria-label="Fermer">×</button>
+      <button type="button" class="modal-close-x" id="ms-suggest-close" onclick="window._closeMenageSuggest()" aria-label="Fermer">×</button>
     </div>
     <div class="modal-field">
       <label style="font-size:12px;color:#888;display:block;margin-bottom:4px;font-weight:500">Photo (optionnelle)</label>
@@ -1364,20 +1402,27 @@ window._openMenageSuggest=function(){
       <textarea id="ms-long" rows="3" placeholder="Détails…"></textarea>
     </div>
     <div class="modal-btns" style="margin-top:14px">
-      <button type="button" class="btn-cancel" onclick="window._closeMenageSuggest()">Annuler</button>
-      <button type="button" class="btn-primary" onclick="window._submitMenageSuggest()">Valider</button>
+      <button type="button" class="btn-cancel" id="ms-cancel" onclick="window._closeMenageSuggest()">Annuler</button>
+      <button type="button" class="btn-primary" id="ms-submit" onclick="window._submitMenageSuggest()">Valider</button>
     </div>
+    <p id="ms-busy-hint" class="menage-suggest-busy-hint" hidden role="status" aria-live="polite"></p>
   </div>`;
-  root.addEventListener('click',e=>{ if(e.target===root) window._closeMenageSuggest(); });
+  root.addEventListener('click',e=>{
+    if(e.target!==root) return;
+    if(menageSuggestSubmitting) return;
+    window._closeMenageSuggest();
+  });
   document.body.appendChild(root);
 };
 
 window._closeMenageSuggest=function(){
+  menageSuggestSubmitting=false;
   menageSuggestRevokePreview();
   document.getElementById('menage-suggest-root')?.remove();
 };
 
 window._submitMenageSuggest=async function(){
+  if(menageSuggestSubmitting) return;
   const ctx=window._menageModalCtx;
   const oid=getStoredOrgId();
   if(!ctx||!oid||!ctx.userName){ window._closeMenageSuggest(); return; }
@@ -1388,6 +1433,8 @@ window._submitMenageSuggest=async function(){
   if(!shortDesc){ showToast('Description courte requise'); return; }
   const longDesc=String(longEl?.value??'').trim();
   const si=String(ctx.r.studio??0);
+  menageSuggestSubmitting=true;
+  menageSuggestSetBusy(true);
   try{
     const sugRef=push(ref(db,`orgs/${oid}/procedureSuggestions`));
     const suggestionId=sugRef.key;
@@ -1395,7 +1442,7 @@ window._submitMenageSuggest=async function(){
     const file=fileInp?.files?.[0];
     if(file&&file.type.startsWith('image/')){
       const blob=await compressImageToJpegBlob(file);
-      const spath=`orgs/${oid}/procedureSuggestions/${suggestionId}.jpg`;
+      const spath=`orgs/${oid}/procedures/${si}/${suggestionId}.jpg`;
       await uploadBytes(sRef(storage,spath),blob,{contentType:'image/jpeg'});
       photoUrl=await getDownloadURL(sRef(storage,spath));
     }
@@ -1408,11 +1455,14 @@ window._submitMenageSuggest=async function(){
       createdAt:Date.now()
     });
     setSyncStatus('ok');
-    showToast('Votre suggestion a bien été prise en compte, elle est en cours de validation.');
+    showToast('« Suggestion envoyée. »');
     window._closeMenageSuggest();
   }catch(_){
     setSyncStatus('err');
     showToast('Erreur envoi suggestion');
+  }finally{
+    menageSuggestSubmitting=false;
+    menageSuggestSetBusy(false);
   }
 };
 
@@ -1477,7 +1527,6 @@ window._oa = function(key){
           </div>
           <div id="menage-panel-p" class="menage-procedure-panel" style="display:none">
             <p class="modal-shared-hint" style="margin-top:0.75rem;margin-bottom:0">Étapes pour ce studio — coches partagées avec l’autre intervenante sur ce départ.</p>
-            <p class="modal-shared-hint menage-proc-legend-stars">Vous pouvez noter la pertinence des étapes avec des étoiles : ⭐ pas pertinente · ⭐⭐ pertinente · ⭐⭐⭐ obligatoire.</p>
             <div class="menage-procedure-top">
               <button type="button" class="menage-procedure-plus" onclick="window._openMenageSuggest()" title="Suggérer une étape" aria-label="Suggérer une étape">+</button>
             </div>
@@ -1636,6 +1685,7 @@ window._cm=function(){
   clearMenageModalUnsubs();
   window._menageModalCtx=null;
   window._menageProcedureStepIdsForModal=null;
+  menageSuggestSubmitting=false;
   menageSuggestRevokePreview();
   document.getElementById('menage-suggest-root')?.remove();
   document.getElementById('modal-container').innerHTML='';
@@ -1649,7 +1699,6 @@ window._toggleType=t=>{
   render();
 };
 
-window.toggleSettings=()=>{};
 window.changeMonth=d=>{
   if(d===0){S.currentMonth=new Date().getMonth();S.currentYear=new Date().getFullYear();}
   else{S.currentMonth+=d;if(S.currentMonth>11){S.currentMonth=0;S.currentYear++;}if(S.currentMonth<0){S.currentMonth=11;S.currentYear--;}}

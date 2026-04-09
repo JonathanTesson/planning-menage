@@ -1,6 +1,6 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 4.3.0** — Avril 2026
+**Version : 4.3.2** — Avril 2026
 
 Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin.
 
@@ -107,14 +107,14 @@ Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, �
 - **Nouvelle étape** (`+ Ajouter une étape`) : insérée **en haut** de la liste du studio (les plus récentes en premier dans l’affichage).
 - **Ordre** : boutons **▲ / ▼** sur **tous** les écrans (pas de glisser-déposer).
 - **Photo** : une seule zone cliquable (aperçu ou icône dans le cadre) ; remplacement avec **modale intégrée** (pas de `window.confirm` du navigateur).
-- **Copier** : duplique **description courte et détails** vers un autre studio ; **pas de photo** (`photoUrl` vide) — la modale l’indique ; ajouter une image sur la nouvelle étape au besoin. Le menu **Studio** reste sur le studio en cours d’édition.
+- **Copier** : duplique **description courte et détails** vers un autre studio ; **pas de photo** (`photoUrl` vide) — la modale l’indique et le toast de succès le rappelle (**v4.3.2**) ; ajouter une image sur la nouvelle étape au besoin. Le menu **Studio** reste sur le studio en cours d’édition.
 - **Remplacer la photo** : enregistrement sur le chemin `…/procedures/{studio}/{stepId}.jpg` de l’étape concernée.
 - **Suppression** : modale intégrée ; retrait de l’étape en base (y compris les **ratings** de l’étape), suppression du fichier image procédure, et **nettoyage multi-chemin** de tous les `cleaningReports/*/stepFeedback/{stepId}` pour cette étape.
-- **Suggestions (v4.3)** : en tête de liste par studio, cartes **orange**. Les suggestions sont **uniquement** dans **`procedureSuggestions/`** (texte + `photoUrl` + métadonnées) ; JPEG **`procedureSuggestions/{suggestionId}.jpg`**. **Valider** : `push` d’une étape dans **`procedures/{studio}/steps/`**, migration de la photo avec **`getBytes`** → **`uploadBytes`** vers **`procedures/{studio}/{stepId}.jpg`**, suppression RTDB + fichier suggestion. **Supprimer** : RTDB suggestion + `deleteObject` sur le JPG suggestion. **Héritage** : si une entrée contient encore **`stepId`** (ancien brouillon dans `procedures/`), la validation enlève `pendingSuggestion` / champs liés via **`update` multi-chemin à la racine** puis supprime le nœud suggestion ; le refus appelle **`procedureRemoveStepCompletely`** + suppression suggestion.
+- **Suggestions (v4.3)** : en tête de liste par studio, cartes **orange**. Métadonnées dans **`procedureSuggestions/`** ; **même fichier Storage que les étapes** : **`orgs/{orgId}/procedures/{studio}/{suggestionId}.jpg`**. **Valider** : l’étape est créée avec **`id` = `suggestionId`** (pas de nouveau `push`) pour garder le même chemin JPEG ; **`photoUrl`** repris depuis la suggestion ; suppression du nœud **`procedureSuggestions`**. **Supprimer** : RTDB + `deleteObject` sur ce même chemin si besoin. **Héritage** : **`stepId`** → **`update`** puis suppression suggestion ; refus → **`procedureRemoveStepCompletely`** + suggestion.
 - **Moyenne des notes** : sous le bouton corbeille, trois étoiles non cliquables (demi-étoiles, gris si aucune note).
 - **Liste des étapes** : lorsque le studio affiché ne change pas **et** qu’il n’y a **pas** de suggestion en attente pour ce studio, le rendu reste **incrémental** (mise à jour des champs texte sans recréer les vignettes) pour éviter de **recharger** les images à chaque enregistrement des descriptions.
 
-**Affichage côté calendrier** (`index.html`, **v4.3**) : **uniquement** pour une **intervenante connectée** (compte ménage, auth activée) **déjà assignée** au départ. La modale **Mon intervention** comporte un second onglet **Procédure** : liste des étapes du studio, case **Fait** (temps réel via un seul `onValue` sur `stepFeedback`), étoiles 1–3 (persistantes, clic sur la note active la retire). Bouton **+** : sous-modale pour **suggérer une étape** (photo optionnelle, même compression que l’admin). **Pas** d’onglet procédure si la ménagère n’est pas assignée ; en **mode sans auth** (vue admin sur le calendrier), comportement inchangé — pas d’onglet procédure.
+**Affichage côté calendrier** (`index.html`, **v4.3+**) : **uniquement** pour une **intervenante connectée** (compte ménage, auth activée) **déjà assignée** au départ. La modale **Mon intervention** comporte un second onglet **Procédure** : liste des étapes du studio, case **Fait** (temps réel via un seul `onValue` sur `stepFeedback`), étoiles 1–3 (persistantes, clic sur la note active la retire ; pas de bloc d’aide textuel sur la signification des notes — interface allégée **v4.3.2**). Bouton **+** : sous-modale **suggérer une étape** (photo optionnelle, même compression que l’admin) avec **état « Envoi en cours… »** (champs et boutons désactivés, message d’attente, anti double-clic) et toast court **« Suggestion envoyée. »** après succès. **Pas** d’onglet procédure si la ménagère n’est pas assignée ; en **mode sans auth** (vue admin sur le calendrier), comportement inchangé — pas d’onglet procédure.
 
 ### `/procedureSuggestions` — file d’attente (v4.3)
 
@@ -129,9 +129,21 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
 | `suggestedBy` | Prénom (compte). |
 | `createdAt` | Horodatage ms. |
 
-**Storage** : **`orgs/{orgId}/procedureSuggestions/{suggestionId}.jpg`** (JPEG depuis le calendrier, même compression que l’admin).
+**Storage** : **`orgs/{orgId}/procedures/{studioIndex}/{suggestionId}.jpg`** — identique aux photos d’étapes admin (`{stepId}.jpg`), l’id de suggestion devient l’id d’étape à la validation.
 
 **Héritage** : anciennes entrées avec **`stepId`** + brouillon sous **`procedures/`** — encore gérées à la validation / au refus (voir comportement admin ci-dessus).
+
+#### Rétrospective — pourquoi la validation cassait, et comment c’est réglé (v4.3.1)
+
+À garder en tête pour toute évolution future (chemins Storage, `getBytes`, etc.) :
+
+1. **Échec principal au début** : après un **`push()`** sur **`steps`**, la nouvelle étape avait un **`stepId` différent** du **`suggestionId`**. Pour « garder » la photo, le code faisait **`getBytes`** sur le fichier de la suggestion puis **`uploadBytes`** vers **`…/procedures/{studio}/{nouveauStepId}.jpg`**. Dès que cette chaîne échouait (souvent : **CORS** ou accès Storage depuis le navigateur, règles, token, réseau), **toute** la validation tombait — y compris la création de l’étape en texte. D’où la première stabilisation : valider **sans** recopie de fichier (étape créée, photo ignorée).
+
+2. **Pourquoi des dossiers Storage à part** : tant que l’id du fichier (`suggestionId`) **n’est pas** l’id de l’étape (`stepId` issu d’un autre `push`), on ne peut pas utiliser **exactement** le même chemin que l’admin (`…/{studio}/{stepId}.jpg`) **sans** renommer ou recopier. D’où des essais avec des racines ou sous-dossiers dédiés (`procedureSuggestions/`, puis `…/suggest/`), ce qui fonctionnait mais multipliait les conventions.
+
+3. **Modèle actuel (celui qui marche avec photo)** : le calendrier upload le JPEG sous **`orgs/{orgId}/procedures/{studio}/{suggestionId}.jpg`**, **identique** à une photo d’étape admin. À la **validation**, on **ne crée pas** l’étape avec un nouveau `push()` : on écrit **`procedures/{studio}/steps/{suggestionId}`** avec **`id = suggestionId`**, on recopie **`photoUrl`** depuis la suggestion, puis on supprime **`procedureSuggestions/{suggestionId}`**. Le fichier Storage **reste au même endroit** ; pas de **`getBytes`**, pas de second upload, pas de suppression du JPG à la validation. **Refus** : suppression RTDB + **`deleteObject`** sur ce même chemin (comme pour une étape sans valider).
+
+4. **Données anciennes** : les images déjà enregistrées sous d’**anciens** chemins (ex. racines **`procedureSuggestions/`** ou **`…/suggest/`** d’essais intermédiaires) **ne sont pas migrées** par l’app ; l’URL en base peut encore pointer vers ces fichiers jusqu’à nettoyage manuel dans la console Firebase Storage si besoin.
 
 **Règles** : l’app utilise une auth « maison » (pas Firebase Auth côté client) ; les règles RTDB / Storage doivent rester cohérentes avec ce modèle (voir commentaire en tête du script dans `admin.html` et § **Sécurité v4.3.0** ci-dessous).
 
@@ -237,7 +249,7 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
 - Accès restreint au domaine de production (Google Cloud Console) quand configuré.  
 - Données sensibles : secrets uniquement côté GitHub Actions ; **`migrate.js`** en local avec la même variable `FIREBASE_SERVICE_ACCOUNT`.
 - Penser à inclure **`/orgs/{orgId}/cleaningReports`** (et sous-chemins **`stepFeedback`**, **`procedureSuggestions`**, **`procedures/.../ratings`**) dans les **règles Realtime Database** si elles ne sont pas déjà couvertes par une règle large (sinon les comptes rendus / procédure ne s’enregistrent pas).
-- **Firebase Storage** : activer le bucket et autoriser **`orgs/{orgId}/procedures/...`** et **`orgs/{orgId}/procedureSuggestions/...`** (voir commentaire dans `admin.html`).
+- **Firebase Storage** : autoriser **`orgs/{orgId}/procedures/...`** (un seul schéma : **`{studio}/{id}.jpg`** pour étape ou suggestion).
 
 #### Sécurité v4.3.0 — exemples de règles (console Firebase)
 
@@ -297,9 +309,6 @@ service firebase.storage {
     match /orgs/{orgId}/procedures/{allPaths=**} {
       allow read, write: if true;
     }
-    match /orgs/{orgId}/procedureSuggestions/{fileName} {
-      allow read, write: if true;
-    }
   }
 }
 ```
@@ -348,7 +357,7 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 4.3.0
+Version : 4.3.2
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
@@ -360,12 +369,24 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 
 ## Historique des versions
 
+### v4.3.2 — Avril 2026
+- **Calendrier (`index.html`)** : suggestion d’étape — interface d’envoi **bloquée pendant** compression / upload / RTDB (libellé **Envoi en cours…**, texte d’attente, pas de double clic, fond modal inactif) ; toast de succès court **« Suggestion envoyée. »** ; suppression du paragraphe d’aide sur la signification des **étoiles** dans l’onglet Procédure (gain de place).
+- **Admin (`admin.html`)** : après **Copier** une étape vers un autre studio, le toast rappelle explicitement que la **photo n’est pas copiée**.
+- **Nettoyage** : retrait de **`renderSettings`** et du stub **`toggleSettings`** dans `index.html` (jamais appelés ; champs `name-s1` / `name-s2` inexistants sur le calendrier).
+- **`APP_VERSION` : 4.3.2** dans `index.html` et `admin.html`.
+
+### v4.3.1 — Avril 2026
+- **Suggestions — validation fiable avec photo** : alignement Storage calendrier / admin sur **`orgs/{orgId}/procedures/{studio}/{id}.jpg`** ; à la validation, création de l’étape avec **`id` = `suggestionId`** (**`set`** sur **`steps/{suggestionId}`**, plus de **`push`** pour ce cas) pour **ne pas déplacer** le JPEG ; **`photoUrl`** repris depuis RTDB ; plus de **`getBytes`** / ré-upload à la validation (cause fréquente d’échec total auparavant).
+- **Refus suggestion** : suppression du fichier via **`procedureStoragePath(si, suggestionId)`** (même convention que les étapes).
+- **Garde-fou** : toast si une étape existe déjà sous le même id (cas anormal).
+- **Docs** : README — nouvelle sous-section **« Rétrospective — pourquoi la validation cassait »** ; `APP_VERSION` **4.3.1**.
+
 ### v4.3.0 — Avril 2026
-- **Calendrier (`index.html`)** : onglet **Procédure** dans la modale ménage (intervenante assignée, auth activée) — coches **Fait**, notes **ratings**, sous-modale **+** : écriture uniquement dans **`procedureSuggestions/`** + JPEG **`procedureSuggestions/{id}.jpg`** (pas d’étape brouillon dans **`procedures/`**)
+- **Calendrier (`index.html`)** : onglet **Procédure** dans la modale ménage (intervenante assignée, auth activée) — coches **Fait**, notes **ratings**, sous-modale **+** : métadonnées **`procedureSuggestions/`** + envoi photo suggestion (chemins Storage affinés en **v4.3.1**).
 - **Admin (`admin.html`)** : suggestions filtrées par studio (encadré orange), **Valider** / **Supprimer** (modale intégrée), moyenne des notes en demi-étoiles sous la corbeille, suppression d’étape étendue (nettoyage `stepFeedback` sur tous les rapports via `update` multi-chemin)
 - **Données** : conservation de **`stepFeedback`** lors des changements d’assignation (`syncCleaningReportAfterAssignmentChange`, comme les heures)
-- **Docs** : README (schéma, sécurité v4.3.0, comportement index/admin) ; commentaire règles en tête de `admin.html` ; `APP_VERSION` **4.3.0** dans `index.html` et `admin.html`
-- **Scripts non modifiés** : `sync-ical.js`, `notify-departs.js`, `migrate.js` — aucune référence contradictoire aux nouveaux chemins (vérification à la livraison)
+- **Docs** : README (schéma, sécurité v4.3.0, comportement index/admin) ; commentaire règles en tête de `admin.html` ; `APP_VERSION` **4.3.0** à la sortie de cette release
+- **Scripts non modifiés** : `sync-ical.js`, `notify-departs.js`, `migrate.js` — aucune référence aux suggestions
 
 ### v4.2.1 — Avril 2026
 - **Admin — Procédures** : nouvelle étape **en tête** ; flèches **▲▼** ; zone photo unifiée ; **Copier** les **textes seulement** (pas de photo, phrase dans la modale) ; après copie, le menu **Studio** reste sur le studio en cours ; **rendu incrémental** de la liste pour ne pas recharger les images quand seules les descriptions changent ; suppression d’étape + fichier Storage `…/{studio}/{stepId}.jpg` ; modales intégrées **remplacer photo** / **supprimer** / **copier** ; code nettoyé (plus de logique copie / partage de photo ni `getBytes` pour les procédures)

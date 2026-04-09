@@ -342,7 +342,7 @@ body.admin-nav-ready .admin-burger{display:flex}
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, set, onValue, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, getBytes } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 /*
  * ⚠️ RÈGLES FIREBASE — à configurer dans la console Firebase
@@ -359,12 +359,11 @@ import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, get
  *   - procedures/{studio}/steps/{stepId}/ratings/{Prénom} (notes 1–3 persistantes)
  * Storage :
  *   match /orgs/{orgId}/procedures/{allPaths=**} { allow read, write: if true; }
- *   match /orgs/{orgId}/procedureSuggestions/{fileName} { allow read, write: if true; }
+ *   JPEG étapes et suggestions : orgs/{orgId}/procedures/{studio}/{id}.jpg (même chemin).
+ *   À la validation, l’étape est créée avec id = suggestionId pour réutiliser le fichier déjà uploadé.
  * — restreindre par domaine dans Google Cloud Console si possible.
- * Photos procédures : orgs/{orgId}/procedures/{studio}/{stepId}.jpg
- * Photos suggestions (file d’attente) : orgs/{orgId}/procedureSuggestions/{suggestionId}.jpg
  *
- * Snippets à coller (si règles fines par enfant) — voir README § Sécurité v4.3.0 pour l’exemple JSON complet.
+ * Snippets à coller (si règles fines par enfant) — voir README § Sécurité v4.3.0 ; suggestions / Storage : § procedureSuggestions + rétrospective v4.3.1.
  *
  * Sécurisation future : Firebase Auth ou App Check pour des règles strictes.
  */
@@ -393,7 +392,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.3.0';
+const APP_VERSION = '4.3.2';
 
 /** Studio sélectionné dans la section Procédures (persiste entre re-rendus). */
 let procSelectedStudioIdx = '0';
@@ -918,10 +917,6 @@ function procedureStoragePath(studioIdx, stepId){
   return `orgs/${orgId}/procedures/${studioIdx}/${stepId}.jpg`;
 }
 
-function procedureSuggestionStoragePath(suggestionId){
-  return `orgs/${orgId}/procedureSuggestions/${suggestionId}.jpg`;
-}
-
 function averageRatingFromRatings(ratings){
   if(!ratings||typeof ratings!=='object') return null;
   const vals=[];
@@ -1299,26 +1294,19 @@ window.procedureValidateSuggestion=async function(suggestionId){
       setSyncStatus('ok');
       return;
     }
+    if(A.procedures[si]?.steps?.[suggestionId]||A.procedures[Number(si)]?.steps?.[suggestionId]){
+      showToast('Conflit : une étape porte déjà cet identifiant');
+      return;
+    }
     const arr=getStepsSorted(si);
     const newOrder=arr.length
       ? Math.min(...arr.map(x=>Number(x.order)||0))-1
       : 0;
-    const newRef=push(ref(db,ob(`procedures/${si}/steps`)));
-    const stepId=newRef.key;
-    await set(newRef,{ id:stepId, order:newOrder, shortDesc:s.shortDesc||'', longDesc:s.longDesc||'', photoUrl:'' });
-    if(String(s.photoUrl||'').trim()){
-      try{
-        const sugRef=sRef(storage,procedureSuggestionStoragePath(suggestionId));
-        const bytes=await getBytes(sugRef);
-        const destRef=sRef(storage,procedureStoragePath(si,stepId));
-        await uploadBytes(destRef,bytes,{contentType:'image/jpeg'});
-        const dl=await getDownloadURL(destRef);
-        await set(ref(db,ob(`procedures/${si}/steps/${stepId}/photoUrl`)),dl);
-        await deleteObject(sugRef).catch(()=>{});
-      }catch(_){/* fichier absent ou erreur : étape sans photo, pas de toast bloquant */}
-    }
+    const stepId=suggestionId;
+    const stepRef=ref(db,ob(`procedures/${si}/steps/${stepId}`));
+    const photoUrl=String(s.photoUrl||'').trim();
+    await set(stepRef,{ id:stepId, order:newOrder, shortDesc:s.shortDesc||'', longDesc:s.longDesc||'', photoUrl });
     await remove(ref(db,ob(`procedureSuggestions/${suggestionId}`)));
-    await deleteObject(sRef(storage,procedureSuggestionStoragePath(suggestionId))).catch(()=>{});
     pushActivity({ type:'admin', text:`Suggestion validée — nouvelle étape studio ${si}` });
     showToast('Suggestion intégrée ✓');
     setSyncStatus('ok');
@@ -1345,7 +1333,7 @@ window.procedureRejectSuggestionOpen=async function(suggestionId){
       await remove(ref(db,ob(`procedureSuggestions/${suggestionId}`)));
     }else{
       await remove(ref(db,ob(`procedureSuggestions/${suggestionId}`)));
-      await deleteObject(sRef(storage,procedureSuggestionStoragePath(suggestionId))).catch(()=>{});
+      await deleteObject(sRef(storage,procedureStoragePath(si,suggestionId))).catch(()=>{});
     }
     showToast('Suggestion supprimée ✓');
     setSyncStatus('ok');
@@ -1465,7 +1453,7 @@ window.procedureCopyStepRun=async function(fromSi,stepId,toSi){
     if(!A.procedures[toKey].steps) A.procedures[toKey].steps={};
     A.procedures[toKey].steps[newId]={ ...payload };
     const nm=(A.studioNames||[])[Number(toSi)]||('Studio '+(Number(toSi)+1));
-    showToast('Étape copiée vers '+nm+' ✓');
+    showToast('Étape copiée vers '+nm+' ✓ (textes uniquement, photo non copiée)');
   }catch(err){
     console.error('procedureCopyStepRun',err);
     const msg=(err&&err.message)||'';
