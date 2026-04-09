@@ -116,6 +116,39 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 .modal-header-row h3{margin:0;flex:1;font-size:16px;font-weight:600;line-height:1.35;padding-right:4px}
 .modal-close-x{flex-shrink:0;width:36px;height:36px;border:none;background:transparent;border-radius:10px;font-size:26px;line-height:1;color:#888;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;margin:-6px -8px 0 0}
 .modal-close-x:hover{background:#f0f0eb;color:#333}
+.menage-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:2px}
+.menage-tab{background:#f0f0eb;border:1px solid #e0e0d8;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;color:#666;cursor:pointer;flex:1;min-width:0;text-align:center}
+.menage-tab:hover{background:#e8e8e2;color:#333}
+.menage-tab--active{background:#fff;border-color:#378ADD;color:#185FA5;box-shadow:0 0 0 1px #378ADD22}
+.menage-procedure-panel{margin-top:0.25rem}
+.menage-procedure-top{display:flex;align-items:center;justify-content:flex-end;margin-bottom:8px}
+.menage-procedure-plus{width:36px;height:36px;border-radius:10px;border:1px solid #ddd;background:#fff;font-size:20px;line-height:1;cursor:pointer;color:#333;display:flex;align-items:center;justify-content:center;padding:0}
+.menage-procedure-plus:hover{background:#f5f5f0;border-color:#bbb}
+.menage-procedure-scroll{max-height:min(52vh,420px);overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px;padding-right:2px}
+.menage-proc-step{border:1px solid #e8e8e2;border-radius:10px;padding:10px;background:#fafaf8;display:flex;gap:10px;align-items:flex-start}
+.menage-proc-step--done{border-color:#1D9E75;box-shadow:0 0 0 1px #1D9E7544;background:#f4fbf7}
+.menage-proc-photo{width:72px;height:72px;flex-shrink:0;border-radius:8px;overflow:hidden;background:#e8e8e2}
+.menage-proc-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.menage-proc-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.menage-proc-short{font-size:13px;font-weight:600;color:#1a1a1a;line-height:1.35}
+.menage-proc-long{font-size:12px;color:#666;line-height:1.45;font-style:italic}
+.menage-proc-done-row{display:flex;align-items:center;gap:8px;font-size:12px;color:#555;flex-wrap:wrap}
+.menage-proc-done-row input[type=checkbox]{width:18px;height:18px;accent-color:#1D9E75;cursor:pointer;flex-shrink:0}
+.menage-proc-stars{display:flex;align-items:center;gap:3px;margin-top:4px}
+.menage-proc-star-btn{background:none;border:none;padding:0 2px;font-size:18px;line-height:1;cursor:pointer;color:#ddd;-webkit-tap-highlight-color:transparent}
+.menage-proc-star-btn--on{color:#F59E0B}
+.menage-proc-legend-stars{font-size:11px;color:#999;line-height:1.45;margin:6px 0 10px}
+.menage-suggest-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:350;display:flex;align-items:center;justify-content:center;padding:1rem}
+.menage-suggest-modal{background:#fff;border-radius:14px;padding:1.1rem;width:100%;max-width:340px;box-shadow:0 12px 40px rgba(0,0,0,.15);max-height:88vh;overflow-y:auto}
+.menage-suggest-modal h4{margin:0 0 10px;font-size:15px;font-weight:600}
+.menage-suggest-photo-box{width:100%;min-height:100px;border-radius:10px;border:1px solid #e0e0d8;background:#e8e8e2;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px;-webkit-tap-highlight-color:transparent}
+.menage-suggest-photo-box:hover{background:#deded8}
+.menage-suggest-photo-box:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
+.menage-suggest-photo-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:100%;min-height:76px}
+.menage-suggest-photo-icon{font-size:28px;line-height:1;opacity:.55}
+.menage-suggest-photo-label{font-size:11px;color:#888;font-weight:500}
+.menage-suggest-photo-hint{font-size:10px;color:#aaa;text-align:center;line-height:1.35;max-width:260px}
+.menage-suggest-photo-thumb{width:100%;max-height:160px;object-fit:cover;display:block;border-radius:8px}
 .modal-btns--split{justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
 .modal-btns--split .btn-primary{flex-shrink:0}
 .modal-btns--split .btn-danger{flex-shrink:0}
@@ -285,7 +318,8 @@ html[data-menage-org-gate="1"] #main-app{display:none!important}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue, push, get, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, onValue, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
@@ -299,6 +333,33 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const storage = getStorage(app);
+
+/*
+ * Snippets règles Firebase (console) — alignés sur admin.html ; voir aussi README § Sécurité v4.3.0.
+ *
+ * Realtime Database (exemple si règle large par org) :
+ *   "procedureSuggestions": { ".read": true, ".write": true },
+ *   "cleaningReports": {
+ *     "$uid": {
+ *       "stepFeedback": { "$stepId": { "checked": { ".read": true, ".write": true } } }
+ *     }
+ *   },
+ *   "procedures": {
+ *     "$studio": {
+ *       "steps": {
+ *         "$stepId": {
+ *           "ratings": { "$name": { ".read": true, ".write": true } }
+ *         }
+ *       }
+ *     }
+ *   }
+ * (Souvent déjà couvert par une règle .read/.write sur orgs/{orgId}/**.)
+ *
+ * Storage :
+ *   match /orgs/{orgId}/procedureSuggestions/{fileName} { allow read, write: if true; }
+ */
+
 /** Garde-fou taille Firebase : au-delà, les entrées les plus anciennes sont supprimées (même valeur que admin.html). */
 const MAX_ACTIVITY_LOG_ENTRIES = 450;
 const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A6E','#c0392b'];
@@ -310,7 +371,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.2.1';
+const APP_VERSION = '4.3.0';
 
 function getStoredOrgId(){
   try{
@@ -336,8 +397,64 @@ let S = {
   filterCleaner: null,
   filterType: 'dep',
   currentUser: null,  // { name, menage, admin }
-  cleaningReports: {}
+  cleaningReports: {},
+  procedures: {}
 };
+
+/** Feedback coches procédure pour la modale ménage (mis à jour par onValue sur stepFeedback). */
+let menageStepFeedbackLive = {};
+const menageModalUnsubs = [];
+function registerMenageModalUnsub(unsub){
+  if(typeof unsub==='function') menageModalUnsubs.push(unsub);
+}
+function clearMenageModalUnsubs(){
+  while(menageModalUnsubs.length){
+    const u=menageModalUnsubs.pop();
+    try{ u(); }catch(_){}
+  }
+}
+/** Contexte modale ménage onglet Procédure : { key, r, userName } ou null. */
+window._menageModalCtx = null;
+/** Aperçu suggestion : URL objet à révoquer à la fermeture. */
+let menageSuggestPreviewUrl = null;
+
+const PROC_IMG_MAX_W = 640;
+const PROC_JPEG_QUALITY = 0.48;
+
+function compressImageToJpegBlob(file){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let w=img.naturalWidth,h=img.naturalHeight;
+      if(w>PROC_IMG_MAX_W){ h=(h*PROC_IMG_MAX_W)/w; w=PROC_IMG_MAX_W; }
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.round(w);
+      canvas.height=Math.round(h);
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      canvas.toBlob(b=>{
+        if(b) resolve(b);
+        else reject(new Error('blob'));
+      },'image/jpeg',PROC_JPEG_QUALITY);
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); reject(new Error('image')); };
+    img.src=url;
+  });
+}
+
+function getProcedureStepsSorted(studioIdx){
+  const si=String(studioIdx);
+  const raw=S.procedures[si]?.steps ?? S.procedures[studioIdx]?.steps ?? {};
+  return Object.entries(raw).map(([id,v])=>({
+    id,
+    order:Number(v?.order)||0,
+    shortDesc:v?.shortDesc??'',
+    longDesc:v?.longDesc??'',
+    photoUrl:v?.photoUrl??''
+  })).sort((a,b)=>a.order-b.order);
+}
 
 let fbReady = false;
 const loaded = { config: false, assignments: false, reservations: false, adminConfig: false };
@@ -748,6 +865,11 @@ function initFirebaseAndApp(){
     if(fbReady&&S.currentUser) render();
   });
 
+  onValue(ref(db,ob('procedures')), snap=>{
+    S.procedures=snap.val()||{};
+    if(typeof window._renderMenageProcedureList==='function') window._renderMenageProcedureList();
+  });
+
   onValue(ref(db,ob('adminConfig')), snap=>{
     const d=snap.val();
     if(d){
@@ -859,6 +981,7 @@ function syncCleaningReportAfterAssignmentChange(key,prevC1,prevC2,nextC1,nextC2
         comment:rep&&rep.comment!=null?rep.comment:'',
         order:rep&&rep.order!=null?rep.order:''
       };
+      if(rep&&rep.stepFeedback!=null&&typeof rep.stepFeedback==='object') out.stepFeedback=rep.stepFeedback;
       if(Object.keys(hoursIn).length) out.hours=hoursIn;
       await set(ref(db,path),out);
       setSyncStatus('ok');
@@ -1090,6 +1213,209 @@ function render(){
 
 function findResa(key){ return S.reservations.find(r=>getKey(r)===key)||null; }
 
+function getUserProcedureRating(si, stepId, userName){
+  const sik=String(si);
+  const steps=S.procedures[sik]?.steps ?? S.procedures[si]?.steps;
+  const rv=steps?.[stepId]?.ratings?.[userName];
+  const n=Number(rv);
+  return n>=1&&n<=3?n:0;
+}
+
+/** Index → id d’étape pendant l’affichage de l’onglet Procédure (onclick fiable). */
+window._menageProcedureStepIdsForModal = null;
+
+window._renderMenageProcedureList=function(){
+  const ctx=window._menageModalCtx;
+  const host=document.getElementById('menage-procedure-list');
+  if(!ctx||!host) return;
+  const si=String(ctx.r.studio??0);
+  const steps=getProcedureStepsSorted(si);
+  window._menageProcedureStepIdsForModal=steps.map(s=>s.id);
+  if(!steps.length){
+    host.innerHTML='<p style="font-size:12px;color:#aaa;margin:0">Aucune étape définie pour ce studio.</p>';
+    return;
+  }
+  const uname=ctx.userName;
+  host.innerHTML=steps.map((st,idx)=>{
+    const done=!!(menageStepFeedbackLive[st.id]&&menageStepFeedbackLive[st.id].checked===true);
+    const photo=st.photoUrl&&String(st.photoUrl).trim()
+      ? `<div class="menage-proc-photo"><img src="${escHtml(String(st.photoUrl).trim())}" alt=""></div>`
+      : '';
+    const cur=getUserProcedureRating(si,st.id,uname);
+    const stars=[1,2,3].map(n=>{
+      const on=cur>=n;
+      return `<button type="button" class="menage-proc-star-btn${on?' menage-proc-star-btn--on':''}" onclick="window._menageProcStarIdx(${idx},${n})" title="${n===1?'Pas pertinente':n===2?'Pertinente':'Obligatoire'}" aria-label="${n} sur 3">${on?'★':'☆'}</button>`;
+    }).join('');
+    const idCh=`mp-ch-${idx}`;
+    return `<div class="menage-proc-step${done?' menage-proc-step--done':''}">
+      ${photo}
+      <div class="menage-proc-body">
+        <div class="menage-proc-short">${escHtml(st.shortDesc||'Étape')}</div>
+        ${st.longDesc?`<div class="menage-proc-long">${escHtml(st.longDesc)}</div>`:''}
+        <div class="menage-proc-done-row">
+          <input type="checkbox" id="${idCh}"${done?' checked':''} onchange="window._menageProcCheckIdx(${idx},this.checked)">
+          <label for="${idCh}">Fait</label>
+        </div>
+        <div class="menage-proc-stars">${stars}</div>
+      </div>
+    </div>`;
+  }).join('');
+};
+
+window._menageTab=function(which){
+  const pi=document.getElementById('menage-panel-i');
+  const pp=document.getElementById('menage-panel-p');
+  const bi=document.getElementById('menage-tab-btn-i');
+  const bp=document.getElementById('menage-tab-btn-p');
+  if(!pi||!pp||!bi||!bp) return;
+  const isI=which==='i';
+  pi.style.display=isI?'':'none';
+  pp.style.display=isI?'none':'';
+  bi.classList.toggle('menage-tab--active',isI);
+  bp.classList.toggle('menage-tab--active',!isI);
+  bi.setAttribute('aria-selected',isI?'true':'false');
+  bp.setAttribute('aria-selected',isI?'false':'true');
+  if(!isI) window._renderMenageProcedureList();
+};
+
+window._menageProcCheckIdx=function(idx,checked){
+  const stepId=window._menageProcedureStepIdsForModal?.[idx];
+  const ctx=window._menageModalCtx;
+  const oid=getStoredOrgId();
+  if(!stepId||!ctx||!oid) return;
+  set(ref(db,`orgs/${oid}/cleaningReports/${ctx.key}/stepFeedback/${stepId}/checked`),!!checked)
+    .then(()=>setSyncStatus('ok'))
+    .catch(()=>setSyncStatus('err'));
+};
+
+window._menageProcStarIdx=function(idx,val){
+  const stepId=window._menageProcedureStepIdsForModal?.[idx];
+  const ctx=window._menageModalCtx;
+  const oid=getStoredOrgId();
+  if(!stepId||!ctx||!oid||!ctx.userName) return;
+  const si=String(ctx.r.studio??0);
+  const path=`orgs/${oid}/procedures/${si}/steps/${stepId}/ratings/${ctx.userName}`;
+  const cur=getUserProcedureRating(si,stepId,ctx.userName);
+  const rRef=ref(db,path);
+  if(cur===val) remove(rRef).then(()=>setSyncStatus('ok')).catch(()=>setSyncStatus('err'));
+  else set(rRef,val).then(()=>setSyncStatus('ok')).catch(()=>setSyncStatus('err'));
+};
+
+function menageSuggestRevokePreview(){
+  if(menageSuggestPreviewUrl){
+    try{ URL.revokeObjectURL(menageSuggestPreviewUrl); }catch(_){}
+    menageSuggestPreviewUrl=null;
+  }
+}
+
+window._menageSuggestPickPhoto=function(){
+  document.getElementById('ms-photo')?.click();
+};
+
+window._menageSuggestPhotoChange=function(inp){
+  const inner=document.getElementById('menage-suggest-photo-inner');
+  if(!inner) return;
+  menageSuggestRevokePreview();
+  const f=inp.files&&inp.files[0];
+  if(!f||!f.type.startsWith('image/')){
+    if(inp) inp.value='';
+    inner.innerHTML='<span class="menage-suggest-photo-icon" aria-hidden="true">📷</span><span class="menage-suggest-photo-label">Photo</span><span class="menage-suggest-photo-hint">Toucher pour ouvrir la caméra ou la galerie</span>';
+    return;
+  }
+  menageSuggestPreviewUrl=URL.createObjectURL(f);
+  inner.innerHTML='';
+  const img=document.createElement('img');
+  img.className='menage-suggest-photo-thumb';
+  img.alt='Aperçu';
+  img.src=menageSuggestPreviewUrl;
+  inner.appendChild(img);
+};
+
+window._openMenageSuggest=function(){
+  if(!window._menageModalCtx) return;
+  if(document.getElementById('menage-suggest-root')) return;
+  const root=document.createElement('div');
+  root.id='menage-suggest-root';
+  root.className='menage-suggest-overlay';
+  root.setAttribute('role','dialog');
+  root.setAttribute('aria-modal','true');
+  root.setAttribute('aria-label','Suggérer une étape');
+  root.innerHTML=`<div class="menage-suggest-modal" role="document" onclick="event.stopPropagation()">
+    <div class="modal-header-row" style="margin-bottom:10px">
+      <h4 style="margin:0;font-size:15px;font-weight:600">Suggérer une étape</h4>
+      <button type="button" class="modal-close-x" onclick="window._closeMenageSuggest()" aria-label="Fermer">×</button>
+    </div>
+    <div class="modal-field">
+      <label style="font-size:12px;color:#888;display:block;margin-bottom:4px;font-weight:500">Photo (optionnelle)</label>
+      <input type="file" id="ms-photo" accept="image/*" capture="environment" style="display:none" tabindex="-1" aria-hidden="true" onchange="window._menageSuggestPhotoChange(this)">
+      <button type="button" class="menage-suggest-photo-box" onclick="window._menageSuggestPickPhoto()" title="Ajouter une photo" aria-label="Ajouter une photo — appareil photo ou galerie">
+        <span class="menage-suggest-photo-inner" id="menage-suggest-photo-inner">
+          <span class="menage-suggest-photo-icon" aria-hidden="true">📷</span>
+          <span class="menage-suggest-photo-label">Photo</span>
+          <span class="menage-suggest-photo-hint">Toucher pour ouvrir la caméra ou la galerie</span>
+        </span>
+      </button>
+    </div>
+    <div class="modal-field">
+      <label for="ms-short">Description courte <span style="color:#E24B4A">*</span></label>
+      <input type="text" id="ms-short" placeholder="Ex. : nettoyer le four">
+    </div>
+    <div class="modal-field">
+      <label for="ms-long">Description longue (optionnelle)</label>
+      <textarea id="ms-long" rows="3" placeholder="Détails…"></textarea>
+    </div>
+    <div class="modal-btns" style="margin-top:14px">
+      <button type="button" class="btn-cancel" onclick="window._closeMenageSuggest()">Annuler</button>
+      <button type="button" class="btn-primary" onclick="window._submitMenageSuggest()">Valider</button>
+    </div>
+  </div>`;
+  root.addEventListener('click',e=>{ if(e.target===root) window._closeMenageSuggest(); });
+  document.body.appendChild(root);
+};
+
+window._closeMenageSuggest=function(){
+  menageSuggestRevokePreview();
+  document.getElementById('menage-suggest-root')?.remove();
+};
+
+window._submitMenageSuggest=async function(){
+  const ctx=window._menageModalCtx;
+  const oid=getStoredOrgId();
+  if(!ctx||!oid||!ctx.userName){ window._closeMenageSuggest(); return; }
+  const shortEl=document.getElementById('ms-short');
+  const longEl=document.getElementById('ms-long');
+  const fileInp=document.getElementById('ms-photo');
+  const shortDesc=(shortEl?.value??'').trim();
+  if(!shortDesc){ showToast('Description courte requise'); return; }
+  const longDesc=String(longEl?.value??'').trim();
+  try{
+    const newRef=push(ref(db,`orgs/${oid}/procedureSuggestions`));
+    const suggestionId=newRef.key;
+    let photoUrl='';
+    const file=fileInp?.files?.[0];
+    if(file&&file.type.startsWith('image/')){
+      const blob=await compressImageToJpegBlob(file);
+      const spath=`orgs/${oid}/procedureSuggestions/${suggestionId}.jpg`;
+      await uploadBytes(sRef(storage,spath),blob,{contentType:'image/jpeg'});
+      photoUrl=await getDownloadURL(sRef(storage,spath));
+    }
+    await set(newRef,{
+      studioIndex:Number(ctx.r.studio)===1?1:0,
+      shortDesc,
+      longDesc:longDesc||'',
+      photoUrl,
+      suggestedBy:ctx.userName,
+      createdAt:Date.now()
+    });
+    setSyncStatus('ok');
+    showToast('Votre suggestion a bien été prise en compte, elle est en cours de validation.');
+    window._closeMenageSuggest();
+  }catch(_){
+    setSyncStatus('err');
+    showToast('Erreur envoi suggestion');
+  }
+};
+
 window._oa = function(key){
   const r=findResa(key); if(!r) return;
   const {c1,c2,note}=getAssignment(r);
@@ -1104,49 +1430,85 @@ window._oa = function(key){
     const vk=JSON.stringify(key);
     const v=cleaningReportViewFor(key,c1,c2,user.name);
     const hadDur=v.hoursH!==''||v.hoursM!=='';
-    document.getElementById('modal-container').innerHTML=`
+    if(alreadyAssigned){
+      menageStepFeedbackLive={};
+      clearMenageModalUnsubs();
+      window._menageModalCtx={ key, r, userName:user.name };
+      document.getElementById('modal-container').innerHTML=`
       <div class="modal-overlay" onclick="if(event.target===this)window._cm()">
         <div class="modal modal--wide">
-          ${alreadyAssigned
-            ? `<div class="modal-header-row">
-                 <h3>Mon intervention</h3>
-                 <button type="button" class="modal-close-x" onclick="window._cm()" aria-label="Fermer" title="Fermer">×</button>
-               </div>`
-            : `<h3>M'assigner</h3>`}
+          <div class="modal-header-row">
+            <div style="flex:1;min-width:0">
+              <div class="menage-tabs" role="tablist">
+                <button type="button" class="menage-tab menage-tab--active" id="menage-tab-btn-i" role="tab" aria-selected="true" onclick="window._menageTab('i')">Mon intervention</button>
+                <button type="button" class="menage-tab" id="menage-tab-btn-p" role="tab" aria-selected="false" onclick="window._menageTab('p')">Procédure</button>
+              </div>
+            </div>
+            <button type="button" class="modal-close-x" onclick="window._cm()" aria-label="Fermer" title="Fermer">×</button>
+          </div>
           <div class="modal-meta">
             <strong>${escHtml(S.studioNames[r.studio])}</strong><br>
             Arrivée : ${fmt(r.start)}<br>
             Départ : ${fmt(r.end)} (${n} nuit${n>1?'s':''})</div>
-          ${alreadyAssigned
-            ? `<p class="modal-shared-hint" style="margin-top:0.75rem">Vous êtes assignée à ce départ.</p>
-               <div class="modal-section-title">Ma durée de travail <span style="font-weight:400;color:#bbb">(personnel)</span></div>
-               <p class="modal-shared-hint">Seule vous voyez et modifiez vos heures. Laissez vide si vous ne souhaitez rien indiquer${hadDur?' ; videz les deux champs pour effacer une durée déjà enregistrée':''}.</p>
-               <div class="modal-field modal-duration-row">
-                 <label for="cb-hours-h">Heures</label>
-                 <input type="number" id="cb-hours-h" inputmode="numeric" min="0" step="1" placeholder="0" value="${escHtml(v.hoursH)}">
-                 <label for="cb-hours-m">Minutes</label>
-                 <input type="number" id="cb-hours-m" inputmode="numeric" min="0" max="59" step="1" placeholder="0" value="${escHtml(v.hoursM)}">
-               </div>
-               <div class="modal-section-title">Infos communes <span style="font-weight:400;color:#bbb">(partagées)</span></div>
-               <p class="modal-shared-hint">Visibles et modifiables par toutes les intervenantes sur ce départ. Dernière enregistrement l’emporte.</p>
-               <div class="modal-field">
-                 <label for="cb-order">Commande produits / matériel</label>
-                 <textarea id="cb-order" rows="2" placeholder="Ex. : sopalin, bonbons, café…">${escTextarea(v.order)}</textarea>
-               </div>
-               <div class="modal-field">
-                 <label for="cb-comment">Commentaire</label>
-                 <textarea id="cb-comment" rows="2" placeholder="Ex. : état du logement après départ">${escTextarea(v.comment)}</textarea>
-               </div>
-               <div class="modal-btns modal-btns--split">
-                 <button type="button" class="btn-primary" onclick='window._saveCleaningFeedback(${vk})'>Enregistrer</button>
-                 <button type="button" class="btn-danger" onclick='window._removeSelf(${vk})'>✕ Me retirer</button>
-               </div>`
-            : `<p style="font-size:13px;color:#555;margin-bottom:1rem">Cliquez sur + pour vous assigner à ce départ.</p>
-               <div class="modal-btns">
-                 <button class="btn-cancel" onclick="window._cm()">Annuler</button>
-                 <button type="button" class="btn-primary" onclick='window._assignSelf(${vk})'>+ M'assigner</button>
-               </div>`
-          }
+          <div id="menage-panel-i">
+            <p class="modal-shared-hint" style="margin-top:0.75rem">Vous êtes assignée à ce départ.</p>
+            <div class="modal-section-title">Ma durée de travail <span style="font-weight:400;color:#bbb">(personnel)</span></div>
+            <p class="modal-shared-hint">Seule vous voyez et modifiez vos heures. Laissez vide si vous ne souhaitez rien indiquer${hadDur?' ; videz les deux champs pour effacer une durée déjà enregistrée':''}.</p>
+            <div class="modal-field modal-duration-row">
+              <label for="cb-hours-h">Heures</label>
+              <input type="number" id="cb-hours-h" inputmode="numeric" min="0" step="1" placeholder="0" value="${escHtml(v.hoursH)}">
+              <label for="cb-hours-m">Minutes</label>
+              <input type="number" id="cb-hours-m" inputmode="numeric" min="0" max="59" step="1" placeholder="0" value="${escHtml(v.hoursM)}">
+            </div>
+            <div class="modal-section-title">Infos communes <span style="font-weight:400;color:#bbb">(partagées)</span></div>
+            <p class="modal-shared-hint">Visibles et modifiables par toutes les intervenantes sur ce départ. Dernière enregistrement l’emporte.</p>
+            <div class="modal-field">
+              <label for="cb-order">Commande produits / matériel</label>
+              <textarea id="cb-order" rows="2" placeholder="Ex. : sopalin, bonbons, café…">${escTextarea(v.order)}</textarea>
+            </div>
+            <div class="modal-field">
+              <label for="cb-comment">Commentaire</label>
+              <textarea id="cb-comment" rows="2" placeholder="Ex. : état du logement après départ">${escTextarea(v.comment)}</textarea>
+            </div>
+            <div class="modal-btns modal-btns--split">
+              <button type="button" class="btn-primary" onclick='window._saveCleaningFeedback(${vk})'>Enregistrer</button>
+              <button type="button" class="btn-danger" onclick='window._removeSelf(${vk})'>✕ Me retirer</button>
+            </div>
+          </div>
+          <div id="menage-panel-p" class="menage-procedure-panel" style="display:none">
+            <p class="modal-shared-hint" style="margin-top:0.75rem;margin-bottom:0">Étapes pour ce studio — coches partagées avec l’autre intervenante sur ce départ.</p>
+            <p class="modal-shared-hint menage-proc-legend-stars">Vous pouvez noter la pertinence des étapes avec des étoiles : ⭐ pas pertinente · ⭐⭐ pertinente · ⭐⭐⭐ obligatoire.</p>
+            <div class="menage-procedure-top">
+              <button type="button" class="menage-procedure-plus" onclick="window._openMenageSuggest()" title="Suggérer une étape" aria-label="Suggérer une étape">+</button>
+            </div>
+            <div class="menage-procedure-scroll" id="menage-procedure-list"></div>
+          </div>
+        </div>
+      </div>`;
+      const oid=getStoredOrgId();
+      if(oid){
+        const unsubFb=onValue(ref(db,`orgs/${oid}/cleaningReports/${key}/stepFeedback`),snap=>{
+          menageStepFeedbackLive=snap.val()||{};
+          window._renderMenageProcedureList();
+        });
+        registerMenageModalUnsub(unsubFb);
+      }
+      window._renderMenageProcedureList();
+      return;
+    }
+    document.getElementById('modal-container').innerHTML=`
+      <div class="modal-overlay" onclick="if(event.target===this)window._cm()">
+        <div class="modal modal--wide">
+          <h3>M'assigner</h3>
+          <div class="modal-meta">
+            <strong>${escHtml(S.studioNames[r.studio])}</strong><br>
+            Arrivée : ${fmt(r.start)}<br>
+            Départ : ${fmt(r.end)} (${n} nuit${n>1?'s':''})</div>
+          <p style="font-size:13px;color:#555;margin-bottom:1rem">Cliquez sur + pour vous assigner à ce départ.</p>
+          <div class="modal-btns">
+            <button class="btn-cancel" onclick="window._cm()">Annuler</button>
+            <button type="button" class="btn-primary" onclick='window._assignSelf(${vk})'>+ M'assigner</button>
+          </div>
         </div>
       </div>`;
     return;
@@ -1270,7 +1632,14 @@ window._sa = function(key){
   window._cm(); render();
 };
 
-window._cm=()=>document.getElementById('modal-container').innerHTML='';
+window._cm=function(){
+  clearMenageModalUnsubs();
+  window._menageModalCtx=null;
+  window._menageProcedureStepIdsForModal=null;
+  menageSuggestRevokePreview();
+  document.getElementById('menage-suggest-root')?.remove();
+  document.getElementById('modal-container').innerHTML='';
+};
 window._sf=n=>{ S.filterCleaner=n; render(); };
 window._toggleType=t=>{
   if(S.filterType==='all') S.filterType=t==='arr'?'dep':'arr';

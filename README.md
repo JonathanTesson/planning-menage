@@ -1,8 +1,8 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 4.2.1** — Avril 2026
+**Version : 4.3.0** — Avril 2026
 
-Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi et **procédures & préparation studio** (étapes par studio avec photos légères, côté admin).
+Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin.
 
 ---
 
@@ -59,8 +59,9 @@ Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. Ancienne rac
     /adminConfig     → comptes, auth, defaultOrgId, telegramEnabled, …
     /lastSync        → dernière sync iCal
     /activityLog     → journal d’activité
-    /cleaningReports → comptes rendus par uid réservation (détail § v4.1 ci-dessous)
-    /procedures      → procédures ménage par studio (détail § v4.2 ci-dessous)
+    /cleaningReports → comptes rendus par uid réservation (détail § v4.1 + v4.3 ci-dessous)
+    /procedures      → procédures ménage par studio (détail § v4.2 + v4.3 ci-dessous)
+    /procedureSuggestions → suggestions d’étapes en attente de validation (v4.3)
   /nade
     (même structure ; remplie selon sync iCal et utilisation)
 ```
@@ -85,18 +86,20 @@ Sous **`/orgs/{orgId}/cleaningReports/{uidRéservation}`** (même `uid` que dans
 | `order` | Texte **commun** (commande produits / matériel), mêmes règles. |
 | `assignSig` | Empreinte JSON de la paire `[intervenante1, intervenante2]` pour invalider les données si l’assignation ne correspond plus. |
 | `hours/{Prénom}` | `{ h, m }` — **durée personnelle** ; seule la personne concernée voit et modifie ses heures dans l’app. |
+| `stepFeedback/{stepId}/checked` | **v4.3** — booléen ; coches **« Fait »** sur la procédure pour ce départ, **partagées** entre les deux intervenantes assignées (temps réel). Conservé lors des changements d’assignation (comme les heures restent filtrées par prénom). |
 
-**Comportement** : si une **deuxième** intervenante est ajoutée sur le même départ, les champs communs et les heures des personnes **toujours** assignées sont **conservés** ; seules les heures des personnes **retirées** du départ sont supprimées. Si la réservation disparaît (sync iCal), l’entrée correspondante est purgée côté client. Les **règles Realtime Database** doivent autoriser la lecture/écriture sur ce chemin (comme pour `assignments` / `reservations` selon votre config).
+**Comportement** : si une **deuxième** intervenante est ajoutée sur le même départ, les champs communs, les **stepFeedback** et les heures des personnes **toujours** assignées sont **conservés** ; seules les heures des personnes **retirées** du départ sont supprimées. Si la réservation disparaît (sync iCal), l’entrée correspondante est purgée côté client (**stepFeedback** inclus). Les **règles Realtime Database** doivent autoriser la lecture/écriture sur ce chemin (comme pour `assignments` / `reservations` selon votre config).
 
-### `/procedures` — préparation studio (v4.2, admin uniquement)
+### `/procedures` — préparation studio (v4.2, édition admin ; consultation & notes v4.3)
 
 Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, … aligné sur les noms de studios dans `config`) :
 
 | Emplacement | Rôle |
 |-------------|------|
 | `steps/{stepId}` | Objet étape : `id`, `order`, `shortDesc`, `longDesc`, `photoUrl` (URL Firebase Storage après upload). |
+| `steps/{stepId}/ratings/{Prénom}` | **v4.3** — entier **1**, **2** ou **3** : note personnelle et **persistante** par intervenante (survit à la fin de la réservation). Moyenne affichée dans l’admin (demi-étoiles, arrondi `Math.round(avg*2)/2`). |
 
-**Firebase Storage** (SDK modulaire v10 dans `admin.html`) : fichiers JPEG **`orgs/{orgId}/procedures/{studioIndex}/{stepId}.jpg`**. Compression navigateur avant envoi (largeur max **640 px**, qualité **~0,48**).
+**Firebase Storage** (SDK modulaire v10 dans `admin.html` et **index.html** pour les suggestions) : fichiers JPEG **`orgs/{orgId}/procedures/{studioIndex}/{stepId}.jpg`**. Compression navigateur avant envoi (largeur max **640 px**, qualité **~0,48**).
 
 **Interface admin** : la zone procédures s’ouvre via le menu latéral (burger), entrée **Procédure** (libellé court ; le titre de page reste « Procédures & préparation studio »). Pas d’onglets en tête de page. Hashes d’URL possibles : **`#procedures`**, **`#procedures-section`** (ancien lien). À la fermeture du menu, le focus repasse sur le burger (accessibilité). Voir § **admin.html** ci-dessous pour le détail des cinq vues.
 
@@ -106,12 +109,29 @@ Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, �
 - **Photo** : une seule zone cliquable (aperçu ou icône dans le cadre) ; remplacement avec **modale intégrée** (pas de `window.confirm` du navigateur).
 - **Copier** : duplique **description courte et détails** vers un autre studio ; **pas de photo** (`photoUrl` vide) — la modale l’indique ; ajouter une image sur la nouvelle étape au besoin. Le menu **Studio** reste sur le studio en cours d’édition.
 - **Remplacer la photo** : enregistrement sur le chemin `…/procedures/{studio}/{stepId}.jpg` de l’étape concernée.
-- **Suppression** : modale intégrée ; retrait de l’étape en base et tentative de suppression du fichier image associé à cette étape dans Storage.
-- **Liste des étapes** : lorsque le studio affiché ne change pas, le rendu est **incrémental** (mise à jour des champs texte sans recréer les vignettes) pour éviter de **recharger** les images à chaque enregistrement des descriptions.
+- **Suppression** : modale intégrée ; retrait de l’étape en base (y compris les **ratings** de l’étape), suppression du fichier image procédure, et **nettoyage multi-chemin** de tous les `cleaningReports/*/stepFeedback/{stepId}` pour cette étape.
+- **Suggestions (v4.3)** : en tête de liste par studio, cartes **orange** avec prénom de la suggérante ; **Valider** crée une étape en tête (photo copiée si possible) et supprime la suggestion ; **Supprimer** ouvre une **modale intégrée** puis retire la suggestion et le fichier Storage **`procedureSuggestions/{id}.jpg`**.
+- **Moyenne des notes** : sous le bouton corbeille, trois étoiles non cliquables (demi-étoiles, gris si aucune note).
+- **Liste des étapes** : lorsque le studio affiché ne change pas **et** qu’il n’y a **pas** de suggestion en attente pour ce studio, le rendu reste **incrémental** (mise à jour des champs texte sans recréer les vignettes) pour éviter de **recharger** les images à chaque enregistrement des descriptions.
 
-**Affichage côté calendrier** (`index.html`) : non prévu dans cette version ; réservé à une évolution ultérieure.
+**Affichage côté calendrier** (`index.html`, **v4.3**) : **uniquement** pour une **intervenante connectée** (compte ménage, auth activée) **déjà assignée** au départ. La modale **Mon intervention** comporte un second onglet **Procédure** : liste des étapes du studio, case **Fait** (temps réel via un seul `onValue` sur `stepFeedback`), étoiles 1–3 (persistantes, clic sur la note active la retire). Bouton **+** : sous-modale pour **suggérer une étape** (photo optionnelle, même compression que l’admin). **Pas** d’onglet procédure si la ménagère n’est pas assignée ; en **mode sans auth** (vue admin sur le calendrier), comportement inchangé — pas d’onglet procédure.
 
-**Règles** : l’app utilise une auth « maison » (pas Firebase Auth côté client) ; les règles RTDB / Storage doivent rester cohérentes avec ce modèle (voir commentaire en tête du script dans `admin.html`).
+### `/procedureSuggestions` — file d’attente (v4.3)
+
+Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
+
+| Champ | Rôle |
+|--------|------|
+| `studioIndex` | `0` ou `1` (studio cible). |
+| `shortDesc` | Description courte (requis à la création). |
+| `longDesc` | Détails optionnels. |
+| `photoUrl` | URL après upload Storage, ou chaîne vide. |
+| `suggestedBy` | Prénom (compte). |
+| `createdAt` | Horodatage ms. |
+
+**Storage** : **`orgs/{orgId}/procedureSuggestions/{suggestionId}.jpg`** (JPEG compressé depuis `index.html`).
+
+**Règles** : l’app utilise une auth « maison » (pas Firebase Auth côté client) ; les règles RTDB / Storage doivent rester cohérentes avec ce modèle (voir commentaire en tête du script dans `admin.html` et § **Sécurité v4.3.0** ci-dessous).
 
 ---
 
@@ -161,7 +181,7 @@ Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, �
 
 **Calendrier**
 - Affichage **S1 / S2** inchangé (noms de studios viennent de `/orgs/{orgId}/config`).
-- **Comptes rendus (rôle ménage, départ où l’on est assignée)** : modale **Mon intervention** — durée personnelle (heures + minutes), champs **communs** commande / commentaire (libellés et placeholders dans l’UI), enregistrement dans **`cleaningReports`** ; croix de fermeture en haut à droite ; fermeture automatique après **Enregistrer**.
+- **Comptes rendus (rôle ménage, départ où l’on est assignée)** : modale avec onglets **Mon intervention** et **Procédure** (v4.3) — durée personnelle (heures + minutes), champs **communs** commande / commentaire, enregistrement dans **`cleaningReports`** ; onglet **Procédure** : étapes du studio, coches **Fait** (**`stepFeedback`**, temps réel), notes 1–3 persistantes (**`ratings/{Prénom}`**), suggestion d’étape (**+**) ; si non assignée, pop-up **M’assigner** seule (pas d’onglet procédure). Croix de fermeture en haut à droite ; fermeture automatique après **Enregistrer** sur l’onglet intervention.
 - **Badge** du prénom sous le départ : **contour noir** si des heures ont été enregistrées pour cette personne sur ce départ.
 
 ### admin.html — Back-office
@@ -171,7 +191,7 @@ Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, �
 - **Topbar** : titre **Administration** et **nom de l’organisation** uniquement (sans suffixe « Planning Ménage ») ; **menu burger** à gauche ; retour **focus** sur le burger à la fermeture du tiroir (accessibilité).
 - **Navigation latérale** (ordre du haut vers le bas) — une **vue pleine page** par entrée, sans sous-menus :
   1. **Dashboard** — statistiques du mois, **export Excel** (aperçu optionnel), **historique des interventions**, bouton **Se déconnecter**.
-  2. **Procédure** — **Procédures & préparation studio** (étapes par studio, photos Storage + texte RTDB), voir § `/procedures` ci-dessus.
+  2. **Procédure** — **Procédures & préparation studio** (étapes par studio, photos Storage + texte RTDB, suggestions orange en tête de liste, moyenne des notes par étape), voir § `/procedures` et `/procedureSuggestions` ci-dessus.
   3. **Comptes** — authentification, **Org. par défaut**, Telegram, liste des comptes, **journal d’activité**.
   4. **Organisation** — **Studios** (noms affichés S1 / S2 sur le calendrier).
   5. **Légende** — **Légende & synchronisation** (points du calendrier, rôles 🧹 / 👑, sync, version affichée en bas).
@@ -214,12 +234,79 @@ Sous **`/orgs/{orgId}/procedures/{studioIndex}/`** (`studioIndex` : `0`, `1`, �
 
 - Accès restreint au domaine de production (Google Cloud Console) quand configuré.  
 - Données sensibles : secrets uniquement côté GitHub Actions ; **`migrate.js`** en local avec la même variable `FIREBASE_SERVICE_ACCOUNT`.
-- Penser à inclure **`/orgs/{orgId}/cleaningReports`** dans les **règles Realtime Database** si elles ne sont pas déjà couvertes par une règle large (sinon les comptes rendus ne s’enregistrent pas).
-- **Firebase Storage** : activer le bucket et autoriser le chemin **`orgs/{orgId}/procedures/...`** si vous utilisez les photos de procédures (voir commentaire dans `admin.html`).
+- Penser à inclure **`/orgs/{orgId}/cleaningReports`** (et sous-chemins **`stepFeedback`**, **`procedureSuggestions`**, **`procedures/.../ratings`**) dans les **règles Realtime Database** si elles ne sont pas déjà couvertes par une règle large (sinon les comptes rendus / procédure ne s’enregistrent pas).
+- **Firebase Storage** : activer le bucket et autoriser **`orgs/{orgId}/procedures/...`** et **`orgs/{orgId}/procedureSuggestions/...`** (voir commentaire dans `admin.html`).
+
+#### Sécurité v4.3.0 — exemples de règles (console Firebase)
+
+Les règles ne sont **pas** versionnées dans ce dépôt ; copier-coller des blocs adaptés si vous n’utilisez pas déjà une règle large sur `orgs/{orgId}`.
+
+**Realtime Database** (exemple si vous affinez par enfant ; à fusionner avec votre arbre existant) :
+
+```json
+{
+  "rules": {
+    "orgs": {
+      "$orgId": {
+        "procedureSuggestions": {
+          ".read": true,
+          ".write": true
+        },
+        "cleaningReports": {
+          "$uid": {
+            "stepFeedback": {
+              "$stepId": {
+                "checked": {
+                  ".read": true,
+                  ".write": true
+                }
+              }
+            }
+          }
+        },
+        "procedures": {
+          "$studio": {
+            "steps": {
+              "$stepId": {
+                "ratings": {
+                  "$name": {
+                    ".read": true,
+                    ".write": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Souvent, une règle du type **`orgs/{orgId}/.read` / `.write`** couvre déjà ces nœuds sans ajout explicite.
+
+**Storage** (règles type) :
+
+```
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /orgs/{orgId}/procedures/{allPaths=**} {
+      allow read, write: if true;
+    }
+    match /orgs/{orgId}/procedureSuggestions/{fileName} {
+      allow read, write: if true;
+    }
+  }
+}
+```
+
+Remplacer les `if true` par une contrainte (domaine, App Check, etc.) lorsque vous durcissez la sécurité.
 
 ### CORS — Firebase Storage (optionnel, dépannage local)
 
-Si des **uploads** ou appels Storage depuis l’admin échouent en local (`http://127.0.0.1:…`) avec *blocked by CORS policy*, vous pouvez configurer le bucket :
+Si des **uploads** ou appels Storage depuis l’admin **ou le calendrier** (suggestions avec photo, v4.3) échouent en local (`http://127.0.0.1:…`) avec *blocked by CORS policy*, vous pouvez configurer le bucket :
 
 1. **Nom du bucket** : Firebase Console → **Storage**.
 2. Adapter **`storage-cors.example.json`** (origines).
@@ -249,7 +336,7 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 2. **Code d'accès simple** sur index.html  
 3. **Sécurisation Firebase** — règles RTDB plus strictes  
 4. **Exploitation de `sharedWith`** — UI et agrégation multi-org  
-5. **Consultation des procédures** depuis le calendrier (`index.html`)  
+5. ~~**Consultation des procédures** depuis le calendrier (`index.html`)~~ — **fait en v4.3** (onglet Procédure pour intervenantes assignées)  
 6. **Hub multi-plannings** (enfants, crèche, etc.)  
 7. **Application mobile native** — notifications push  
 
@@ -259,7 +346,7 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 4.2.1
+Version : 4.3.0
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
@@ -270,6 +357,13 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ---
 
 ## Historique des versions
+
+### v4.3.0 — Avril 2026
+- **Calendrier (`index.html`)** : onglet **Procédure** dans la modale ménage (intervenante assignée, auth activée) — liste des étapes du studio, coches **Fait** partagées (`cleaningReports/{uid}/stepFeedback/{stepId}/checked`, un seul `onValue` sur `stepFeedback`), notes 1–3 persistantes (`procedures/.../ratings/{Prénom}`), sous-modale **+** pour **procedureSuggestions** + upload JPEG `procedureSuggestions/{id}.jpg` (compression identique à l’admin)
+- **Admin (`admin.html`)** : suggestions filtrées par studio (encadré orange), **Valider** / **Supprimer** (modale intégrée), moyenne des notes en demi-étoiles sous la corbeille, suppression d’étape étendue (nettoyage `stepFeedback` sur tous les rapports via `update` multi-chemin)
+- **Données** : conservation de **`stepFeedback`** lors des changements d’assignation (`syncCleaningReportAfterAssignmentChange`, comme les heures)
+- **Docs** : README (schéma, sécurité v4.3.0, comportement index/admin) ; commentaire règles en tête de `admin.html` ; `APP_VERSION` **4.3.0** dans `index.html` et `admin.html`
+- **Scripts non modifiés** : `sync-ical.js`, `notify-departs.js`, `migrate.js` — aucune référence contradictoire aux nouveaux chemins (vérification à la livraison)
 
 ### v4.2.1 — Avril 2026
 - **Admin — Procédures** : nouvelle étape **en tête** ; flèches **▲▼** ; zone photo unifiée ; **Copier** les **textes seulement** (pas de photo, phrase dans la modale) ; après copie, le menu **Studio** reste sur le studio en cours ; **rendu incrémental** de la liste pour ne pas recharger les images quand seules les descriptions changent ; suppression d’étape + fichier Storage `…/{studio}/{stepId}.jpg` ; modales intégrées **remplacer photo** / **supprimer** / **copier** ; code nettoyé (plus de logique copie / partage de photo ni `getBytes` pour les procédures)

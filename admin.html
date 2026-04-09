@@ -135,6 +135,19 @@ body.admin-nav-ready .admin-burger{display:flex}
 .proc-long-input{width:100%;min-height:72px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:0.875em;font-style:italic;color:#666;background:#fff;resize:vertical;line-height:1.45}
 .proc-step-actions{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0}
 .proc-order-arrows{display:flex;flex-direction:column;gap:4px;align-items:center}
+.proc-suggestions-block{margin-bottom:14px;display:flex;flex-direction:column;gap:10px}
+.proc-suggestion-row{border:2px solid #fdba74;background:#fff7ed;border-radius:10px;padding:10px}
+.proc-suggestion-meta{font-size:11px;color:#9a3412;font-weight:600;margin-bottom:6px}
+.proc-suggestion-short{font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:4px}
+.proc-suggestion-long{font-size:12px;color:#555;line-height:1.45;font-style:italic;margin-bottom:8px}
+.proc-suggestion-photo{max-width:100%;max-height:120px;border-radius:8px;display:block;margin-bottom:8px;object-fit:cover}
+.proc-suggestion-actions{display:flex;gap:8px;flex-wrap:wrap}
+.proc-avg-stars-wrap{margin-top:6px;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:36px;justify-content:flex-end}
+.proc-avg-stars-label{font-size:9px;color:#bbb;text-transform:uppercase;letter-spacing:0.04em}
+.proc-avg-stars-row{font-size:15px;line-height:1;letter-spacing:1px;user-select:none}
+.proc-avg-star{color:#e5e5e0;display:inline-block;width:1em;text-align:center}
+.proc-avg-star.full,.proc-avg-star.half{position:relative;color:#e5e5e0}
+.proc-avg-star.half::after{content:'★';position:absolute;left:0;top:0;width:50%;overflow:hidden;color:#F59E0B}
 </style>
 </head>
 <body>
@@ -228,7 +241,10 @@ body.admin-nav-ready .admin-burger{display:flex}
         <button type="button" class="btn-primary" onclick="procedureAddStep()">+ Ajouter une étape</button>
       </div>
       <input type="file" id="proc-file-input" accept="image/*" capture="environment" style="display:none" tabindex="-1">
-      <div id="procedures-steps-host" class="proc-steps">Chargement…</div>
+      <div id="procedures-steps-host">
+        <div id="proc-suggestions-block" class="proc-suggestions-block" aria-live="polite"></div>
+        <div id="proc-steps-inner" class="proc-steps">Chargement…</div>
+      </div>
     </div>
     </div>
 
@@ -336,11 +352,19 @@ import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } fr
  * ça bloquerait tous les accès depuis le site.
  *
  * Option actuelle (petite app, accès restreint par domaine dans Google Cloud) :
- * Realtime Database : autoriser read/write sur orgs/{orgId}/procedures (ex. .read/.write true sous orgs)
- * Storage : match /orgs/{orgId}/procedures/{allPaths=**} { allow read, write: if true; }
+ * Realtime Database : autoriser read/write sous orgs/{orgId}/ (souvent une règle large sur orgs).
+ * Chemins métier supplémentaires v4.3 :
+ *   - procedureSuggestions (liste + validation admin / création depuis index)
+ *   - cleaningReports/{uid}/stepFeedback/{stepId}/checked (coches partagées par départ)
+ *   - procedures/{studio}/steps/{stepId}/ratings/{Prénom} (notes 1–3 persistantes)
+ * Storage :
+ *   match /orgs/{orgId}/procedures/{allPaths=**} { allow read, write: if true; }
+ *   match /orgs/{orgId}/procedureSuggestions/{fileName} { allow read, write: if true; }
  * — restreindre par domaine dans Google Cloud Console si possible.
- * Copie d’étape : textes seulement (pas de photo). Chaque photo est stockée sous
- *   orgs/{orgId}/procedures/{studio}/{stepId}.jpg ; suppression d’étape → deleteObject sur ce chemin.
+ * Photos procédures : orgs/{orgId}/procedures/{studio}/{stepId}.jpg
+ * Photos suggestions : orgs/{orgId}/procedureSuggestions/{suggestionId}.jpg
+ *
+ * Snippets à coller (si règles fines par enfant) — voir README § Sécurité v4.3.0 pour l’exemple JSON complet.
  *
  * Sécurisation future : Firebase Auth ou App Check pour des règles strictes.
  */
@@ -369,7 +393,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.2.1';
+const APP_VERSION = '4.3.0';
 
 /** Studio sélectionné dans la section Procédures (persiste entre re-rendus). */
 let procSelectedStudioIdx = '0';
@@ -407,7 +431,8 @@ let A = {
   selectedMonth: new Date().getMonth(),
   selectedYear: new Date().getFullYear(),
   activityEntries: [],
-  procedures: {}
+  procedures: {},
+  procedureSuggestions: {}
 };
 
 function hashSimple(str){
@@ -504,6 +529,11 @@ onValue(ref(db,ob('activityLog')), snap=>{
 
 onValue(ref(db,ob('procedures')), snap=>{
   A.procedures=snap.val()||{};
+  if(A.unlocked) renderProcedures();
+});
+
+onValue(ref(db,ob('procedureSuggestions')), snap=>{
+  A.procedureSuggestions=snap.val()||{};
   if(A.unlocked) renderProcedures();
 });
 
@@ -888,6 +918,51 @@ function procedureStoragePath(studioIdx, stepId){
   return `orgs/${orgId}/procedures/${studioIdx}/${stepId}.jpg`;
 }
 
+function procedureSuggestionStoragePath(suggestionId){
+  return `orgs/${orgId}/procedureSuggestions/${suggestionId}.jpg`;
+}
+
+function averageRatingFromRatings(ratings){
+  if(!ratings||typeof ratings!=='object') return null;
+  const vals=[];
+  for(const v of Object.values(ratings)){
+    const n=Number(v);
+    if(n>=1&&n<=3&&!Number.isNaN(n)) vals.push(n);
+  }
+  if(!vals.length) return null;
+  const sum=vals.reduce((a,b)=>a+b,0);
+  return Math.round((sum/vals.length)*2)/2;
+}
+
+function procedureAvgStarsHtml(si, stepId){
+  const sik=String(si);
+  const raw=A.procedures[sik]?.steps?.[stepId]?.ratings ?? A.procedures[si]?.steps?.[stepId]?.ratings;
+  const avg=averageRatingFromRatings(raw);
+  if(avg==null){
+    return '<div class="proc-avg-stars-wrap" data-avg-empty="1"><div class="proc-avg-stars-label">Moyenne</div><div class="proc-avg-stars-row" style="color:#ddd">★★★</div></div>';
+  }
+  const parts=[1,2,3].map(i=>{
+    const seg=avg-(i-1);
+    if(seg>=1) return '<span class="proc-avg-star full">★</span>';
+    if(seg>=0.5) return '<span class="proc-avg-star half">★</span>';
+    return '<span class="proc-avg-star">★</span>';
+  });
+  return `<div class="proc-avg-stars-wrap" data-avg="${avg}"><div class="proc-avg-stars-label">Moyenne</div><div class="proc-avg-stars-row">${parts.join('')}</div></div>`;
+}
+
+function buildProcSuggestionRowHtml(id,s){
+  return `<div class="proc-suggestion-row" id="proc-sug-${id}">
+      <div class="proc-suggestion-meta">Suggestion — ${escHtml(s.suggestedBy||'—')}</div>
+      ${s.photoUrl&&String(s.photoUrl).trim()?`<img class="proc-suggestion-photo" src="${escHtml(String(s.photoUrl).trim())}" alt="">`:''}
+      <div class="proc-suggestion-short">${escHtml(s.shortDesc||'')}</div>
+      ${s.longDesc?`<div class="proc-suggestion-long">${escHtml(s.longDesc)}</div>`:''}
+      <div class="proc-suggestion-actions">
+        <button type="button" class="btn-primary btn-sm" onclick='procedureValidateSuggestion(${JSON.stringify(id)})'>Valider</button>
+        <button type="button" class="btn-danger" onclick='procedureRejectSuggestionOpen(${JSON.stringify(id)})'>Supprimer</button>
+      </div>
+    </div>`;
+}
+
 function getStepsSorted(studioIdx){
   const si=String(studioIdx);
   const raw=A.procedures[si]?.steps ?? A.procedures[studioIdx]?.steps ?? {};
@@ -977,6 +1052,7 @@ function buildProcStepRowHtml(si, st){
           <button type="button" class="btn-sm" onclick="procedureMoveStep('${si}','${st.id}',1)" title="Descendre">▼</button>
         </div>
         <button type="button" class="btn-danger" onclick="procedureDeleteStep('${si}','${st.id}')" title="Supprimer l’étape">🗑</button>
+        ${procedureAvgStarsHtml(si, st.id)}
       </div>
     </div>`;
 }
@@ -1030,6 +1106,12 @@ function procPatchProcedureRow(row, si, st, hasPhoto, uploading){
   }
   const del=row.querySelector('.btn-danger');
   if(del) del.setAttribute('onclick',`procedureDeleteStep('${si}','${st.id}')`);
+  const aw=row.querySelector('.proc-avg-stars-wrap');
+  if(aw){
+    const tpl=document.createElement('template');
+    tpl.innerHTML=procedureAvgStarsHtml(si,st.id).trim();
+    aw.replaceWith(tpl.content.firstElementChild);
+  }
 }
 
 function bindProcedureFileInputOnce(){
@@ -1065,7 +1147,8 @@ function bindProcedureFileInputOnce(){
 }
 
 function renderProcedures(){
-  const host=document.getElementById('procedures-steps-host');
+  const sugBlock=document.getElementById('proc-suggestions-block');
+  const host=document.getElementById('proc-steps-inner');
   const sel=document.getElementById('proc-studio-select');
   if(!host||!sel) return;
   const names=A.studioNames||['Studio 1','Studio 2'];
@@ -1077,13 +1160,17 @@ function renderProcedures(){
     sel.addEventListener('change',()=>{ procSelectedStudioIdx=sel.value; renderProcedures(); });
   }
   const si=sel.value;
+  const sugs=Object.entries(A.procedureSuggestions||{}).filter(([_,s])=>s&&String(s.studioIndex)===String(si));
+  if(sugBlock) sugBlock.innerHTML=sugs.length?sugs.map(([id,s])=>buildProcSuggestionRowHtml(id,s)).join(''):'';
+
   const steps=getStepsSorted(si);
+  const forceFullRebuild=sugs.length>0;
   if(!steps.length){
     procLastRenderedStudioIdx=si;
     host.innerHTML='<p style="font-size:12px;color:#aaa">Aucune étape — utilisez « + Ajouter une étape ».</p>';
     return;
   }
-  const canIncremental=String(procLastRenderedStudioIdx)===String(si)&&host.querySelector('.proc-step-row')!==null;
+  const canIncremental=!forceFullRebuild&&String(procLastRenderedStudioIdx)===String(si)&&host.querySelector('.proc-step-row')!==null;
   if(!canIncremental){
     host.innerHTML=steps.map(st=>buildProcStepRowHtml(si,st)).join('');
     procLastRenderedStudioIdx=si;
@@ -1171,10 +1258,70 @@ window.procedureDeleteStep=async function(si,stepId){
     if(hadPhoto){
       await deleteObject(sRef(storage,procedureStoragePath(si,stepId))).catch(()=>{});
     }
+    const crSnap=await get(ref(db,ob('cleaningReports')));
+    const all=crSnap.val()||{};
+    const upd={};
+    for(const uid of Object.keys(all)){
+      upd[`orgs/${orgId}/cleaningReports/${uid}/stepFeedback/${stepId}`]=null;
+    }
+    if(Object.keys(upd).length) await update(ref(db),upd);
     setSyncStatus('ok');
     showToast('Étape supprimée ✓');
   }catch(_){
     showToast('Erreur suppression');
+  }
+};
+
+window.procedureValidateSuggestion=async function(suggestionId){
+  const s=A.procedureSuggestions?.[suggestionId];
+  if(!s){ showToast('Suggestion introuvable'); return; }
+  const si=String(s.studioIndex??0);
+  const arr=getStepsSorted(si);
+  const newOrder=arr.length
+    ? Math.min(...arr.map(x=>Number(x.order)||0))-1
+    : 0;
+  const newRef=push(ref(db,ob(`procedures/${si}/steps`)));
+  const stepId=newRef.key;
+  let photoWarn=false;
+  try{
+    await set(newRef,{ id:stepId, order:newOrder, shortDesc:s.shortDesc||'', longDesc:s.longDesc||'', photoUrl:'' });
+    const url=String(s.photoUrl||'').trim();
+    if(url){
+      try{
+        const res=await fetch(url);
+        const blob=await res.blob();
+        await uploadBytes(sRef(storage,procedureStoragePath(si,stepId)),blob,{contentType:'image/jpeg'});
+        const dl=await getDownloadURL(sRef(storage,procedureStoragePath(si,stepId)));
+        await set(ref(db,ob(`procedures/${si}/steps/${stepId}/photoUrl`)),dl);
+      }catch(_){ photoWarn=true; }
+    }
+    await remove(ref(db,ob(`procedureSuggestions/${suggestionId}`)));
+    await deleteObject(sRef(storage,procedureSuggestionStoragePath(suggestionId))).catch(()=>{});
+    pushActivity({ type:'admin', text:`Suggestion validée — nouvelle étape studio ${si}` });
+    showToast(photoWarn?'Étape créée — photo non copiée':'Suggestion intégrée ✓');
+    setSyncStatus('ok');
+  }catch(_){
+    showToast('Erreur validation suggestion');
+    setSyncStatus('err');
+  }
+};
+
+window.procedureRejectSuggestionOpen=async function(suggestionId){
+  const ok=await procedureShowConfirmModal({
+    title:'Supprimer cette suggestion ?',
+    body:'La suggestion et son fichier photo éventuel seront retirés.',
+    okText:'Supprimer',
+    danger:true
+  });
+  if(!ok) return;
+  try{
+    await remove(ref(db,ob(`procedureSuggestions/${suggestionId}`)));
+    await deleteObject(sRef(storage,procedureSuggestionStoragePath(suggestionId))).catch(()=>{});
+    showToast('Suggestion supprimée ✓');
+    setSyncStatus('ok');
+  }catch(_){
+    showToast('Erreur suppression');
+    setSyncStatus('err');
   }
 };
 
