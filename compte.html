@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mon compte — Planning Ménage</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f5f5f0;color:#1a1a1a;padding:0 0 2rem}
+.topbar{background:#fff;border-bottom:1px solid #e0e0d8;padding:0.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar-left{display:flex;align-items:center;gap:0;min-width:0}
+.admin-burger{display:none;align-items:center;justify-content:center;width:40px;height:40px;margin-right:10px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;flex-shrink:0;padding:0;-webkit-tap-highlight-color:transparent}
+.admin-burger:hover{background:#f5f5f0}
+.admin-burger:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
+body.compte-nav-ready .admin-burger{display:flex}
+.admin-burger-icon{display:block;width:18px;height:2px;background:#1a1a1a;border-radius:1px;box-shadow:0 -6px 0 #1a1a1a,0 6px 0 #1a1a1a}
+.admin-nav-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.22);z-index:150;opacity:0;visibility:hidden;transition:opacity .2s ease,visibility .2s ease}
+.admin-nav-overlay:not(.is-open){pointer-events:none}
+.admin-nav-overlay.is-open{opacity:1;visibility:visible}
+.admin-nav-panel{position:fixed;top:0;left:0;bottom:0;width:max-content;max-width:min(92vw,300px);z-index:151;background:#fafaf8;border-right:1px solid #e0e0d8;box-shadow:4px 0 20px rgba(0,0,0,0.07);transform:translateX(-100%);transition:transform .25s ease;overflow-y:auto;-webkit-overflow-scrolling:touch;box-sizing:border-box}
+.admin-nav-panel:not(.is-open){pointer-events:none}
+.admin-nav-panel.is-open{transform:translateX(0);pointer-events:auto}
+.admin-nav-panel-inner{padding:0.5rem 1rem 1.25rem 0.875rem;width:max-content;max-width:100%;box-sizing:border-box}
+.admin-nav-link{display:block;padding:12px 10px;margin:4px 0;border-radius:8px;font-size:14px;font-weight:600;color:#333;text-decoration:none;line-height:1.35;white-space:nowrap}
+.admin-nav-link:hover{background:#eeece6;color:#111}
+.topbar-title{font-size:16px;font-weight:600}
+.topbar-sub{font-size:12px;color:#888;margin-top:1px}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;margin-right:5px}
+.sync-dot.ok{background:#1D9E75}
+.sync-dot.err{background:#E24B4A}
+.back-btn{font-size:12px;color:#555;text-decoration:none;display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;white-space:nowrap;flex-shrink:0;line-height:1.2}
+.back-btn:hover{background:#f5f5f0}
+@media (max-width:540px){
+  .back-btn{padding:6px 10px;font-size:11px}
+}
+.container{max-width:700px;margin:0 auto;padding:1.25rem 1rem}
+.lock-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:1rem}
+.lock-icon{font-size:48px}
+.lock-title{font-size:18px;font-weight:600}
+.lock-sub{font-size:13px;color:#888;text-align:center}
+.section{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
+.section h3{font-size:14px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem}
+.stat-card{background:#f5f5f0;border-radius:10px;padding:0.75rem;text-align:center}
+.stat-val{font-size:22px;font-weight:700;color:#1a1a1a}
+.stat-val.sm{font-size:16px;padding-top:3px;line-height:1.2}
+.stat-lbl{font-size:10px;color:#aaa;margin-top:2px;line-height:1.3}
+.stat-val.green{color:#1D9E75}
+.stat-val.orange{color:#F59E0B}
+.stat-val.red{color:#E24B4A}
+.nav-btn{background:#fff;border:1px solid #ddd;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:13px;color:#333}
+.nav-btn:hover{background:#f5f5f0}
+.histo-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:0.5rem}
+.histo-table th{text-align:left;padding:5px 8px;color:#aaa;font-weight:500;border-bottom:1px solid #e8e8e2;font-size:11px}
+.histo-table td{padding:5px 8px;border-bottom:1px solid #f0f0eb;color:#555}
+.histo-table tr:last-child td{border-bottom:none}
+.btn-primary{background:#1a1a1a;color:#fff;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500}
+.btn-primary:hover{background:#333}
+.btn-cancel{background:#fff;border:1px solid #ddd;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;color:#333}
+.btn-cancel:hover{background:#f5f5f0}
+.field-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.field-row label{font-size:12px;color:#888;width:110px;flex-shrink:0}
+.field-row input[type=password]{flex:1;min-width:160px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
+.field-row input:focus{outline:none;border-color:#378ADD}
+.modal-shared-hint{font-size:11px;color:#999;line-height:1.45;margin:0 0 0.75rem}
+.modal-section-title{font-size:11px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin:1rem 0 0.5rem}
+.modal-btns{display:flex;gap:8px;margin-top:1.25rem;justify-content:flex-end;flex-wrap:wrap}
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+.empty-hint{font-size:12px;color:#aaa;padding:8px 0}
+</style>
+</head>
+<body>
+
+<div id="compte-nav-overlay" class="admin-nav-overlay" aria-hidden="true"></div>
+<nav id="compte-nav-panel" class="admin-nav-panel" aria-label="Navigation compte" aria-hidden="true">
+  <div class="admin-nav-panel-inner">
+    <a href="#" class="admin-nav-link" data-compte-view="dashboard">Dashboard</a>
+    <a href="#" class="admin-nav-link" data-compte-view="compte">Compte</a>
+  </div>
+</nav>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <button type="button" class="admin-burger" id="compte-burger" aria-label="Menu" aria-expanded="false" aria-controls="compte-nav-panel">
+      <span class="admin-burger-icon" aria-hidden="true"></span>
+    </button>
+    <div style="min-width:0">
+      <div class="topbar-title" id="compte-topbar-title">…</div>
+      <div class="topbar-sub"><span id="compte-org-label">…</span></div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#aaa;white-space:nowrap">
+      <span class="sync-dot" id="sync-dot"></span>
+      <span id="sync-label">...</span>
+    </div>
+    <a href="index.html" class="back-btn" title="Retour au calendrier" aria-label="Retour au calendrier">
+      <span aria-hidden="true">←</span><span> Retour</span>
+    </a>
+  </div>
+</div>
+
+<div class="container">
+  <div id="compte-gate-wait" class="lock-screen">
+    <div class="lock-icon">⏳</div>
+    <div class="lock-title">Vérification de l’accès</div>
+    <div class="lock-sub">Session et droits…</div>
+  </div>
+
+  <div id="compte-content" style="display:none">
+
+    <div id="compte-view-dashboard" role="region" aria-label="Tableau de bord">
+      <div class="section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+          <h3 style="margin-bottom:0"><span>📊</span> <span id="compte-month-title">…</span></h3>
+          <div style="display:flex;align-items:center;gap:6px">
+            <button type="button" class="nav-btn" onclick="window.compteChangeMonth(-1)">&#8592;</button>
+            <button type="button" class="nav-btn" onclick="window.compteChangeMonth(0)" id="compte-month-btn" style="min-width:55px">…</button>
+            <button type="button" class="nav-btn" onclick="window.compteChangeMonth(1)">&#8594;</button>
+          </div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-val" id="kpi-interventions">—</div><div class="stat-lbl">Interventions<br>ce mois</div></div>
+          <div class="stat-card"><div class="stat-val sm" id="kpi-next">—</div><div class="stat-lbl">Prochain<br>départ</div></div>
+          <div class="stat-card"><div class="stat-val" id="kpi-hours">—</div><div class="stat-lbl">Heures totales<br>ce mois</div></div>
+        </div>
+      </div>
+      <div class="section">
+        <h3><span>📋</span> Historique des interventions</h3>
+        <div id="compte-histo-host">Chargement…</div>
+      </div>
+    </div>
+
+    <div id="compte-view-compte" role="region" aria-label="Compte" style="display:none">
+      <div class="section">
+        <h3><span>👤</span> Mon compte</h3>
+        <p class="modal-shared-hint" style="margin-top:0"><strong style="color:#555" id="compte-name-label"></strong></p>
+        <div class="modal-section-title">Mot de passe</div>
+        <p class="modal-shared-hint" id="compte-pwd-hint"></p>
+        <div class="field-row">
+          <label for="self-pwd-current" id="label-self-pwd-current">Mot de passe actuel</label>
+          <input type="password" id="self-pwd-current" autocomplete="current-password" placeholder="">
+        </div>
+        <div class="field-row">
+          <label for="self-pwd-new">Nouveau mot de passe</label>
+          <input type="password" id="self-pwd-new" autocomplete="new-password" placeholder="">
+        </div>
+        <div class="field-row">
+          <label for="self-pwd-confirm">Confirmer</label>
+          <input type="password" id="self-pwd-confirm" autocomplete="new-password" placeholder="">
+        </div>
+        <div class="modal-btns">
+          <button type="button" class="btn-primary" onclick="window._saveOwnPassword()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, set, onValue, push, get, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
+  authDomain: "planning-menage-18b09.firebaseapp.com",
+  databaseURL: "https://planning-menage-18b09-default-rtdb.firebaseio.com",
+  projectId: "planning-menage-18b09",
+  storageBucket: "planning-menage-18b09.firebasestorage.app",
+  messagingSenderId: "685094108459",
+  appId: "1:685094108459:web:b90ec9f136de34d699996e"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const MAX_ACTIVITY_LOG_ENTRIES = 450;
+const SESSION_KEY = 'menage_session_v1';
+const ORG_STORAGE_KEY = 'menage_org_v1';
+const ORGANIZATIONS = [
+  { id: 'tesson', label: 'Studio Tesson' },
+  { id: 'nade', label: 'Studio Nade' }
+];
+const MO_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const COMPTE_VIEW_IDS = ['dashboard','compte'];
+
+function getStoredOrgId(){
+  try{
+    const v = localStorage.getItem(ORG_STORAGE_KEY);
+    if (v && ORGANIZATIONS.some(o => o.id === v)) return v;
+  }catch(e){}
+  return null;
+}
+
+function loadSession(){
+  try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch(e){ return null; }
+}
+
+const orgId = getStoredOrgId();
+const session = loadSession();
+if (!orgId || !session?.name) {
+  window.location.replace('index.html');
+  throw new Error('no-access');
+}
+
+const ob = p => `orgs/${orgId}/${p}`;
+
+let C = {
+  userName: session.name,
+  assignments: {},
+  reservations: [],
+  cleaningReports: {},
+  adminConfig: { authEnabled: false, accounts: [], defaultOrgId: 'tesson' },
+  selectedMonth: new Date().getMonth(),
+  selectedYear: new Date().getFullYear(),
+  unlocked: false
+};
+
+let compteUiHashApplied = false;
+
+function el(id){ return document.getElementById(id); }
+
+function hashSimple(str){
+  let h=0;
+  for(let i=0;i<str.length;i++) h=((h<<5)-h)+str.charCodeAt(i),h|=0;
+  return h.toString(36);
+}
+
+function setSyncStatus(s){
+  const dot=el('sync-dot'), lab=el('sync-label');
+  if(dot) dot.className='sync-dot '+(s==='ok'?'ok':s==='err'?'err':'');
+  if(lab) lab.textContent=s==='ok'?'Connecté':s==='err'?'Hors ligne':'Chargement...';
+}
+
+function showToast(msg){
+  const t=el('toast'); t.textContent=msg;
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+function fbSet(path,data){
+  set(ref(db,path),data).then(()=>setSyncStatus('ok')).catch(()=>setSyncStatus('err'));
+}
+
+async function trimActivityLogIfNeeded(){
+  const logRoot=ob('activityLog');
+  try{
+    const snap=await get(ref(db,logRoot));
+    const v=snap.val()||{};
+    const keys=Object.keys(v);
+    if(keys.length<=MAX_ACTIVITY_LOG_ENTRIES) return;
+    const ranked=keys.map(k=>({ k, ts:Number(v[k]?.ts)||0 })).sort((a,b)=>a.ts-b.ts);
+    const cut=keys.length-MAX_ACTIVITY_LOG_ENTRIES;
+    const updates={};
+    for(let i=0;i<cut;i++) updates[`${logRoot}/${ranked[i].k}`]=null;
+    await update(ref(db),updates);
+  }catch(_){}
+}
+
+function logActivity(payload){
+  push(ref(db,ob('activityLog')),{
+    ts:Date.now(),
+    type:payload.type||'event',
+    actor:payload.actor||'',
+    text:payload.text||'',
+    uid:payload.uid||null
+  }).then(()=>trimActivityLogIfNeeded()).catch(()=>{});
+}
+
+function getAssignSig(c1,c2){
+  return JSON.stringify([c1||null,c2||null]);
+}
+
+function getAssignment(r){
+  const a=C.assignments[r.uid];
+  if(!a) return {c1:null,c2:null};
+  if(typeof a==='string') return {c1:a,c2:null};
+  return {
+    c1:a.cleaner||a.c1||null,
+    c2:a.c2||null
+  };
+}
+
+function isAssignedToMe(r){
+  const {c1,c2}=getAssignment(r);
+  const n=C.userName;
+  return c1===n||c2===n;
+}
+
+/** Heures affichables seulement si le rapport correspond à l’assignation actuelle (assignSig). */
+function hoursSlotForReservation(r){
+  const {c1,c2}=getAssignment(r);
+  const sig=getAssignSig(c1,c2);
+  const rep=C.cleaningReports[r.uid];
+  if(!rep||rep.assignSig!==sig) return null;
+  const slot=C.userName&&rep.hours&&rep.hours[C.userName]!=null?rep.hours[C.userName]:null;
+  if(!slot||typeof slot!=='object') return null;
+  const h=slot.h!=null?Number(slot.h):0;
+  const m=slot.m!=null?Number(slot.m):0;
+  if(Number.isNaN(h)||Number.isNaN(m)) return null;
+  return {h,m};
+}
+
+function formatHours(slot){
+  if(!slot) return null;
+  const h=slot.h|0, m=slot.m|0;
+  if(h===0&&m===0) return '0h 0min';
+  return `${h}h ${m}min`;
+}
+
+function totalMinutesInMonth(){
+  const mo=C.selectedMonth, yr=C.selectedYear;
+  let total=0;
+  for(const r of C.reservations){
+    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
+    if(e.getMonth()!==mo||e.getFullYear()!==yr) continue;
+    if(!isAssignedToMe(r)) continue;
+    const slot=hoursSlotForReservation(r);
+    if(slot) total+=slot.h*60+slot.m;
+  }
+  return total;
+}
+
+function formatTotalMinutes(mins){
+  if(mins<=0) return '—';
+  const h=Math.floor(mins/60), m=mins%60;
+  return `${h}h ${m}min`;
+}
+
+function verifyAndUnlock(){
+  const acc=(C.adminConfig.accounts||[]).find(a=>a.name===C.userName);
+  if(!acc||acc.admin){
+    window.location.replace('index.html');
+    return;
+  }
+  C.unlocked=true;
+  el('compte-gate-wait').style.display='none';
+  el('compte-content').style.display='';
+  document.body.classList.add('compte-nav-ready');
+  el('compte-topbar-title').textContent=C.userName;
+  el('compte-org-label').textContent=ORGANIZATIONS.find(o=>o.id===orgId)?.label||orgId;
+  setupCompteNavOnce();
+  setupAccountForm();
+  setSyncStatus('ok');
+  if(!compteUiHashApplied){
+    compteUiHashApplied=true;
+    let h=location.hash.slice(1);
+    if(COMPTE_VIEW_IDS.includes(h)&&h!=='dashboard') window.setCompteView(h,{noScroll:true});
+    else window.setCompteView('dashboard',{noScroll:true});
+  }
+  renderCompteDashboard();
+}
+
+function setupAccountForm(){
+  const acc=(C.adminConfig.accounts||[]).find(a=>a.name===C.userName);
+  if(!acc) return;
+  const hasPwd=!!acc.pwdHash;
+  el('compte-name-label').textContent=C.userName;
+  el('compte-pwd-hint').textContent=hasPwd
+    ? 'Saisissez votre mot de passe actuel, puis le nouveau.'
+    : 'Aucun mot de passe défini pour l’instant : choisissez-en un.';
+  el('label-self-pwd-current').textContent=hasPwd?'Mot de passe actuel':'Mot de passe actuel (si déjà défini)';
+}
+
+window._saveOwnPassword=function(){
+  if(!C.unlocked) return;
+  const acc=(C.adminConfig.accounts||[]).find(a=>a.name===C.userName);
+  if(!acc){ showToast('Compte introuvable'); return; }
+  const cur=String(el('self-pwd-current')?.value||'');
+  const nw=String(el('self-pwd-new')?.value||'');
+  const cf=String(el('self-pwd-confirm')?.value||'');
+  if(nw.length<4){ showToast('Nouveau mot de passe : au moins 4 caractères'); return; }
+  if(nw!==cf){ showToast('La confirmation ne correspond pas'); return; }
+  if(acc.pwdHash){
+    if(hashSimple(cur)!==acc.pwdHash){ showToast('Mot de passe actuel incorrect'); return; }
+  }
+  const accounts=C.adminConfig.accounts.map(a=>({...a}));
+  const i=accounts.findIndex(a=>a.name===C.userName);
+  if(i<0){ showToast('Erreur'); return; }
+  accounts[i]={...accounts[i], pwdHash:hashSimple(nw)};
+  const next={...C.adminConfig, accounts};
+  fbSet(ob('adminConfig'),next);
+  logActivity({ type:'admin_config', actor:C.userName, text:`${C.userName} a modifié son mot de passe` });
+  showToast('Mot de passe enregistré ✓');
+  el('self-pwd-current').value='';
+  el('self-pwd-new').value='';
+  el('self-pwd-confirm').value='';
+};
+
+window.compteChangeMonth=function(dir){
+  if(dir===0){ C.selectedMonth=new Date().getMonth(); C.selectedYear=new Date().getFullYear(); }
+  else{
+    C.selectedMonth+=dir;
+    if(C.selectedMonth>11){C.selectedMonth=0;C.selectedYear++;}
+    if(C.selectedMonth<0){C.selectedMonth=11;C.selectedYear--;}
+  }
+  renderCompteDashboard();
+};
+
+function renderCompteDashboard(){
+  if(!C.unlocked) return;
+  const mo=C.selectedMonth, yr=C.selectedYear;
+  el('compte-month-title').textContent=MO_FR[mo]+' '+yr;
+  el('compte-month-btn').textContent=MO_FR[mo];
+
+  const interventions=C.reservations.filter(r=>{
+    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
+    return e.getMonth()===mo&&e.getFullYear()===yr&&isAssignedToMe(r);
+  });
+  el('kpi-interventions').textContent=String(interventions.length);
+
+  const today=new Date(); today.setHours(0,0,0,0);
+  const nextMine=C.reservations
+    .filter(r=>{
+      const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
+      return e>=today&&isAssignedToMe(r);
+    })
+    .sort((a,b)=>a.end-b.end)[0];
+
+  const kpiNext=el('kpi-next');
+  if(!nextMine){
+    kpiNext.textContent='Aucun';
+    kpiNext.className='stat-val sm green';
+  }else{
+    const endD=new Date(nextMine.end.getFullYear(),nextMine.end.getMonth(),nextMine.end.getDate());
+    const diff=Math.round((endD-today)/86400000);
+    const label=diff===0?'Aujourd\'hui':diff===1?'Demain':`J-${diff}`;
+    kpiNext.textContent=label;
+    kpiNext.className='stat-val sm '+(diff<=2?'red':diff<=5?'orange':'green');
+  }
+
+  el('kpi-hours').textContent=formatTotalMinutes(totalMinutesInMonth());
+
+  const sorted=[...interventions].sort((a,b)=>b.end-a.end);
+  const host=el('compte-histo-host');
+  if(!sorted.length){
+    host.innerHTML='<p class="empty-hint">Aucune intervention ce mois</p>';
+    return;
+  }
+  const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  host.innerHTML=`<table class="histo-table">
+    <thead><tr><th>Date départ</th><th>Studio</th><th>Heures</th></tr></thead>
+    <tbody>${sorted.map(r=>{
+      const d=r.end;
+      const dateStr=d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'2-digit'});
+      const studioLabel=`S${(r.studio|0)+1}`;
+      const slot=hoursSlotForReservation(r);
+      const hoursStr=slot?formatHours(slot):'Non renseigné';
+      return `<tr><td>${esc(dateStr)}</td><td>${esc(studioLabel)}</td><td>${esc(hoursStr)}</td></tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+window.setCompteView=function(view,opts){
+  const v=COMPTE_VIEW_IDS.includes(view)?view:'dashboard';
+  COMPTE_VIEW_IDS.forEach(id=>{
+    const node=el('compte-view-'+id);
+    if(node) node.style.display=id===v?'':'none';
+  });
+  try{
+    const base=location.pathname+location.search;
+    history.replaceState(null,'',v==='dashboard'?base:(base+'#'+v));
+  }catch(_){}
+  if(!(opts&&opts.noScroll)) window.scrollTo(0,0);
+};
+
+function setCompteNavOpen(open){
+  const o=el('compte-nav-overlay');
+  const p=el('compte-nav-panel');
+  const b=el('compte-burger');
+  if(!o||!p) return;
+  if(!open&&b&&p.contains(document.activeElement)) b.focus();
+  o.classList.toggle('is-open',open);
+  p.classList.toggle('is-open',open);
+  o.setAttribute('aria-hidden','true');
+  p.setAttribute('aria-hidden',open?'false':'true');
+  if(b){
+    b.setAttribute('aria-expanded',open?'true':'false');
+    b.setAttribute('aria-label',open?'Fermer le menu':'Menu');
+  }
+  document.body.classList.toggle('compte-nav-open',open);
+}
+
+function setupCompteNavOnce(){
+  const o=el('compte-nav-overlay');
+  const p=el('compte-nav-panel');
+  const b=el('compte-burger');
+  if(!o||!p||!b||b.dataset.navBound) return;
+  b.dataset.navBound='1';
+  b.addEventListener('click',()=>setCompteNavOpen(!p.classList.contains('is-open')));
+  o.addEventListener('click',()=>setCompteNavOpen(false));
+  p.querySelectorAll('.admin-nav-link').forEach(a=>{
+    a.addEventListener('click',e=>{
+      e.preventDefault();
+      const navView=a.getAttribute('data-compte-view');
+      setCompteNavOpen(false);
+      window.setCompteView(COMPTE_VIEW_IDS.includes(navView)?navView:'dashboard');
+    });
+  });
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'&&p.classList.contains('is-open')) setCompteNavOpen(false);
+  });
+}
+
+onValue(ref(db,ob('assignments')), snap=>{
+  C.assignments=snap.val()||{};
+  if(C.unlocked) renderCompteDashboard();
+}, ()=>setSyncStatus('err'));
+
+onValue(ref(db,ob('reservations')), snap=>{
+  const data=snap.val()||{};
+  C.reservations=Object.values(data).map(r=>({...r,start:new Date(r.start),end:new Date(r.end)}));
+  if(C.unlocked) renderCompteDashboard();
+}, ()=>setSyncStatus('err'));
+
+onValue(ref(db,ob('cleaningReports')), snap=>{
+  C.cleaningReports=snap.val()||{};
+  if(C.unlocked) renderCompteDashboard();
+}, ()=>setSyncStatus('err'));
+
+onValue(ref(db,ob('adminConfig')), snap=>{
+  const d=snap.val();
+  if(d){
+    C.adminConfig={...C.adminConfig,...d, accounts:d.accounts||[], defaultOrgId:d.defaultOrgId||C.adminConfig.defaultOrgId||'tesson'};
+  }else{
+    C.adminConfig={ authEnabled:false, accounts:[], defaultOrgId:orgId||'tesson' };
+  }
+  if(!C.unlocked) verifyAndUnlock();
+  else{
+    setupAccountForm();
+    renderCompteDashboard();
+  }
+}, ()=>{
+  setSyncStatus('err');
+  if(!C.unlocked) window.location.replace('index.html');
+});
+
+window.addEventListener('hashchange',()=>{
+  if(!C.unlocked) return;
+  const h=location.hash.slice(1);
+  if(COMPTE_VIEW_IDS.includes(h)) window.setCompteView(h,{noScroll:true});
+});
+</script>
+</body>
+</html>

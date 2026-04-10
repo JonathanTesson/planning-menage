@@ -387,7 +387,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.3.4';
+const APP_VERSION = '4.4.0';
 
 function getStoredOrgId(){
   try{
@@ -630,9 +630,9 @@ function showApp(){
       }else{
         badgeMenu.textContent=S.currentUser.name;
         badgeMenu.style.display='';
-        badgeMenu.title='Mon compte';
-        badgeMenu.setAttribute('aria-label','Mon compte — '+S.currentUser.name);
-        badgeMenu.onclick=function(){ window.openAccountMenu(); };
+        badgeMenu.title='Tableau de bord et compte';
+        badgeMenu.setAttribute('aria-label','Ouvrir mon compte — '+S.currentUser.name);
+        badgeMenu.onclick=function(){ window.location.href='compte.html'; };
       }
     }
   }
@@ -715,69 +715,6 @@ window.doLogout = function(){
   if(!essentialDataLoaded()) return;
   if(!orgHasConfiguredAccounts()) showOrgUnconfigured();
   else checkAuth();
-};
-
-window.openAccountMenu=function(){
-  const u=S.currentUser;
-  if(!u?.name||u.noAuth||u.admin) return;
-  const acc=(S.adminConfig.accounts||[]).find(a=>a.name===u.name);
-  if(!acc) return;
-  const hasPwd=!!acc.pwdHash;
-  const n=escHtml(u.name);
-  document.getElementById('modal-container').innerHTML=`
-    <div class="modal-overlay" onclick="if(event.target===this)window._cm()">
-      <div class="modal modal--wide">
-        <div class="modal-header-row">
-          <h3>Mon compte</h3>
-          <button type="button" class="modal-close-x" onclick="window._cm()" aria-label="Fermer" title="Fermer">×</button>
-        </div>
-        <p class="modal-shared-hint" style="margin-top:0"><strong style="color:#555">${n}</strong></p>
-        <div class="modal-section-title">Mot de passe</div>
-        <p class="modal-shared-hint">${hasPwd?'Saisissez votre mot de passe actuel, puis le nouveau.':'Aucun mot de passe défini pour l’instant : choisissez-en un.'}</p>
-        <div class="modal-field">
-          <label for="self-pwd-current">${hasPwd?'Mot de passe actuel':'Mot de passe actuel (si déjà défini)'}</label>
-          <input type="password" id="self-pwd-current" autocomplete="current-password" placeholder="">
-        </div>
-        <div class="modal-field">
-          <label for="self-pwd-new">Nouveau mot de passe</label>
-          <input type="password" id="self-pwd-new" autocomplete="new-password" placeholder="">
-        </div>
-        <div class="modal-field">
-          <label for="self-pwd-confirm">Confirmer</label>
-          <input type="password" id="self-pwd-confirm" autocomplete="new-password" placeholder="">
-        </div>
-        <div class="modal-btns">
-          <button type="button" class="btn-cancel" onclick="window._cm()">Annuler</button>
-          <button type="button" class="btn-primary" onclick="window._saveOwnPassword()">Enregistrer</button>
-        </div>
-      </div>
-    </div>`;
-};
-
-window._saveOwnPassword=function(){
-  const u=S.currentUser;
-  if(!u?.name||u.admin||u.noAuth) return;
-  const oid=getStoredOrgId();
-  if(!oid) return;
-  const acc=(S.adminConfig.accounts||[]).find(a=>a.name===u.name);
-  if(!acc){ showToast('Compte introuvable'); return; }
-  const cur=String(el('self-pwd-current')?.value||'');
-  const nw=String(el('self-pwd-new')?.value||'');
-  const cf=String(el('self-pwd-confirm')?.value||'');
-  if(nw.length<4){ showToast('Nouveau mot de passe : au moins 4 caractères'); return; }
-  if(nw!==cf){ showToast('La confirmation ne correspond pas'); return; }
-  if(acc.pwdHash){
-    if(hashSimple(cur)!==acc.pwdHash){ showToast('Mot de passe actuel incorrect'); return; }
-  }
-  const accounts=S.adminConfig.accounts.map(a=>({...a}));
-  const i=accounts.findIndex(a=>a.name===u.name);
-  if(i<0){ showToast('Erreur'); return; }
-  accounts[i]={...accounts[i], pwdHash:hashSimple(nw)};
-  const next={...S.adminConfig, accounts};
-  fbSet(`orgs/${oid}/adminConfig`,next);
-  logActivity({ type:'admin_config', actor:u.name, text:`${u.name} a modifié son mot de passe` });
-  showToast('Mot de passe enregistré ✓');
-  window._cm();
 };
 
 // ─── Firebase ─────────────────────────────────────────────────────────────────

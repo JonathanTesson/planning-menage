@@ -11,6 +11,11 @@ Arrêter le serveur : Ctrl+C dans le terminal
   node migrate.js
   (nécessite la variable d’environnement FIREBASE_SERVICE_ACCOUNT)
 
+--- Purge des indisponibilités (> 3 ans, UTC) — manuel ou cron GitHub ---
+  node purge-unavailability.js
+  (variable d’environnement FIREBASE_SERVICE_ACCOUNT — même secret que sync / notify)
+  Workflow : .github/workflows/purge-unavailability.yml (1er du mois à 3h00 UTC)
+
 --- Prochaines commandes à apprendre (selon l’avancement du projet) ---
 
 Étape 1 — Voir où tu en es avec Git (à utiliser souvent)

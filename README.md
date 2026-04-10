@@ -1,8 +1,8 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 4.3.4** — Avril 2026
+**Version : 4.4.0** — Avril 2026
 
-Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin. **Note d’assignation** côté calendrier (**`note`** + traçage **`noteBy`**, indicateur **📝** sur les départs, lecture seule pour les ménagères) — détail § **`/assignments`** et § **index.html** ci-dessous.
+Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin. **Note d’assignation** côté calendrier (**`note`** + traçage **`noteBy`**, indicateur **📝** sur les départs, lecture seule pour les ménagères) — détail § **`/assignments`** et § **index.html** ci-dessous. **v4.4.0** : page **`compte.html`** (tableau de bord ménagère + changement de mot de passe), schéma **`unavailability`** documenté, script **`purge-unavailability.js`** et workflow GitHub mensuel.
 
 ---
 
@@ -12,7 +12,8 @@ Application web de planning des interventions ménage pour plusieurs organisatio
 |------|-------------|
 | [Calendrier](https://jonathantesson.github.io/planning-menage/) | Interface principale |
 | [Administration](https://jonathantesson.github.io/planning-menage/admin.html) | Back-office (session + rôle admin + org choisie sur le calendrier) |
-| [GitHub Actions](https://github.com/JonathanTesson/planning-menage/actions) | Sync automatique + notifications |
+| [Mon compte](https://jonathantesson.github.io/planning-menage/compte.html) | Espace intervenante (session ménagère, hors admin) — lien depuis le prénom sur le calendrier |
+| [GitHub Actions](https://github.com/JonathanTesson/planning-menage/actions) | Sync iCal, notifications, purge indisponibilités |
 
 ---
 
@@ -23,7 +24,7 @@ Application web de planning des interventions ménage pour plusieurs organisatio
 | `tesson` | Studio Tesson    |
 | `nade`   | Studio Nade      |
 
-Ces paires sont définies **en dur** dans `index.html`, `admin.html`, `sync-ical.js` et `notify-departs.js`. L’**organisation par défaut** sur l’écran de connexion / premier choix est **`tesson`** ; l’admin peut fixer une autre valeur via **`defaultOrgId`** dans `adminConfig` (liste « Org. par défaut » dans l’admin).
+Ces paires sont définies **en dur** dans `index.html`, `admin.html`, `compte.html`, `sync-ical.js`, `notify-departs.js` et `purge-unavailability.js`. L’**organisation par défaut** sur l’écran de connexion / premier choix est **`tesson`** ; l’admin peut fixer une autre valeur via **`defaultOrgId`** dans `adminConfig` (liste « Org. par défaut » dans l’admin).
 
 ---
 
@@ -33,14 +34,17 @@ Ces paires sont définies **en dur** dans `index.html`, `admin.html`, `sync-ical
 planning-menage/
 ├── index.html           → Calendrier principal
 ├── admin.html           → Back-office administration
+├── compte.html          → Tableau de bord + compte (intervenantes, hors admin)
 ├── storage-cors.example.json → Exemple CORS bucket Storage (optionnel, si uploads / SDK bloqués en local)
 ├── sync-ical.js         → Sync iCal → Firebase par organisation (cron)
 ├── notify-departs.js    → Notifications Telegram départs du jour (cron)
+├── purge-unavailability.js → Supprime indisponibilités > 3 ans (UTC) sous /unavailability/ (cron mensuel)
 ├── migrate.js           → Script one-shot : copie racine → /orgs/tesson/ (manuel)
 ├── .gitignore           → Ignore les JSON de compte de service dans Firebase/ (local)
 ├── .github/workflows/
 │   ├── sync-ical.yml
-│   └── notify-departs.yml
+│   ├── notify-departs.yml
+│   └── purge-unavailability.yml
 └── README.md
 ```
 
@@ -62,9 +66,21 @@ Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. Ancienne rac
     /cleaningReports → comptes rendus par uid réservation (détail § v4.1 + v4.3 ci-dessous)
     /procedures      → procédures ménage par studio (détail § v4.2 + v4.3 ci-dessous)
     /procedureSuggestions → suggestions d’étapes en attente de validation (v4.3)
+    /unavailability     → indisponibilités par prénom (v4.4.0 — structure réservée étape 2 UI)
   /nade
     (même structure ; remplie selon sync iCal et utilisation)
 ```
+
+### `/unavailability` — indisponibilités (**v4.4.0**, données futures)
+
+Prévu pour une **étape 2** (saisie côté app) ; le nœud peut être **absent** jusqu’à l’implémentation.
+
+```
+/orgs/{orgId}/unavailability/{prenom}/dates/{YYYY-MM-DD} → true
+```
+
+- **`purge-unavailability.js`** (et le workflow **`.github/workflows/purge-unavailability.yml`**, cron **1er du mois 3h00 UTC**) suppriment les clés **`YYYY-MM-DD`** strictement **antérieures** à **aujourd’hui UTC − 3 ans**. Comparaison et « aujourd’hui » en **UTC** (pas de fuseau Paris).
+- Si **`unavailability`** n’existe pas pour une org, le script **ignore** silencieusement cette org.
 
 ### `/assignments` — note d’assignation (**v4.3.4**)
 
@@ -200,13 +216,21 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
 
 **Authentification** (par org)
 - Case à cocher **« Activer l’authentification »** dans l’admin de **l’org concernée** ; session **`menage_session_v1`** globale (prénom), combinée à **`menage_org_v1`** pour savoir quelle base lire.
-- Badge en-tête : **lien** vers **`admin.html`** si rôle 👑 ou mode sans auth (**Admin**) ; **bouton** « Mon compte » (modale mot de passe) si compte ménage sans rôle admin. Pour tester **`admin.html`** en local, le serveur statique doit rester actif (ex. `python -m http.server 5173`) : le calendrier peut sembler vivant via Firebase alors qu’une navigation vers une autre page locale échoue si le serveur est arrêté.
+- Badge en-tête : **lien** vers **`admin.html`** si rôle 👑 ou mode sans auth (**Admin**) ; **bouton** prénom (style discret) vers **`compte.html`** si compte ménage sans rôle admin (**v4.4.0** : tableau de bord + mot de passe sur page dédiée, plus de modale « Mon compte »). Pour tester **`admin.html`** ou **`compte.html`** en local, le serveur statique doit rester actif (ex. `python -m http.server 5173`) : le calendrier peut sembler vivant via Firebase alors qu’une navigation vers une autre page locale échoue si le serveur est arrêté.
 
 **Calendrier**
 - Affichage **S1 / S2** inchangé (noms de studios viennent de `/orgs/{orgId}/config`).
 - **Départs** : si l’assignation a une **`note`** non vide (après trim), le bloc départ affiche **📝** après le libellé (ex. `Départ S1 📝`) — visible par tous (admin et ménagères).
 - **Comptes rendus (rôle ménage, départ où l’on est assignée)** : modale avec onglets **Mon intervention** et **Procédure** (v4.3) — durée personnelle (heures + minutes), champs **communs** commande / commentaire, enregistrement dans **`cleaningReports`** ; onglet **Procédure** : étapes du studio, coches **Fait** (**`stepFeedback`**, temps réel), notes 1–3 persistantes (**`ratings/{Prénom}`**), suggestion d’étape (**+**) ; **v4.3.4** : si une **note d’assignation** existe, **3ᵉ onglet** **📝** (orange, largeur réduite — info optionnelle) : texte **en lecture seule** (« Note de [noteBy ou l’administration] »). Onglet par défaut : **Mon intervention**. Si non assignée, pop-up **M’assigner** uniquement (pas d’onglet procédure) ; **v4.3.4** : si une note existe, encart discret **lecture seule** sous les dates, avant les boutons. Croix de fermeture en haut à droite ; fermeture automatique après **Enregistrer** sur l’onglet intervention.
 - **Badge** du prénom sous le départ : **contour noir** si des heures ont été enregistrées pour cette personne sur ce départ.
+
+### compte.html — Espace intervenante (**v4.4.0**)
+
+- **Accès** : session **`menage_session_v1`** (prénom) + org **`menage_org_v1`** ; sinon redirection vers **`index.html`**. Comptes **admin** : redirection vers **`index.html`** (page réservée aux intervenantes sans rôle admin).
+- **Topbar** : prénom, indicateur sync, **Retour** vers **`index.html`** (session conservée) ; pas de bouton déconnexion (déco sur le calendrier).
+- **Menu burger** : **Dashboard** (défaut), **Compte** ; hashes **`#dashboard`**, **`#compte`**.
+- **Dashboard** : mois (← / libellé / → comme l’admin), KPIs **Interventions ce mois** (une réservation = une intervention si assignée en **c1** ou **c2**), **Prochain départ** (même libellés que le KPI calendrier *sans intervenante* : **Aujourd’hui**, **Demain**, **J-*n***, **Aucun**), **Heures totales ce mois** (somme **`cleaningReports`** pour ce prénom uniquement si **`assignSig`** correspond à l’assignation actuelle — comme **`cleaningReportViewFor`** sur **`index.html`**). Tableau d’historique du mois : date départ **jj/mm/aa**, studio **S1** / **S2**, heures ou **Non renseigné**.
+- **Vue Compte** : changement de mot de passe (même règles qu’avant sur **`index.html`**, écriture **`adminConfig`**, entrée journal **`activityLog`**).
 
 ### admin.html — Back-office
 
@@ -240,6 +264,13 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
 - Parcourt **`tesson`** puis **`nade`** (liste **`ORGS`**).
 - Lit **`/orgs/{orgId}/reservations`**, **`assignments`**, **`config`**, **`adminConfig`** (pour **`telegramEnabled`**).
 - Un message Telegram par départ du jour, avec le **libellé org** dans le titre (sauf si Telegram est désactivé pour cette org).
+
+### purge-unavailability.js (**v4.4.0**)
+
+- Parcourt **`tesson`** puis **`nade`** (même liste que **`notify-departs.js`**).
+- Lit **`/orgs/{orgId}/unavailability`** ; si le nœud est absent, **aucune** action pour cette org.
+- Supprime les entrées **`…/unavailability/{prenom}/dates/{YYYY-MM-DD}`** dont la date est **strictement &lt;** (aujourd’hui **UTC** − 3 ans). Secret **`FIREBASE_SERVICE_ACCOUNT`** uniquement.
+- Workflow : **`.github/workflows/purge-unavailability.yml`** — planification **1er de chaque mois à 3h00 UTC**, Node **20**, **`workflow_dispatch`** possible.
 
 ---
 
@@ -368,17 +399,24 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 4.3.4
+Version : 4.4.0
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
-Fichiers : index.html, admin.html, sync-ical.js, notify-departs.js, migrate.js, .gitignore
+Compte : https://jonathantesson.github.io/planning-menage/compte.html
+Fichiers : index.html, admin.html, compte.html, sync-ical.js, notify-departs.js, purge-unavailability.js, migrate.js, .gitignore
 README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ```
 
 ---
 
 ## Historique des versions
+
+### v4.4.0 — Avril 2026
+- **`compte.html`** : page **intervenante** (menu burger) — **Dashboard** (KPIs mois, historique, règle **`assignSig`** pour les heures, prochain départ aligné sur les libellés du calendrier) et **Compte** (mot de passe).
+- **`index.html`** : clic sur le **prénom** → **`compte.html`** ; suppression de la modale **Mon compte** et des fonctions **`openAccountMenu`** / **`_saveOwnPassword`**.
+- **`purge-unavailability.js`** + **`.github/workflows/purge-unavailability.yml`** : purge mensuelle des indisponibilités **> 3 ans** (UTC), schéma **`/unavailability/{prenom}/dates/{YYYY-MM-DD}`** documenté dans le README.
+- **`APP_VERSION` : 4.4.0** dans **`index.html`**.
 
 ### v4.3.4 — Avril 2026
 - **Calendrier (`index.html`)** — **Note d’assignation** : enregistrement de **`noteBy`** (auteur) lorsque la **note** est non vide à la sauvegarde admin (**`_sa`** / **`assignActorLabel()`**) ; **`noteBy: null`** si la note est vidée.
