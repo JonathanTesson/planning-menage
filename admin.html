@@ -69,6 +69,17 @@ body.admin-nav-ready .admin-burger{display:flex}
 .report-preview{background:#f5f5f0;border-radius:8px;padding:0.75rem;font-size:12px;color:#555;line-height:1.8;margin-top:0.75rem;max-height:200px;overflow-y:auto}
 .nav-btn{background:#fff;border:1px solid #ddd;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:13px;color:#333}
 .nav-btn:hover{background:#f5f5f0}
+.nav-btn:disabled{opacity:0.35;cursor:not-allowed}
+.compte-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}
+.unavail-cal-head{text-align:center;font-size:11px;color:#999;padding:6px 0;font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
+.unavail-cal-cell{min-height:48px;border-radius:8px;border:1px solid #e8e8e2;display:flex;align-items:flex-start;justify-content:flex-start;padding:6px 8px;cursor:default;background:#fff;font-size:14px;font-weight:600;color:#333;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+.unavail-cal-cell--other{opacity:0.35;pointer-events:none;background:#fafaf8}
+.unavail-cal-cell--past{color:#aaa;background:#f3f3ef}
+.unavail-cal-cell--past-busy{background:#fde8ef;border-color:#f0c4d4;color:#999}
+.unavail-cal-cell--future{cursor:pointer}
+.unavail-cal-cell--future:active{opacity:0.92}
+.unavail-cal-cell--busy{background:#fde8e8;border-color:#e8a8a8;color:#8b2f2f}
+.unavail-cal-note{font-size:11px;color:#888;line-height:1.45;margin-top:12px}
 .histo-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:0.5rem}
 .histo-table th{text-align:left;padding:5px 8px;color:#aaa;font-weight:500;border-bottom:1px solid #e8e8e2;font-size:11px}
 .histo-table td{padding:5px 8px;border-bottom:1px solid #f0f0eb;color:#555}
@@ -162,6 +173,7 @@ body.admin-nav-ready .admin-burger{display:flex}
     <a href="#" class="admin-nav-link" data-admin-view="comptes">Comptes</a>
     <a href="#" class="admin-nav-link" data-admin-view="organisation">Organisation</a>
     <a href="#" class="admin-nav-link" data-admin-view="legend">Légende</a>
+    <a href="#" class="admin-nav-link" data-admin-view="indisponibilites">Indisponibilités</a>
   </div>
 </nav>
 
@@ -336,6 +348,27 @@ body.admin-nav-ready .admin-burger{display:flex}
       <div id="admin-app-version" style="font-size:11px;color:#aaa;margin-top:10px;line-height:1.5"></div>
     </div>
     </div>
+
+    <div id="admin-view-indisponibilites" role="region" aria-label="Indisponibilités" style="display:none">
+    <div class="section">
+      <h3><span>🗓️</span> Indisponibilités</h3>
+      <p style="font-size:11px;color:#aaa;margin-bottom:10px;line-height:1.5">Calendrier des jours indisponibles par intervenante (même données que sur la page compte). Les jours passés ne sont pas modifiables.</p>
+      <div class="field-row" style="margin-bottom:14px">
+        <label for="admin-unavail-cleaner-select">Intervenante</label>
+        <select id="admin-unavail-cleaner-select" style="flex:1;min-width:200px;max-width:320px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:#fff" onchange="adminUnavailPickerChange()" title="Choisir une intervenante"></select>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+        <h3 style="margin-bottom:0"><span>🗓️</span> <span id="admin-unavail-month-title">…</span></h3>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button type="button" class="nav-btn" id="admin-unavail-nav-prev" onclick="adminUnavailChangeMonth(-1)">&#8592;</button>
+          <button type="button" class="nav-btn" onclick="adminUnavailChangeMonth(0)" id="admin-unavail-month-btn" style="min-width:55px">…</button>
+          <button type="button" class="nav-btn" id="admin-unavail-nav-next" onclick="adminUnavailChangeMonth(1)">&#8594;</button>
+        </div>
+      </div>
+      <div id="admin-unavail-cal-host"></div>
+      <p class="unavail-cal-note">Touchez un jour pour le marquer indisponible (rouge). Touchez à nouveau pour annuler. Les jours passés ne sont pas modifiables.</p>
+    </div>
+    </div>
   </div>
 </div>
 
@@ -394,7 +427,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.5.0';
+const APP_VERSION = '4.5.1';
 
 /** Studio sélectionné dans la section Procédures (persiste entre re-rendus). */
 let procSelectedStudioIdx = '0';
@@ -435,7 +468,11 @@ let A = {
   selectedYear: new Date().getFullYear(),
   activityEntries: [],
   procedures: {},
-  procedureSuggestions: {}
+  procedureSuggestions: {},
+  adminUnavailMonth: new Date().getMonth(),
+  adminUnavailYear: new Date().getFullYear(),
+  adminUnavailSelectedName: '',
+  adminUnavailDates: {}
 };
 
 function hashSimple(str){
@@ -485,6 +522,159 @@ const cleanerColor = n => {
   const accounts = A.adminConfig.accounts||[];
   const i = accounts.findIndex(a=>a.name===n);
   return i>=0 ? CLEANER_COLORS[i%CLEANER_COLORS.length] : '#aaa';
+};
+
+/** Vue admin courante (pour re-rendre Indisponibilités après maj Firebase). */
+let adminCurrentView='dashboard';
+/** Désinscription listener RTDB `unavailability/{prenom}/dates`. */
+let adminUnavailUnsub=null;
+/** Dernier prénom souscrit (évite de recréer le listener inutilement). */
+let adminUnavailBoundPrenom=null;
+
+function localDateKeyAdmin(d){
+  const y=d.getFullYear();
+  const mo=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${mo}-${day}`;
+}
+
+function adminUnavailMonthIndex(yr,mo){ return yr*12+mo; }
+
+function adminUnavailMonthBounds(){
+  const t=new Date();
+  const minD=new Date(t.getFullYear()-3,t.getMonth(),t.getDate());
+  const maxD=new Date(t.getFullYear()+3,t.getMonth(),t.getDate());
+  return {
+    min:adminUnavailMonthIndex(minD.getFullYear(),minD.getMonth()),
+    max:adminUnavailMonthIndex(maxD.getFullYear(),maxD.getMonth())
+  };
+}
+
+function bindAdminUnavailListener(prenom){
+  const key=prenom||'';
+  if(adminUnavailBoundPrenom===key&&adminUnavailUnsub) return;
+  if(adminUnavailUnsub){ try{ adminUnavailUnsub(); }catch(_){} adminUnavailUnsub=null; }
+  adminUnavailBoundPrenom=key||null;
+  if(!prenom){
+    A.adminUnavailDates={};
+    if(A.unlocked) renderAdminUnavailCal();
+    return;
+  }
+  adminUnavailUnsub=onValue(ref(db,`${ob('unavailability')}/${prenom}/dates`),snap=>{
+    const v=snap.val()||{};
+    const next={};
+    for(const k of Object.keys(v)) if(v[k]) next[k]=true;
+    A.adminUnavailDates=next;
+    if(A.unlocked) renderAdminUnavailCal();
+  });
+}
+
+function syncAdminUnavailSelect(){
+  const sel=document.getElementById('admin-unavail-cleaner-select');
+  if(!sel) return;
+  const cleaners=(A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
+  if(!cleaners.length){
+    sel.innerHTML='<option value="">— Aucun compte ménage —</option>';
+    A.adminUnavailSelectedName='';
+    bindAdminUnavailListener('');
+    renderAdminUnavailCal();
+    return;
+  }
+  sel.innerHTML=cleaners.map(n=>`<option value="${procAttrEsc(n)}">${escHtml(n)}</option>`).join('');
+  const prev=A.adminUnavailSelectedName;
+  const next=prev&&cleaners.includes(prev)?prev:cleaners[0];
+  A.adminUnavailSelectedName=next;
+  sel.value=next;
+  bindAdminUnavailListener(next);
+}
+
+function renderAdminUnavailCal(){
+  if(!A.unlocked) return;
+  const host=document.getElementById('admin-unavail-cal-host');
+  if(!host) return;
+  const yr=A.adminUnavailYear, mo=A.adminUnavailMonth;
+  const {min,max}=adminUnavailMonthBounds();
+  const cur=adminUnavailMonthIndex(yr,mo);
+  const prevB=document.getElementById('admin-unavail-nav-prev');
+  const nextB=document.getElementById('admin-unavail-nav-next');
+  if(prevB) prevB.disabled=cur<=min;
+  if(nextB) nextB.disabled=cur>=max;
+  const title=document.getElementById('admin-unavail-month-title');
+  const mid=document.getElementById('admin-unavail-month-btn');
+  if(title) title.textContent=MO_FR[mo]+' '+yr;
+  if(mid) mid.textContent=MO_FR[mo];
+
+  const first=new Date(yr,mo,1), last=new Date(yr,mo+1,0);
+  let sd=first.getDay(); if(sd===0)sd=7;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const DAYS=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+  let html=DAYS.map(d=>`<div class="unavail-cal-head">${d}</div>`).join('');
+
+  const cell=(d,other)=>{
+    const key=localDateKeyAdmin(d);
+    const isPast=!other&&d.getTime()<today.getTime();
+    const busy=!!A.adminUnavailDates[key];
+    let cls='unavail-cal-cell';
+    if(other) cls+=' unavail-cal-cell--other';
+    else if(isPast) cls+=busy?' unavail-cal-cell--past-busy':' unavail-cal-cell--past';
+    else cls+=busy?' unavail-cal-cell--busy unavail-cal-cell--future':' unavail-cal-cell--future';
+    const click=!other&&!isPast&&A.adminUnavailSelectedName?` onclick="window._adminUnavailToggleDay(${d.getFullYear()},${d.getMonth()},${d.getDate()})" role="button" tabindex="0"`:'';
+    return `<div class="${cls}"${click}><span class="unavail-cal-daynum">${d.getDate()}</span></div>`;
+  };
+
+  for(let i=1;i<sd;i++) html+=cell(new Date(yr,mo,1-sd+i),true);
+  for(let i=1;i<=last.getDate();i++) html+=cell(new Date(yr,mo,i),false);
+  const rem=7-((sd-1+last.getDate())%7);
+  if(rem<7) for(let i=1;i<=rem;i++) html+=cell(new Date(yr,mo+1,i),true);
+  host.innerHTML=`<div class="compte-cal-grid">${html}</div>`;
+}
+
+window.adminUnavailPickerChange=function(){
+  const sel=document.getElementById('admin-unavail-cleaner-select');
+  if(!sel) return;
+  A.adminUnavailSelectedName=sel.value||'';
+  bindAdminUnavailListener(A.adminUnavailSelectedName);
+  renderAdminUnavailCal();
+};
+
+window.adminUnavailChangeMonth=function(dir){
+  const {min,max}=adminUnavailMonthBounds();
+  if(dir===0){
+    const n=new Date();
+    A.adminUnavailMonth=n.getMonth();
+    A.adminUnavailYear=n.getFullYear();
+  }else{
+    const idx=adminUnavailMonthIndex(A.adminUnavailYear,A.adminUnavailMonth)+dir;
+    if(idx<min||idx>max) return;
+    A.adminUnavailMonth+=dir;
+    if(A.adminUnavailMonth>11){A.adminUnavailMonth=0;A.adminUnavailYear++;}
+    if(A.adminUnavailMonth<0){A.adminUnavailMonth=11;A.adminUnavailYear--;}
+  }
+  renderAdminUnavailCal();
+};
+
+window._adminUnavailToggleDay=async function(y,m,day){
+  if(!A.unlocked||!A.adminUnavailSelectedName) return;
+  const d=new Date(y,m,day);
+  const t0=new Date(); t0.setHours(0,0,0,0);
+  if(d.getTime()<t0.getTime()) return;
+  const dateKey=localDateKeyAdmin(d);
+  const prenom=A.adminUnavailSelectedName;
+  const was=!!A.adminUnavailDates[dateKey];
+  const backup={...A.adminUnavailDates};
+  if(was) delete A.adminUnavailDates[dateKey]; else A.adminUnavailDates[dateKey]=true;
+  renderAdminUnavailCal();
+  const path=`${ob('unavailability')}/${prenom}/dates/${dateKey}`;
+  try{
+    if(was) await remove(ref(db,path));
+    else await set(ref(db,path),true);
+    setSyncStatus('ok');
+  }catch(_){
+    A.adminUnavailDates=backup;
+    renderAdminUnavailCal();
+    showToast('Erreur synchronisation — réessayez');
+    setSyncStatus('err');
+  }
 };
 
 // ─── Firebase listeners ───────────────────────────────────────────────────────
@@ -569,14 +759,15 @@ window.logout = function(){
   window.location.href='index.html';
 };
 
-/** Vues : dashboard (stats, export, historique, déco), procédures, comptes + journal, organisation (studios), légende */
-const ADMIN_VIEW_IDS=['dashboard','procedures','comptes','organisation','legend'];
+/** Vues : dashboard (stats, export, historique, déco), procédures, comptes + journal, organisation (studios), légende, indisponibilités */
+const ADMIN_VIEW_IDS=['dashboard','procedures','comptes','organisation','legend','indisponibilites'];
 
 /** Une seule fois : ouvrir la vue correspondant au hash (#comptes, #legend, #procedures, …) */
 let adminUiHashApplied=false;
 
 window.setAdminUiView=function(view,opts){
   const v=ADMIN_VIEW_IDS.includes(view)?view:'dashboard';
+  adminCurrentView=v;
   let ok=false;
   ADMIN_VIEW_IDS.forEach(id=>{
     const el=document.getElementById('admin-view-'+id);
@@ -592,6 +783,10 @@ window.setAdminUiView=function(view,opts){
   }catch(_){}
   if(!(opts&&opts.noScroll)) window.scrollTo(0,0);
   if(v==='procedures'&&A.unlocked) renderProcedures();
+  if(v==='indisponibilites'&&A.unlocked){
+    syncAdminUnavailSelect();
+    renderAdminUnavailCal();
+  }
 };
 
 function setAdminNavOpen(open){
@@ -657,6 +852,10 @@ function renderAdminContent(){
   bindProcedureFileInputOnce();
   const av=document.getElementById('admin-app-version');
   if(av) av.textContent='Planning Ménage · version '+APP_VERSION;
+  if(A.unlocked&&adminCurrentView==='indisponibilites'){
+    syncAdminUnavailSelect();
+    renderAdminUnavailCal();
+  }
   if(A.unlocked&&!adminUiHashApplied){
     adminUiHashApplied=true;
     let h=location.hash.slice(1);
