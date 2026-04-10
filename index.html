@@ -120,6 +120,21 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 .menage-tab{background:#f0f0eb;border:1px solid #e0e0d8;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;color:#666;cursor:pointer;flex:1;min-width:0;text-align:center}
 .menage-tab:hover{background:#e8e8e2;color:#333}
 .menage-tab--active{background:#fff;border-color:#378ADD;color:#185FA5;box-shadow:0 0 0 1px #378ADD22}
+/* Onglet note : optionnel — ne prend pas la même largeur que Mon intervention / Procédure */
+.menage-tab--note{
+  flex:0 0 auto;
+  min-width:0;
+  width:auto;
+  padding:6px 5px;
+  color:#F59E0B;
+  font-size:15px;
+  line-height:1;
+}
+.menage-tab--note.menage-tab--active{border-color:#F59E0B;color:#F59E0B;box-shadow:0 0 0 1px rgba(245,158,11,0.15)}
+.menage-note-panel{margin-top:0.25rem}
+.assign-note-readonly{background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 12px;margin:0 0 1rem;font-size:12px;color:#666;line-height:1.45}
+.assign-note-readonly-by{font-size:11px;color:#92400e;font-weight:600;margin-bottom:6px}
+.assign-note-readonly-text{color:#555;white-space:pre-wrap;word-break:break-word}
 .menage-procedure-panel{margin-top:0.25rem}
 .menage-procedure-top{display:flex;align-items:center;justify-content:flex-end;margin-bottom:8px}
 .menage-procedure-plus{width:36px;height:36px;border-radius:10px;border:1px solid #ddd;background:#fff;font-size:20px;line-height:1;cursor:pointer;color:#333;display:flex;align-items:center;justify-content:center;padding:0}
@@ -372,7 +387,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.3.3';
+const APP_VERSION = '4.3.4';
 
 function getStoredOrgId(){
   try{
@@ -1073,11 +1088,19 @@ function setStatus(msg,loading=false){
 }
 
 const getKey=r=>r.uid;
+function assignNoteTrimmed(note){
+  return String(note??'').trim();
+}
 function getAssignment(r){
   const a=S.assignments[getKey(r)];
-  if(!a) return {c1:null,c2:null,note:''};
-  if(typeof a==='string') return {c1:a,c2:null,note:''};
-  return {c1:a.cleaner||a.c1||null,c2:a.c2||null,note:a.note||''};
+  if(!a) return {c1:null,c2:null,note:'',noteBy:null};
+  if(typeof a==='string') return {c1:a,c2:null,note:'',noteBy:null};
+  return {
+    c1:a.cleaner||a.c1||null,
+    c2:a.c2||null,
+    note:a.note||'',
+    noteBy:a.noteBy!=null&&a.noteBy!==''?a.noteBy:null
+  };
 }
 
 function cleanerColor(n){
@@ -1184,9 +1207,10 @@ function renderCalendar(){
     for(let si=0;si<2;si++){
       if(showDep){
         for(const r of getCheckouts(d,si)){
-          const {c1,c2}=getAssignment(r);
+          const {c1,c2,note}=getAssignment(r);
           if(S.filterCleaner && c1!==S.filterCleaner && c2!==S.filterCleaner) continue;
-          inner+=`<div class="resa-block checkout" onclick="window._oa('${getKey(r)}')" title="Départ — ${S.studioNames[si]}">Départ S${si+1}</div>`;
+          const noteMark=assignNoteTrimmed(note)?' 📝':'';
+          inner+=`<div class="resa-block checkout" onclick="window._oa('${getKey(r)}')" title="Départ — ${S.studioNames[si]}">Départ S${si+1}${noteMark}</div>`;
           // Tout le monde voit les noms assignés
           if(c1||c2){
             const rk=getKey(r);
@@ -1381,17 +1405,26 @@ window._renderMenageProcedureList=function(){
 window._menageTab=function(which){
   const pi=document.getElementById('menage-panel-i');
   const pp=document.getElementById('menage-panel-p');
+  const pn=document.getElementById('menage-panel-n');
   const bi=document.getElementById('menage-tab-btn-i');
   const bp=document.getElementById('menage-tab-btn-p');
+  const bn=document.getElementById('menage-tab-btn-n');
   if(!pi||!pp||!bi||!bp) return;
-  const isI=which==='i';
-  pi.style.display=isI?'':'none';
-  pp.style.display=isI?'none':'';
-  bi.classList.toggle('menage-tab--active',isI);
-  bp.classList.toggle('menage-tab--active',!isI);
-  bi.setAttribute('aria-selected',isI?'true':'false');
-  bp.setAttribute('aria-selected',isI?'false':'true');
-  if(!isI) window._renderMenageProcedureList();
+  const showI=which==='i';
+  const showP=which==='p';
+  const showN=which==='n'&&pn&&bn;
+  pi.style.display=showI?'':'none';
+  pp.style.display=showP?'':'none';
+  if(pn) pn.style.display=showN?'':'none';
+  bi.classList.toggle('menage-tab--active',showI);
+  bp.classList.toggle('menage-tab--active',showP);
+  if(bn){
+    bn.classList.toggle('menage-tab--active',showN);
+    bn.setAttribute('aria-selected',showN?'true':'false');
+  }
+  bi.setAttribute('aria-selected',showI?'true':'false');
+  bp.setAttribute('aria-selected',showP?'true':'false');
+  if(showP) window._renderMenageProcedureList();
 };
 
 window._menageProcCheckIdx=function(idx,checked){
@@ -1550,7 +1583,28 @@ window._submitMenageSuggest=async function(){
 
 window._oa = function(key){
   const r=findResa(key); if(!r) return;
-  const {c1,c2,note}=getAssignment(r);
+  const {c1,c2,note,noteBy}=getAssignment(r);
+  const hasAssignNote=!!assignNoteTrimmed(note);
+  const assignNoteAuthorHtml=(noteBy&&String(noteBy).trim())
+    ? escHtml(String(noteBy).trim())
+    : 'l\'administration';
+  const assignNoteReadonlyBlock=hasAssignNote
+    ? `<div class="assign-note-readonly" role="region" aria-label="Note d’assignation">
+        <div class="assign-note-readonly-by">Note de ${assignNoteAuthorHtml}</div>
+        <div class="assign-note-readonly-text">${escHtml(note)}</div>
+      </div>`
+    : '';
+  const menageNoteTabBtn=hasAssignNote
+    ? `<button type="button" class="menage-tab menage-tab--note" id="menage-tab-btn-n" role="tab" aria-selected="false" onclick="window._menageTab('n')" title="Note d’assignation" aria-label="Note d’assignation">📝</button>`
+    : '';
+  const menageNotePanel=hasAssignNote
+    ? `<div id="menage-panel-n" class="menage-note-panel" style="display:none" role="tabpanel">
+        <div class="modal-field" style="margin-top:0.75rem">
+          <label style="font-size:12px;color:#888;display:block;margin-bottom:6px;font-weight:500">Note de ${assignNoteAuthorHtml}</label>
+          <div class="assign-note-readonly-text" style="background:#fafaf8;border:1px solid #e8e8e2;border-radius:8px;padding:10px 12px;font-size:13px;color:#555;line-height:1.45;white-space:pre-wrap;word-break:break-word">${escHtml(note)}</div>
+        </div>
+      </div>`
+    : '';
   const user=S.currentUser;
   const isAdminOrNoAuth=!user||user.noAuth||user.admin;
   const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
@@ -1574,6 +1628,7 @@ window._oa = function(key){
               <div class="menage-tabs" role="tablist">
                 <button type="button" class="menage-tab menage-tab--active" id="menage-tab-btn-i" role="tab" aria-selected="true" onclick="window._menageTab('i')">Mon intervention</button>
                 <button type="button" class="menage-tab" id="menage-tab-btn-p" role="tab" aria-selected="false" onclick="window._menageTab('p')">Procédure</button>
+                ${menageNoteTabBtn}
               </div>
             </div>
             <button type="button" class="modal-close-x" onclick="window._cm()" aria-label="Fermer" title="Fermer">×</button>
@@ -1614,6 +1669,7 @@ window._oa = function(key){
             </div>
             <div class="menage-procedure-scroll" id="menage-procedure-list"></div>
           </div>
+          ${menageNotePanel}
         </div>
       </div>`;
       const oid=getStoredOrgId();
@@ -1635,6 +1691,7 @@ window._oa = function(key){
             <strong>${escHtml(S.studioNames[r.studio])}</strong><br>
             Arrivée : ${fmt(r.start)}<br>
             Départ : ${fmt(r.end)} (${n} nuit${n>1?'s':''})</div>
+          ${assignNoteReadonlyBlock}
           <p style="font-size:13px;color:#555;margin-bottom:1rem">Cliquez sur + pour vous assigner à ce départ.</p>
           <div class="modal-btns">
             <button class="btn-cancel" onclick="window._cm()">Annuler</button>
@@ -1677,13 +1734,15 @@ window._oa = function(key){
 window._assignSelf = function(key){
   const user=S.currentUser; if(!user) return;
   const r=findResa(key);
-  const {c1,c2,note}=getAssignment(r||{uid:key});
+  const {c1,c2,note,noteBy}=getAssignment(r||{uid:key});
   let n1=c1,n2=c2;
   if(!n1) n1=user.name;
   else if(!n2) n2=user.name;
   else { showToast('2 intervenantes déjà assignées'); window._cm(); return; }
   syncCleaningReportAfterAssignmentChange(key,c1,c2,n1,n2);
-  S.assignments[key]={c1:n1,c2:n2,note};
+  const selfAsg={c1:n1,c2:n2,note};
+  if(noteBy!=null) selfAsg.noteBy=noteBy;
+  S.assignments[key]=selfAsg;
   const st=r?S.studioNames[r.studio]:'';
   logActivity({ type:'assign', actor:user.name, uid:key, text:`${user.name} s'est assignée — ${st} — départ ${resaDepartLabel(r)}` });
   saveAssignments();
@@ -1694,14 +1753,18 @@ window._assignSelf = function(key){
 window._removeSelf = function(key){
   const user=S.currentUser; if(!user) return;
   const r=findResa(key);
-  const {c1,c2,note}=getAssignment(r||{uid:key});
+  const {c1,c2,note,noteBy}=getAssignment(r||{uid:key});
   let n1=c1,n2=c2;
   if(c1===user.name){ n1=c2||null; n2=null; }
   else if(c2===user.name){ n1=c1; n2=null; }
   else { window._cm(); return; }
   syncCleaningReportAfterAssignmentChange(key,c1,c2,n1,n2);
   if(!n1&&!n2) delete S.assignments[key];
-  else S.assignments[key]={c1:n1,c2:n2,note};
+  else{
+    const rest={c1:n1,c2:n2,note};
+    if(noteBy!=null) rest.noteBy=noteBy;
+    S.assignments[key]=rest;
+  }
   const st=r?S.studioNames[r.studio]:'';
   logActivity({ type:'assign', actor:user.name, uid:key, text:`${user.name} s'est retirée — ${st} — départ ${resaDepartLabel(r)}` });
   saveAssignments();
@@ -1756,8 +1819,12 @@ window._sa = function(key){
     text=`${who} a défini ${names} (avant : ${was}) — ${st} — départ ${dep}`;
   }
   logActivity({ type:'assign_admin', actor:who, uid:key, text });
-  if(c1||c2) S.assignments[key]={c1:nc1,c2:nc2,note};
-  else delete S.assignments[key];
+  if(c1||c2){
+    const admAsg={c1:nc1,c2:nc2,note};
+    if(assignNoteTrimmed(note)) admAsg.noteBy=who;
+    else admAsg.noteBy=null;
+    S.assignments[key]=admAsg;
+  }else delete S.assignments[key];
   saveAssignments();
   showToast([c1,c2].filter(Boolean).join(' + ')||'Assignation supprimée');
   window._cm(); render();

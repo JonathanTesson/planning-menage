@@ -1,8 +1,8 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 4.3.3** — Avril 2026
+**Version : 4.3.4** — Avril 2026
 
-Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin.
+Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin. **Note d’assignation** côté calendrier (**`note`** + traçage **`noteBy`**, indicateur **📝** sur les départs, lecture seule pour les ménagères) — détail § **`/assignments`** et § **index.html** ci-dessous.
 
 ---
 
@@ -65,6 +65,15 @@ Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. Ancienne rac
   /nade
     (même structure ; remplie selon sync iCal et utilisation)
 ```
+
+### `/assignments` — note d’assignation (**v4.3.4**)
+
+Sous **`/orgs/{orgId}/assignments/{uidRéservation}`**, l’objet d’assignation comporte en pratique **`c1`**, **`c2`** (ou format historique : valeur chaîne unique pour une seule intervenante), **`note`** (texte libre, ex. consigne clé) et, depuis la v4.3.4, **`noteBy`** :
+
+| Champ | Rôle |
+|--------|------|
+| `note` | Saisie dans la modale **Assigner les intervenantes** sur **`index.html`** (comptes admin ou mode sans auth). |
+| `noteBy` | Renseigné **uniquement** si `note` est non vide après trim : prénom ou libellé d’acteur au moment de l’enregistrement (**`assignActorLabel()`** — admin connecté, ou **« Mode ouvert »** sans auth). Si la note est vide : **`noteBy: null`** (efface un ancien auteur). **Données existantes** sans `noteBy` : l’UI affiche **« l’administration »** comme source de la note. Lors d’un **M’assigner** / **Me retirer**, **`noteBy`** est **conservé** si présent (la note n’est pas modifiée par les ménagères). |
 
 ### Champ optionnel `sharedWith` (comptes)
 
@@ -195,11 +204,13 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
 
 **Calendrier**
 - Affichage **S1 / S2** inchangé (noms de studios viennent de `/orgs/{orgId}/config`).
-- **Comptes rendus (rôle ménage, départ où l’on est assignée)** : modale avec onglets **Mon intervention** et **Procédure** (v4.3) — durée personnelle (heures + minutes), champs **communs** commande / commentaire, enregistrement dans **`cleaningReports`** ; onglet **Procédure** : étapes du studio, coches **Fait** (**`stepFeedback`**, temps réel), notes 1–3 persistantes (**`ratings/{Prénom}`**), suggestion d’étape (**+**) ; si non assignée, pop-up **M’assigner** seule (pas d’onglet procédure). Croix de fermeture en haut à droite ; fermeture automatique après **Enregistrer** sur l’onglet intervention.
+- **Départs** : si l’assignation a une **`note`** non vide (après trim), le bloc départ affiche **📝** après le libellé (ex. `Départ S1 📝`) — visible par tous (admin et ménagères).
+- **Comptes rendus (rôle ménage, départ où l’on est assignée)** : modale avec onglets **Mon intervention** et **Procédure** (v4.3) — durée personnelle (heures + minutes), champs **communs** commande / commentaire, enregistrement dans **`cleaningReports`** ; onglet **Procédure** : étapes du studio, coches **Fait** (**`stepFeedback`**, temps réel), notes 1–3 persistantes (**`ratings/{Prénom}`**), suggestion d’étape (**+**) ; **v4.3.4** : si une **note d’assignation** existe, **3ᵉ onglet** **📝** (orange, largeur réduite — info optionnelle) : texte **en lecture seule** (« Note de [noteBy ou l’administration] »). Onglet par défaut : **Mon intervention**. Si non assignée, pop-up **M’assigner** uniquement (pas d’onglet procédure) ; **v4.3.4** : si une note existe, encart discret **lecture seule** sous les dates, avant les boutons. Croix de fermeture en haut à droite ; fermeture automatique après **Enregistrer** sur l’onglet intervention.
 - **Badge** du prénom sous le départ : **contour noir** si des heures ont été enregistrées pour cette personne sur ce départ.
 
 ### admin.html — Back-office
 
+- La **note** sur une réservation (champ **Note** de la modale d’assignation) est saisie depuis **`index.html`** (pas depuis une vue dédiée de l’admin). **`noteBy`** est enregistré côté **`index.html`** lors de l’enregistrement admin — voir § **`/assignments`**.
 - **Sans** `menage_org_v1` valide : **redirection vers `index.html`**.
 - Toutes les opérations Firebase sous **`/orgs/{orgId}/`** pour l’org choisie sur le calendrier.
 - **Topbar** : titre **Administration** et **nom de l’organisation** uniquement (sans suffixe « Planning Ménage ») ; **menu burger** à gauche ; retour **focus** sur le burger à la fermeture du tiroir (accessibilité).
@@ -357,7 +368,7 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 4.3.3
+Version : 4.3.4
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
@@ -368,6 +379,14 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ---
 
 ## Historique des versions
+
+### v4.3.4 — Avril 2026
+- **Calendrier (`index.html`)** — **Note d’assignation** : enregistrement de **`noteBy`** (auteur) lorsque la **note** est non vide à la sauvegarde admin (**`_sa`** / **`assignActorLabel()`**) ; **`noteBy: null`** si la note est vidée.
+- **Calendrier** : indicateur **📝** sur le libellé des **départs** lorsqu’une note existe (trim).
+- **Ménagère non assignée** : affichage **lecture seule** de la note (auteur **noteBy** ou **l’administration** si absent) dans la pop-up **M’assigner**.
+- **Ménagère assignée** : **3ᵉ onglet** **📝** (orange, compact) dans la modale **Mon intervention** si une note existe ; contenu en lecture seule ; onglets principaux **Mon intervention** / **Procédure** inchangés.
+- **Self-assign / retrait** : conservation de **`noteBy`** lorsque l’objet assignation est réécrit.
+- **`APP_VERSION` : 4.3.4** dans `index.html` et `admin.html`.
 
 ### v4.3.3 — Avril 2026
 - **Admin (`admin.html`)** : **Procédure** — (1) suppression de **`forceFullRebuild=sugs.length>0`** qui empêchait le rendu incrémental des **étapes officielles** dès qu’une suggestion existait ; (2) **cause principale** du rechargement des **photos orange** : à **chaque** appel de **`renderProcedures()`** (y compris après un blur sur une étape officielle), le bloc **`proc-suggestions-block`** était entièrement refait en **`innerHTML`**, ce qui **recréait** les vignettes suggestion. Désormais une **signature** (ids + champs affichés) évite de toucher au DOM des suggestions si leurs données n’ont pas changé.
