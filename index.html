@@ -47,6 +47,7 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 .kpi-filter-btn{padding:3px 8px;border-radius:12px;font-size:10px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#555;transition:all 0.12s;line-height:1.4;text-align:center}
 .kpi-filter-btn.arr.active{background:#1047a0;color:#fff;border-color:#1047a0}
 .kpi-filter-btn.dep.active{background:#7a4a00;color:#fff;border-color:#7a4a00}
+.kpi-filter-btn.indispo.active{background:#E24B4A;color:#fff;border-color:#E24B4A}
 
 /* Controls */
 .controls-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:0.5rem}
@@ -56,7 +57,7 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 /* Calendar */
 .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:0.5rem}
 .day-header{text-align:center;font-size:11px;color:#999;padding:4px 0;font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
-.day-cell{min-height:72px;border-radius:8px;border:1px solid #e8e8e2;padding:4px;background:#fff;transition:border-color 0.1s}
+.day-cell{position:relative;min-height:72px;border-radius:8px;border:1px solid #e8e8e2;padding:4px;background:#fff;transition:border-color 0.1s}
 .day-cell:hover{border-color:#bbb}
 .day-cell.other-month{opacity:0.3;background:#fafaf8}
 .day-cell.today{border-color:#378ADD;border-width:2px}
@@ -74,6 +75,10 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 .assign-wrap{margin-top:1px;margin-bottom:2px}
 .assign-badge{display:inline-block;font-size:9px;background:#f0f0eb;border-radius:3px;padding:1px 4px;color:#555;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
 .assign-badge-hours{box-shadow:0 0 0 1px #1a1a1a}
+.unavail-pips{position:absolute;top:2px;right:2px;display:flex;flex-direction:row-reverse;flex-wrap:wrap;justify-content:flex-end;align-items:flex-start;gap:2px;max-width:58%;z-index:2;pointer-events:none;line-height:0}
+.unavail-pip{position:relative;pointer-events:auto;width:13px;height:13px;min-width:13px;min-height:13px;border-radius:50%;border:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;background:#fde8e8;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.unavail-pip:active{opacity:0.88;transform:scale(0.96)}
+.unavail-pip-text{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:8px;font-weight:400;color:#1a1a1a;line-height:0;text-align:center;pointer-events:none;user-select:none;transform:translateY(-0.5px)}
 
 /* Legend */
 .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:0.5rem;padding:0.5rem 0;border-top:1px solid #e8e8e2;align-items:center}
@@ -222,6 +227,8 @@ html[data-menage-org-gate="1"] #main-app{display:none!important}
   .chip{font-size:10px;padding:3px 8px}
   .status-pip{width:5px;height:5px}
   .kpi-value{font-size:16px}
+  .unavail-pip{width:12px;height:12px;min-width:12px;min-height:12px}
+  .unavail-pip-text{font-size:7px}
 }
 </style>
 </head>
@@ -387,7 +394,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.4.0';
+const APP_VERSION = '4.5.0';
 
 function getStoredOrgId(){
   try{
@@ -412,9 +419,12 @@ let S = {
   showSettings: false,
   filterCleaner: null,
   filterType: 'dep',
+  showUnavailability: false,
   currentUser: null,  // { name, menage, admin }
   cleaningReports: {},
-  procedures: {}
+  procedures: {},
+  /** @type {Record<string, Record<string, true>>} prénom → { 'YYYY-MM-DD': true } (dates locales, cf. normalizeUnavailability) */
+  unavailability: {}
 };
 
 /** Feedback coches procédure pour la modale ménage (mis à jour par onValue sur stepFeedback). */
@@ -548,6 +558,33 @@ function hashSimple(str){
   let h=0;
   for(let i=0;i<str.length;i++) h=((h<<5)-h)+str.charCodeAt(i),h|=0;
   return h.toString(36);
+}
+
+/** Clé jour **locale** (alignée sur le calendrier), format YYYY-MM-DD. */
+function localDateKey(d){
+  const y=d.getFullYear();
+  const mo=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${mo}-${day}`;
+}
+
+/**
+ * RTDB : /unavailability/{prenom}/dates/{YYYY-MM-DD} → objet aplati { prénom: { date: true } }.
+ * Si un jour les prénoms contiennent `. # $ [ ]`, Firebase impose d’encoder les segments de chemin — pas le cas actuellement.
+ */
+function normalizeUnavailability(raw){
+  const out={};
+  if(!raw||typeof raw!=='object') return out;
+  for(const prenom of Object.keys(raw)){
+    const node=raw[prenom];
+    if(!node||typeof node!=='object'||!node.dates||typeof node.dates!=='object') continue;
+    const flat={};
+    for(const dk of Object.keys(node.dates)){
+      if(node.dates[dk]) flat[dk]=true;
+    }
+    if(Object.keys(flat).length) out[prenom]=flat;
+  }
+  return out;
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -886,6 +923,11 @@ function initFirebaseAndApp(){
       setSyncStatus('ok',`Sync ${fmt}`);
     }
   });
+
+  onValue(ref(db,ob('unavailability')), snap=>{
+    S.unavailability=normalizeUnavailability(snap.val());
+    if(fbReady&&S.currentUser) render();
+  });
 }
 
 function showOrgFirst(){
@@ -1103,6 +1145,7 @@ function renderKpi(){
       <div class="kpi-filter-btns">
         <button class="kpi-filter-btn arr${S.filterType==='all'||S.filterType==='arr'?' active':''}" onclick="window._toggleType('arr')">Arrivées</button>
         <button class="kpi-filter-btn dep${S.filterType==='all'||S.filterType==='dep'?' active':''}" onclick="window._toggleType('dep')">Départs</button>
+        <button type="button" class="kpi-filter-btn indispo${S.showUnavailability?' active':''}" onclick="window._toggleUnavailability()">Indispo</button>
       </div>
     </div>`;
 }
@@ -1122,6 +1165,25 @@ function renderControls(){
     </div>`;
 }
 
+function buildUnavailPipsHtml(d){
+  if(!S.showUnavailability) return '';
+  const dateKey=localDateKey(d);
+  const cleaners=(S.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
+  const list=S.filterCleaner?cleaners.filter(c=>c===S.filterCleaner):cleaners;
+  const names=[];
+  for(const n of list){
+    if(S.unavailability[n]?.[dateKey]) names.push(n);
+  }
+  if(!names.length) return '';
+  const btns=names.map(n=>{
+    const t=String(n||'').trim();
+    const ch=t?t.charAt(0).toUpperCase():'?';
+    const onClick=`event.stopPropagation();window._indispoModal(${JSON.stringify(n)},${JSON.stringify(dateKey)})`;
+    return `<button type="button" class="unavail-pip" onclick="${menageAttrEsc(onClick)}" title="${menageAttrEsc(n)}" aria-label="${menageAttrEsc(n+' indisponible sur cette date')}"><span class="unavail-pip-text">${escHtml(ch)}</span></button>`;
+  }).join('');
+  return `<div class="unavail-pips">${btns}</div>`;
+}
+
 function renderCalendar(){
   const yr=S.currentYear, mo=S.currentMonth;
   const first=new Date(yr,mo,1), last=new Date(yr,mo+1,0);
@@ -1139,7 +1201,7 @@ function renderCalendar(){
     const isToday=d.getTime()===today.getTime();
     const pip=other?null:getDayPip(d);
     const pipHtml=pip?`<span class="status-pip ${pip}"></span>`:'';
-    let inner=`<div class="day-num-row"><span class="day-num">${d.getDate()}</span>${pipHtml}</div>`;
+    let inner=`${buildUnavailPipsHtml(d)}<div class="day-num-row"><span class="day-num">${d.getDate()}</span>${pipHtml}</div>`;
 
     for(let si=0;si<2;si++){
       if(showDep){
@@ -1783,6 +1845,27 @@ window._toggleType=t=>{
   else if(S.filterType==='none') S.filterType=t;
   else S.filterType='all';
   render();
+};
+
+window._toggleUnavailability=function(){
+  S.showUnavailability=!S.showUnavailability;
+  render();
+};
+
+window._indispoModal=function(name,dateKey){
+  const parts=String(dateKey||'').split('-');
+  const nice=parts.length===3?`${parts[2]}/${parts[1]}/${parts[0]}`:escHtml(String(dateKey||''));
+  const n=escHtml(name||'');
+  document.getElementById('modal-container').innerHTML=`
+    <div class="modal-overlay" onclick="if(event.target===this)window._cm()">
+      <div class="modal">
+        <div class="modal-header-row">
+          <h3>Indisponibilité</h3>
+          <button type="button" class="modal-close-x" onclick="window._cm()" aria-label="Fermer" title="Fermer">×</button>
+        </div>
+        <p class="modal-shared-hint" style="margin-top:0"><strong style="color:#555">${n}</strong> indisponible sur cette date (${nice}).</p>
+      </div>
+    </div>`;
 };
 
 window.changeMonth=d=>{

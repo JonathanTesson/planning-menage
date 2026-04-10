@@ -68,6 +68,17 @@ body.compte-nav-ready .admin-burger{display:flex}
 .toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
 .empty-hint{font-size:12px;color:#aaa;padding:8px 0}
+.compte-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}
+.unavail-cal-head{text-align:center;font-size:11px;color:#999;padding:6px 0;font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
+.unavail-cal-cell{min-height:48px;border-radius:8px;border:1px solid #e8e8e2;display:flex;align-items:flex-start;justify-content:flex-start;padding:6px 8px;cursor:default;background:#fff;font-size:14px;font-weight:600;color:#333;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+.unavail-cal-cell--other{opacity:0.35;pointer-events:none;background:#fafaf8}
+.unavail-cal-cell--past{color:#aaa;background:#f3f3ef}
+.unavail-cal-cell--past-busy{background:#fde8ef;border-color:#f0c4d4;color:#999}
+.unavail-cal-cell--future{cursor:pointer}
+.unavail-cal-cell--future:active{opacity:0.92}
+.unavail-cal-cell--busy{background:#fde8e8;border-color:#e8a8a8;color:#8b2f2f}
+.unavail-cal-note{font-size:11px;color:#888;line-height:1.45;margin-top:12px}
+.nav-btn:disabled{opacity:0.35;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -77,6 +88,7 @@ body.compte-nav-ready .admin-burger{display:flex}
   <div class="admin-nav-panel-inner">
     <a href="#" class="admin-nav-link" data-compte-view="dashboard">Dashboard</a>
     <a href="#" class="admin-nav-link" data-compte-view="compte">Compte</a>
+    <a href="#" class="admin-nav-link" data-compte-view="indisponibilites">Indisponibilités</a>
   </div>
 </nav>
 
@@ -156,6 +168,21 @@ body.compte-nav-ready .admin-burger{display:flex}
       </div>
     </div>
 
+    <div id="compte-view-indisponibilites" role="region" aria-label="Indisponibilités" style="display:none">
+      <div class="section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+          <h3 style="margin-bottom:0"><span>🗓️</span> <span id="unavail-month-title">…</span></h3>
+          <div style="display:flex;align-items:center;gap:6px">
+            <button type="button" class="nav-btn" id="unavail-nav-prev" onclick="window.unavailChangeMonth(-1)">&#8592;</button>
+            <button type="button" class="nav-btn" onclick="window.unavailChangeMonth(0)" id="unavail-month-btn" style="min-width:55px">…</button>
+            <button type="button" class="nav-btn" id="unavail-nav-next" onclick="window.unavailChangeMonth(1)">&#8594;</button>
+          </div>
+        </div>
+        <div id="unavail-cal-host"></div>
+        <p class="unavail-cal-note">Touchez un jour pour le marquer indisponible (rouge). Touchez à nouveau pour annuler. Les jours passés ne sont pas modifiables.</p>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -163,7 +190,7 @@ body.compte-nav-ready .admin-burger{display:flex}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue, push, get, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, onValue, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
@@ -186,7 +213,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 const MO_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-const COMPTE_VIEW_IDS = ['dashboard','compte'];
+const COMPTE_VIEW_IDS = ['dashboard','compte','indisponibilites'];
 
 function getStoredOrgId(){
   try{
@@ -217,6 +244,10 @@ let C = {
   adminConfig: { authEnabled: false, accounts: [], defaultOrgId: 'tesson' },
   selectedMonth: new Date().getMonth(),
   selectedYear: new Date().getFullYear(),
+  unavailMonth: new Date().getMonth(),
+  unavailYear: new Date().getFullYear(),
+  /** @type {Record<string, true>} dates locales YYYY-MM-DD */
+  unavailMyDates: {},
   unlocked: false
 };
 
@@ -228,6 +259,27 @@ function hashSimple(str){
   let h=0;
   for(let i=0;i<str.length;i++) h=((h<<5)-h)+str.charCodeAt(i),h|=0;
   return h.toString(36);
+}
+
+/** Jour civil local → YYYY-MM-DD (aligné sur le calendrier principal). */
+function localDateKey(d){
+  const y=d.getFullYear();
+  const mo=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${mo}-${day}`;
+}
+
+function unavailMonthIndex(yr,mo){ return yr*12+mo; }
+
+/** Fenêtre mois : aujourd’hui ± 3 ans (calendrier local). */
+function unavailMonthBounds(){
+  const t=new Date();
+  const minD=new Date(t.getFullYear()-3,t.getMonth(),t.getDate());
+  const maxD=new Date(t.getFullYear()+3,t.getMonth(),t.getDate());
+  return {
+    min:unavailMonthIndex(minD.getFullYear(),minD.getMonth()),
+    max:unavailMonthIndex(maxD.getFullYear(),maxD.getMonth())
+  };
 }
 
 function setSyncStatus(s){
@@ -352,6 +404,7 @@ function verifyAndUnlock(){
     else window.setCompteView('dashboard',{noScroll:true});
   }
   renderCompteDashboard();
+  renderUnavailCal();
 }
 
 function setupAccountForm(){
@@ -399,6 +452,84 @@ window.compteChangeMonth=function(dir){
   }
   renderCompteDashboard();
 };
+
+window.unavailChangeMonth=function(dir){
+  const {min,max}=unavailMonthBounds();
+  if(dir===0){
+    const n=new Date();
+    C.unavailMonth=n.getMonth();
+    C.unavailYear=n.getFullYear();
+  }else{
+    let idx=unavailMonthIndex(C.unavailYear,C.unavailMonth)+dir;
+    if(idx<min||idx>max) return;
+    C.unavailMonth+=dir;
+    if(C.unavailMonth>11){C.unavailMonth=0;C.unavailYear++;}
+    if(C.unavailMonth<0){C.unavailMonth=11;C.unavailYear--;}
+  }
+  renderUnavailCal();
+};
+
+window._unavailToggleDay=async function(y,m,day){
+  if(!C.unlocked) return;
+  const d=new Date(y,m,day);
+  const t0=new Date(); t0.setHours(0,0,0,0);
+  if(d.getTime()<t0.getTime()) return;
+  const key=localDateKey(d);
+  const was=!!C.unavailMyDates[key];
+  const backup={...C.unavailMyDates};
+  if(was) delete C.unavailMyDates[key]; else C.unavailMyDates[key]=true;
+  renderUnavailCal();
+  const path=`${ob('unavailability')}/${C.userName}/dates/${key}`;
+  try{
+    if(was) await remove(ref(db,path));
+    else await set(ref(db,path),true);
+    setSyncStatus('ok');
+  }catch(_){
+    C.unavailMyDates=backup;
+    renderUnavailCal();
+    showToast('Erreur synchronisation — réessayez');
+    setSyncStatus('err');
+  }
+};
+
+function renderUnavailCal(){
+  if(!C.unlocked) return;
+  const host=el('unavail-cal-host');
+  if(!host) return;
+  const yr=C.unavailYear, mo=C.unavailMonth;
+  const {min,max}=unavailMonthBounds();
+  const cur=unavailMonthIndex(yr,mo);
+  const prevB=el('unavail-nav-prev'), nextB=el('unavail-nav-next');
+  if(prevB) prevB.disabled=cur<=min;
+  if(nextB) nextB.disabled=cur>=max;
+  const title=el('unavail-month-title'), mid=el('unavail-month-btn');
+  if(title) title.textContent=MO_FR[mo]+' '+yr;
+  if(mid) mid.textContent=MO_FR[mo];
+
+  const first=new Date(yr,mo,1), last=new Date(yr,mo+1,0);
+  let sd=first.getDay(); if(sd===0)sd=7;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const DAYS=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+  let html=DAYS.map(d=>`<div class="unavail-cal-head">${d}</div>`).join('');
+
+  const cell=(d,other)=>{
+    const key=localDateKey(d);
+    const isPast=!other&&d.getTime()<today.getTime();
+    const busy=!!C.unavailMyDates[key];
+    let cls='unavail-cal-cell';
+    if(other) cls+=' unavail-cal-cell--other';
+    else if(isPast) cls+=busy?' unavail-cal-cell--past-busy':' unavail-cal-cell--past';
+    else cls+=busy?' unavail-cal-cell--busy unavail-cal-cell--future':' unavail-cal-cell--future';
+    const click=!other&&!isPast?` onclick="window._unavailToggleDay(${d.getFullYear()},${d.getMonth()},${d.getDate()})" role="button" tabindex="0"`:'';
+    return `<div class="${cls}"${click}><span class="unavail-cal-daynum">${d.getDate()}</span></div>`;
+  };
+
+  for(let i=1;i<sd;i++) html+=cell(new Date(yr,mo,1-sd+i),true);
+  for(let i=1;i<=last.getDate();i++) html+=cell(new Date(yr,mo,i),false);
+  const rem=7-((sd-1+last.getDate())%7);
+  if(rem<7) for(let i=1;i<=rem;i++) html+=cell(new Date(yr,mo+1,i),true);
+  host.innerHTML=`<div class="compte-cal-grid">${html}</div>`;
+}
 
 function renderCompteDashboard(){
   if(!C.unlocked) return;
@@ -465,6 +596,7 @@ window.setCompteView=function(view,opts){
     history.replaceState(null,'',v==='dashboard'?base:(base+'#'+v));
   }catch(_){}
   if(!(opts&&opts.noScroll)) window.scrollTo(0,0);
+  if(v==='indisponibilites') renderUnavailCal();
 };
 
 function setCompteNavOpen(open){
@@ -537,6 +669,20 @@ onValue(ref(db,ob('adminConfig')), snap=>{
   setSyncStatus('err');
   if(!C.unlocked) window.location.replace('index.html');
 });
+
+/**
+ * Indisponibilités de l’utilisateur : …/unavailability/{prenom}/dates/{YYYY-MM-DD}.
+ * Prénoms avec caractères réservés Firebase (. # $ [ ]) non prévus aujourd’hui.
+ */
+onValue(ref(db,`${ob('unavailability')}/${C.userName}/dates`), snap=>{
+  const v=snap.val()||{};
+  const next={};
+  for(const k of Object.keys(v)){
+    if(v[k]) next[k]=true;
+  }
+  C.unavailMyDates=next;
+  if(C.unlocked) renderUnavailCal();
+}, ()=>setSyncStatus('err'));
 
 window.addEventListener('hashchange',()=>{
   if(!C.unlocked) return;
