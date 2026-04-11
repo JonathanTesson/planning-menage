@@ -72,7 +72,7 @@ body.admin-nav-ready .admin-burger{display:flex}
 .nav-btn:disabled{opacity:0.35;cursor:not-allowed}
 .compte-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}
 .unavail-cal-head{text-align:center;font-size:11px;color:#999;padding:6px 0;font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
-.unavail-cal-cell{min-height:48px;border-radius:8px;border:1px solid #e8e8e2;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;padding:6px 8px;cursor:default;background:#fff;font-size:14px;font-weight:600;color:#333;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+.unavail-cal-cell{min-height:48px;min-width:0;width:100%;border-radius:8px;border:1px solid #e8e8e2;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:6px 8px;cursor:default;background:#fff;font-size:14px;font-weight:600;color:#333;-webkit-tap-highlight-color:transparent;box-sizing:border-box;overflow:hidden}
 .unavail-cal-cell--other{opacity:0.35;pointer-events:none;background:#fafaf8}
 .unavail-cal-cell--past{color:#aaa;background:#f3f3ef}
 .unavail-cal-cell--past-busy{background:#fde8ef;border-color:#f0c4d4;color:#999}
@@ -372,6 +372,14 @@ body.admin-nav-ready .admin-burger{display:flex}
       </div>
       <div id="admin-unavail-cal-host"></div>
       <p class="unavail-cal-note">Touchez un jour pour le marquer indisponible (rouge). Touchez à nouveau pour annuler. Les jours passés ne sont pas modifiables.</p>
+      <div class="field-row" style="margin-top:12px;margin-bottom:4px;align-items:flex-start">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;color:#333;line-height:1.45">Afficher le détail (par qui)</div>
+        </div>
+        <div class="telegram-check-wrap" title="Afficher la ligne « par … » dans les cases rouges">
+          <input type="checkbox" id="admin-unavail-show-by-detail" class="checkbox-compact" aria-label="Afficher le détail (par qui)">
+        </div>
+      </div>
       <div id="admin-unavail-future-summary" class="unavail-future-summary" style="display:none" aria-live="polite"></div>
     </div>
     </div>
@@ -433,7 +441,8 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.5.4';
+const APP_VERSION = '4.5.5';
+const UNAVAIL_SHOWBY_KEY = 'menage_unavail_showby_v1';
 
 /** Studio sélectionné dans la section Procédures (persiste entre re-rendus). */
 let procSelectedStudioIdx = '0';
@@ -562,6 +571,14 @@ function adminActor(){
   return 'admin';
 }
 
+function unavailShowByDetailEnabled(){
+  try{ return localStorage.getItem(UNAVAIL_SHOWBY_KEY)==='1'; }catch(_){ return false; }
+}
+function syncAdminUnavailShowByCheckbox(){
+  const cb=document.getElementById('admin-unavail-show-by-detail');
+  if(cb) cb.checked=unavailShowByDetailEnabled();
+}
+
 function adminUnavailMonthIndex(yr,mo){ return yr*12+mo; }
 
 function adminUnavailMonthBounds(){
@@ -660,6 +677,7 @@ function syncAdminUnavailSelect(){
 
 function renderAdminUnavailCal(){
   if(!A.unlocked) return;
+  syncAdminUnavailShowByCheckbox();
   const host=document.getElementById('admin-unavail-cal-host');
   if(!host) return;
   const yr=A.adminUnavailYear, mo=A.adminUnavailMonth;
@@ -686,7 +704,7 @@ function renderAdminUnavailCal(){
     const entry=A.adminUnavailDates[key];
     const busy=unavailLocalPresent(entry);
     const byRaw=busy&&entry&&typeof entry==='object'&&entry.by!=null?String(entry.by).trim():'';
-    const byHtml=busy&&byRaw?`<span class="unavail-cal-by">par ${escHtml(byRaw)}</span>`:'';
+    const byHtml=busy&&unavailShowByDetailEnabled()&&byRaw?`<span class="unavail-cal-by">par ${escHtml(byRaw)}</span>`:'';
     let cls='unavail-cal-cell';
     if(other) cls+=' unavail-cal-cell--other';
     else if(isPast) cls+=busy?' unavail-cal-cell--past-busy':' unavail-cal-cell--past';
@@ -837,6 +855,15 @@ function verifyAdminAccess(){
   document.body.classList.add('admin-nav-ready');
   A.unlocked=true;
   renderAdminContent();
+  const aucb=document.getElementById('admin-unavail-show-by-detail');
+  if(aucb&&!aucb.dataset.bound){
+    aucb.dataset.bound='1';
+    aucb.addEventListener('change',()=>{
+      try{ if(aucb.checked) localStorage.setItem(UNAVAIL_SHOWBY_KEY,'1'); else localStorage.removeItem(UNAVAIL_SHOWBY_KEY); }catch(_){}
+      renderAdminUnavailCal();
+    });
+  }
+  syncAdminUnavailShowByCheckbox();
 }
 
 window.logout = function(){

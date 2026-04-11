@@ -70,7 +70,7 @@ body.compte-nav-ready .admin-burger{display:flex}
 .empty-hint{font-size:12px;color:#aaa;padding:8px 0}
 .compte-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}
 .unavail-cal-head{text-align:center;font-size:11px;color:#999;padding:6px 0;font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
-.unavail-cal-cell{min-height:48px;border-radius:8px;border:1px solid #e8e8e2;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;padding:6px 8px;cursor:default;background:#fff;font-size:14px;font-weight:600;color:#333;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+.unavail-cal-cell{min-height:48px;min-width:0;width:100%;border-radius:8px;border:1px solid #e8e8e2;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:6px 8px;cursor:default;background:#fff;font-size:14px;font-weight:600;color:#333;-webkit-tap-highlight-color:transparent;box-sizing:border-box;overflow:hidden}
 .unavail-cal-cell--other{opacity:0.35;pointer-events:none;background:#fafaf8}
 .unavail-cal-cell--past{color:#aaa;background:#f3f3ef}
 .unavail-cal-cell--past-busy{background:#fde8ef;border-color:#f0c4d4;color:#999}
@@ -81,6 +81,8 @@ body.compte-nav-ready .admin-burger{display:flex}
 .unavail-cal-note{font-size:11px;color:#888;line-height:1.45;margin-top:12px}
 .unavail-future-summary-line{margin-top:12px;font-size:13px;font-weight:600;color:#555;line-height:1.45}
 .nav-btn:disabled{opacity:0.35;cursor:not-allowed}
+.checkbox-compact{width:18px;height:18px;min-width:18px;accent-color:#1D9E75;cursor:pointer;margin:0;flex-shrink:0}
+.telegram-check-wrap{display:flex;align-items:flex-start;flex-shrink:0;padding-top:2px}
 </style>
 </head>
 <body>
@@ -182,6 +184,14 @@ body.compte-nav-ready .admin-burger{display:flex}
         </div>
         <div id="unavail-cal-host"></div>
         <p class="unavail-cal-note">Touchez un jour pour le marquer indisponible (rouge). Touchez à nouveau pour annuler. Les jours passés ne sont pas modifiables.</p>
+        <div class="field-row" style="margin-top:12px;margin-bottom:4px;align-items:flex-start">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;color:#333;line-height:1.45">Afficher le détail (par qui)</div>
+          </div>
+          <div class="telegram-check-wrap" title="Afficher la ligne « par … » dans les cases rouges">
+            <input type="checkbox" id="unavail-show-by-detail" class="checkbox-compact" aria-label="Afficher le détail (par qui)">
+          </div>
+        </div>
         <p id="compte-unavail-future-line" class="unavail-future-summary-line" style="display:none" aria-live="polite"></p>
       </div>
     </div>
@@ -215,7 +225,8 @@ const ORGANIZATIONS = [
   { id: 'tesson', label: 'Studio Tesson' },
   { id: 'nade', label: 'Studio Nade' }
 ];
-const APP_VERSION = '4.5.3';
+const APP_VERSION = '4.5.5';
+const UNAVAIL_SHOWBY_KEY = 'menage_unavail_showby_v1';
 const MO_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const COMPTE_VIEW_IDS = ['dashboard','compte','indisponibilites'];
 
@@ -258,6 +269,14 @@ let C = {
 let compteUiHashApplied = false;
 
 function el(id){ return document.getElementById(id); }
+
+function unavailShowByDetailEnabled(){
+  try{ return localStorage.getItem(UNAVAIL_SHOWBY_KEY)==='1'; }catch(_){ return false; }
+}
+function syncUnavailShowByCheckbox(){
+  const cb=el('unavail-show-by-detail');
+  if(cb) cb.checked=unavailShowByDetailEnabled();
+}
 
 function hashSimple(str){
   let h=0;
@@ -414,6 +433,15 @@ function verifyAndUnlock(){
   el('compte-org-label').textContent=ORGANIZATIONS.find(o=>o.id===orgId)?.label||orgId;
   setupCompteNavOnce();
   setupAccountForm();
+  const ucb=el('unavail-show-by-detail');
+  if(ucb&&!ucb.dataset.bound){
+    ucb.dataset.bound='1';
+    ucb.addEventListener('change',()=>{
+      try{ if(ucb.checked) localStorage.setItem(UNAVAIL_SHOWBY_KEY,'1'); else localStorage.removeItem(UNAVAIL_SHOWBY_KEY); }catch(_){}
+      renderUnavailCal();
+    });
+  }
+  syncUnavailShowByCheckbox();
   setSyncStatus('ok');
   if(!compteUiHashApplied){
     compteUiHashApplied=true;
@@ -512,6 +540,7 @@ window._unavailToggleDay=async function(y,m,day){
 
 function renderUnavailCal(){
   if(!C.unlocked) return;
+  syncUnavailShowByCheckbox();
   const host=el('unavail-cal-host');
   if(!host) return;
   const yr=C.unavailYear, mo=C.unavailMonth;
@@ -537,7 +566,7 @@ function renderUnavailCal(){
     const entry=C.unavailMyDates[key];
     const busy=unavailLocalPresent(entry);
     const byRaw=busy&&entry&&typeof entry==='object'&&entry.by!=null?String(entry.by).trim():'';
-    const byHtml=busy&&byRaw?`<span class="unavail-cal-by">par ${escAttr(byRaw)}</span>`:'';
+    const byHtml=busy&&unavailShowByDetailEnabled()&&byRaw?`<span class="unavail-cal-by">par ${escAttr(byRaw)}</span>`:'';
     let cls='unavail-cal-cell';
     if(other) cls+=' unavail-cal-cell--other';
     else if(isPast) cls+=busy?' unavail-cal-cell--past-busy':' unavail-cal-cell--past';
