@@ -148,7 +148,12 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 .assign-note-readonly-by{font-size:11px;color:#92400e;font-weight:600;margin-bottom:6px}
 .assign-note-readonly-text{color:#555;white-space:pre-wrap;word-break:break-word}
 .menage-procedure-panel{margin-top:0.25rem}
-.menage-procedure-top{display:flex;align-items:center;justify-content:flex-end;margin-bottom:8px}
+.menage-procedure-top{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:8px}
+.menage-procedure-suggest-indicator{width:36px;height:36px;position:relative;flex-shrink:0;box-sizing:border-box}
+.menage-procedure-suggest-spin{position:absolute;inset:0;animation:menage-suggest-spin 1.5s linear infinite}
+.menage-procedure-suggest-spin svg{display:block;width:100%;height:100%}
+@keyframes menage-suggest-spin{to{transform:rotate(360deg)}}
+.menage-procedure-suggest-count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#92400e;line-height:1;pointer-events:none}
 .menage-procedure-plus{width:36px;height:36px;border-radius:10px;border:1px solid #ddd;background:#fff;font-size:20px;line-height:1;cursor:pointer;color:#333;display:flex;align-items:center;justify-content:center;padding:0}
 .menage-procedure-plus:hover{background:#f5f5f0;border-color:#bbb}
 .menage-procedure-scroll{max-height:min(52vh,420px);overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px;padding-right:2px}
@@ -161,7 +166,9 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 .menage-proc-long{font-size:12px;color:#666;line-height:1.45;font-style:italic}
 .menage-proc-done-row{display:flex;align-items:center;gap:8px;font-size:12px;color:#555;flex-wrap:wrap}
 .menage-proc-done-row input[type=checkbox]{width:18px;height:18px;accent-color:#1D9E75;cursor:pointer;flex-shrink:0}
-.menage-proc-stars{display:flex;align-items:center;gap:3px;margin-top:4px}
+.menage-proc-stars-wrap{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:4px;width:100%}
+.menage-proc-stars{display:flex;align-items:center;gap:3px;flex-shrink:0}
+.menage-proc-trace{font-size:9px;font-style:italic;color:#bbb;line-height:1.3;flex:1;min-width:92px;text-align:right;word-break:break-word}
 .menage-proc-star-btn{background:none;border:none;padding:0 2px;font-size:18px;line-height:1;cursor:pointer;color:#ddd;-webkit-tap-highlight-color:transparent}
 .menage-proc-star-btn--on{color:#F59E0B}
 .menage-suggest-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:350;display:flex;align-items:center;justify-content:center;padding:1rem}
@@ -402,7 +409,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.5.3';
+const APP_VERSION = '4.5.4';
 
 function getStoredOrgId(){
   try{
@@ -446,6 +453,25 @@ function clearMenageModalUnsubs(){
     const u=menageModalUnsubs.pop();
     try{ u(); }catch(_){}
   }
+}
+
+function updateMenagePendingSuggestIndicator(count){
+  const wrap=document.getElementById('menage-pending-suggest-indicator');
+  const numEl=document.getElementById('menage-pending-suggest-count');
+  if(!wrap||!numEl) return;
+  if(!count){
+    wrap.style.display='none';
+    wrap.removeAttribute('title');
+    wrap.setAttribute('aria-hidden','true');
+    wrap.removeAttribute('aria-label');
+    return;
+  }
+  wrap.style.display='block';
+  numEl.textContent=String(count);
+  const title=count===1?'1 suggestion en cours de validation':`${count} suggestions en cours de validation`;
+  wrap.title=title;
+  wrap.setAttribute('aria-label',title);
+  wrap.setAttribute('aria-hidden','false');
 }
 /** Contexte modale ménage onglet Procédure : { key, r, userName } ou null. */
 window._menageModalCtx = null;
@@ -524,8 +550,34 @@ function getProcedureStepsSorted(studioIdx){
     order:Number(v?.order)||0,
     shortDesc:v?.shortDesc??'',
     longDesc:v?.longDesc??'',
-    photoUrl:v?.photoUrl??''
+    photoUrl:v?.photoUrl??'',
+    createdBy:v?.createdBy??'',
+    createdAt:v?.createdAt??'',
+    updatedBy:v?.updatedBy??'',
+    updatedAt:v?.updatedAt??''
   })).sort((a,b)=>a.order-b.order);
+}
+
+function formatProcTraceDate(yymmdd){
+  const s=String(yymmdd??'').trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return '';
+  const [y,m,d]=s.split('-');
+  return `${d}/${m}/${y.slice(-2)}`;
+}
+
+function formatProcedureStepTraceLine(st){
+  const cbRaw=st&&st.createdBy!=null?String(st.createdBy).trim():'';
+  if(!cbRaw) return '—';
+  const cAt=String(st?.createdAt??'').trim();
+  const uAt=String(st?.updatedAt??'').trim();
+  const uByRaw=st&&st.updatedBy!=null?String(st.updatedBy).trim():'';
+  const dCreated=formatProcTraceDate(cAt);
+  const base=`Créé par ${cbRaw}${dCreated?` le ${dCreated}`:' le —'}`;
+  if(!uAt||uAt===cAt) return base;
+  const dUp=formatProcTraceDate(uAt);
+  if(!dUp) return base;
+  if(uByRaw&&uByRaw!==cbRaw) return `${base} — modifié par ${uByRaw} le ${dUp}`;
+  return `${base} — modifié le ${dUp}`;
 }
 
 let fbReady = false;
@@ -1328,7 +1380,10 @@ function buildMenageProcStepHtml(st,idx,done,cur){
           <input type="checkbox" id="${idCh}"${done?' checked':''} onchange="window._menageProcCheckIdx(${idx},this.checked)">
           <label for="${idCh}">Fait</label>
         </div>
-        <div class="menage-proc-stars">${stars}</div>
+        <div class="menage-proc-stars-wrap">
+          <div class="menage-proc-stars">${stars}</div>
+          <div class="menage-proc-trace">${escHtml(formatProcedureStepTraceLine(st))}</div>
+        </div>
       </div>
     </div>`;
 }
@@ -1369,7 +1424,17 @@ function menagePatchMenageProcRow(row,st,idx,done,cur){
   }
   const lab=row.querySelector('.menage-proc-done-row label');
   if(lab) lab.setAttribute('for',idCh);
-  const starsHost=row.querySelector('.menage-proc-stars');
+  let starsHost=row.querySelector('.menage-proc-stars');
+  if(starsHost&&!row.querySelector('.menage-proc-stars-wrap')){
+    const wrap=document.createElement('div');
+    wrap.className='menage-proc-stars-wrap';
+    starsHost.replaceWith(wrap);
+    wrap.appendChild(starsHost);
+    const tr=document.createElement('div');
+    tr.className='menage-proc-trace';
+    wrap.appendChild(tr);
+    starsHost=row.querySelector('.menage-proc-stars');
+  }
   if(starsHost){
     const titles=['Pas pertinente','Pertinente','Obligatoire'];
     starsHost.innerHTML=[1,2,3].map(n=>{
@@ -1377,6 +1442,8 @@ function menagePatchMenageProcRow(row,st,idx,done,cur){
       return `<button type="button" class="menage-proc-star-btn${on?' menage-proc-star-btn--on':''}" onclick="window._menageProcStarIdx(${idx},${n})" title="${titles[n-1]}" aria-label="${n} sur 3">${on?'★':'☆'}</button>`;
     }).join('');
   }
+  const traceEl=row.querySelector('.menage-proc-trace');
+  if(traceEl) traceEl.textContent=formatProcedureStepTraceLine(st);
 }
 
 window._renderMenageProcedureList=function(){
@@ -1688,6 +1755,15 @@ window._oa = function(key){
           <div id="menage-panel-p" class="menage-procedure-panel" style="display:none">
             <p class="modal-shared-hint" style="margin-top:0.75rem;margin-bottom:0">Étapes pour ce studio — coches partagées avec l’autre intervenante sur ce départ.</p>
             <div class="menage-procedure-top">
+              <div id="menage-pending-suggest-indicator" class="menage-procedure-suggest-indicator" style="display:none" aria-hidden="true">
+                <div class="menage-procedure-suggest-spin" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                    <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
+                    <path d="M21 3v6h-6"/>
+                  </svg>
+                </div>
+                <span id="menage-pending-suggest-count" class="menage-procedure-suggest-count">0</span>
+              </div>
               <button type="button" class="menage-procedure-plus" onclick="window._openMenageSuggest()" title="Suggérer une étape" aria-label="Suggérer une étape">+</button>
             </div>
             <div class="menage-procedure-scroll" id="menage-procedure-list"></div>
@@ -1702,6 +1778,22 @@ window._oa = function(key){
           window._renderMenageProcedureList();
         });
         registerMenageModalUnsub(unsubFb);
+        const unsubSug=onValue(ref(db,`orgs/${oid}/procedureSuggestions`),snap=>{
+          const ctx=window._menageModalCtx;
+          if(!ctx||!ctx.userName){ updateMenagePendingSuggestIndicator(0); return; }
+          const si=String(ctx.r.studio??0);
+          const raw=snap.val()||{};
+          let pending=0;
+          for(const id of Object.keys(raw)){
+            const s=raw[id];
+            if(!s||typeof s!=='object') continue;
+            if(String(s.studioIndex)!==si) continue;
+            const by=s.suggestedBy!=null?String(s.suggestedBy).trim():'';
+            if(by===ctx.userName) pending++;
+          }
+          updateMenagePendingSuggestIndicator(pending);
+        });
+        registerMenageModalUnsub(unsubSug);
       }
       window._renderMenageProcedureList();
       return;

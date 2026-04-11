@@ -122,6 +122,7 @@ body.admin-nav-ready .admin-burger{display:flex}
 .proc-step-row.proc-flash-err{background:#f8d7da!important}
 .proc-photo-col{flex-shrink:0;width:80px;display:flex;flex-direction:column;align-items:stretch;gap:6px;align-self:flex-start}
 .proc-copy-step-btn{width:100%;padding:4px 2px;font-size:10px;line-height:1.2;border-radius:6px;white-space:normal;word-break:break-word}
+.proc-step-trace{margin-top:1px;margin-bottom:0;padding:0;font-size:9px;font-style:italic;color:#bbb;line-height:1.3;width:100%;word-break:break-word}
 .proc-copy-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
 .proc-copy-dialog{background:#fafaf8;border:1px solid #e8e8e2;border-radius:12px;padding:16px;max-width:320px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.12)}
 .proc-copy-title{font-size:14px;font-weight:600;color:#222;margin-bottom:12px}
@@ -432,7 +433,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.5.3';
+const APP_VERSION = '4.5.4';
 
 /** Studio sélectionné dans la section Procédures (persiste entre re-rendus). */
 let procSelectedStudioIdx = '0';
@@ -543,6 +544,22 @@ function localDateKeyAdmin(d){
   const mo=String(d.getMonth()+1).padStart(2,'0');
   const day=String(d.getDate()).padStart(2,'0');
   return `${y}-${mo}-${day}`;
+}
+
+/** Date locale du jour, format YYYY-MM-DD (traçabilité procédures, etc.). */
+function localDateKey(){
+  return localDateKeyAdmin(new Date());
+}
+
+/** Prénom admin connecté ou `"admin"` (auth désactivée / session sans nom). */
+function adminActor(){
+  if(!A.adminConfig.authEnabled) return 'admin';
+  try{
+    const session=JSON.parse(localStorage.getItem(SESSION_KEY));
+    const n=session&&session.name&&String(session.name).trim();
+    if(n) return n;
+  }catch(e){}
+  return 'admin';
 }
 
 function adminUnavailMonthIndex(yr,mo){ return yr*12+mo; }
@@ -711,13 +728,7 @@ window.adminUnavailChangeMonth=function(dir){
 };
 
 function adminUnavailByActor(){
-  if(!A.adminConfig.authEnabled) return 'admin';
-  try{
-    const session=JSON.parse(localStorage.getItem(SESSION_KEY));
-    const n=session&&session.name&&String(session.name).trim();
-    if(n) return n;
-  }catch(e){}
-  return 'admin';
+  return adminActor();
 }
 
 window._adminUnavailToggleDay=async function(y,m,day){
@@ -1280,8 +1291,40 @@ function getStepsSorted(studioIdx){
     order:Number(v?.order)||0,
     shortDesc:v?.shortDesc??'',
     longDesc:v?.longDesc??'',
-    photoUrl:v?.photoUrl??''
+    photoUrl:v?.photoUrl??'',
+    createdBy:v?.createdBy??'',
+    createdAt:v?.createdAt??'',
+    updatedBy:v?.updatedBy??'',
+    updatedAt:v?.updatedAt??''
   })).sort((a,b)=>a.order-b.order);
+}
+
+function formatProcTraceDate(yymmdd){
+  const s=String(yymmdd??'').trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return '';
+  const [y,m,d]=s.split('-');
+  return `${d}/${m}/${y.slice(-2)}`;
+}
+
+function formatProcedureStepTraceLine(st){
+  const cbRaw=st&&st.createdBy!=null?String(st.createdBy).trim():'';
+  if(!cbRaw) return '—';
+  const cAt=String(st?.createdAt??'').trim();
+  const uAt=String(st?.updatedAt??'').trim();
+  const uByRaw=st&&st.updatedBy!=null?String(st.updatedBy).trim():'';
+  const dCreated=formatProcTraceDate(cAt);
+  const base=`Créé par ${cbRaw}${dCreated?` le ${dCreated}`:' le —'}`;
+  if(!uAt||uAt===cAt) return base;
+  const dUp=formatProcTraceDate(uAt);
+  if(!dUp) return base;
+  if(uByRaw&&uByRaw!==cbRaw) return `${base} — modifié par ${uByRaw} le ${dUp}`;
+  return `${base} — modifié le ${dUp}`;
+}
+
+function dateFromSuggestionTimestamp(ms){
+  const n=Number(ms);
+  if(!Number.isFinite(n)) return '';
+  return localDateKeyAdmin(new Date(n));
 }
 
 function procedureFlashRow(stepId, kind){
@@ -1354,6 +1397,7 @@ function buildProcStepRowHtml(si, st){
         <input type="text" class="proc-short-input" placeholder="Description courte" value="${escHtml(st.shortDesc)}"
           data-si="${si}" data-id="${st.id}" data-field="shortDesc" onblur="procedureFieldBlur(this)">
         <textarea class="proc-long-input" placeholder="Détails optionnels…" data-si="${si}" data-id="${st.id}" data-field="longDesc" onblur="procedureFieldBlur(this)">${escHtml(st.longDesc)}</textarea>
+        <div class="proc-step-trace">${escHtml(formatProcedureStepTraceLine(st))}</div>
       </div>
       <div class="proc-step-actions">
         <div class="proc-order-arrows">
@@ -1423,6 +1467,8 @@ function procPatchProcedureRow(row, si, st, hasPhoto, uploading){
     tpl.innerHTML=procedureAvgStarsHtml(si,st.id).trim();
     aw.replaceWith(tpl.content.firstElementChild);
   }
+  const tr=row.querySelector('.proc-step-trace');
+  if(tr) tr.textContent=formatProcedureStepTraceLine(st);
 }
 
 function bindProcedureFileInputOnce(){
@@ -1443,7 +1489,12 @@ function bindProcedureFileInputOnce(){
       const path=procedureStoragePath(si,stepId);
       await uploadBytes(sRef(storage,path),blob,{contentType:'image/jpeg'});
       const url=await getDownloadURL(sRef(storage,path));
-      await set(ref(db,ob(`procedures/${si}/steps/${stepId}/photoUrl`)),url);
+      const base=ob(`procedures/${si}/steps/${stepId}`);
+      await set(ref(db,`${base}/photoUrl`),url);
+      await update(ref(db),{
+        [`${base}/updatedBy`]:adminActor(),
+        [`${base}/updatedAt`]:localDateKey()
+      });
       procedureFlashRow(stepId,'ok');
       setSyncStatus('ok');
     }catch(_){
@@ -1517,7 +1568,16 @@ window.procedureFieldBlur=function(el){
   const si=el.dataset.si, id=el.dataset.id, field=el.dataset.field;
   if(!si||!id||!field) return;
   const v=field==='longDesc'?el.value:el.value.trim();
-  set(ref(db,ob(`procedures/${si}/steps/${id}/${field}`)),v)
+  const base=ob(`procedures/${si}/steps/${id}`);
+  set(ref(db,`${base}/${field}`),v)
+    .then(()=>{
+      if(field==='shortDesc'||field==='longDesc'){
+        return update(ref(db),{
+          [`${base}/updatedBy`]:adminActor(),
+          [`${base}/updatedAt`]:localDateKey()
+        });
+      }
+    })
     .then(()=>{ procedureFlashRow(id,'ok'); setSyncStatus('ok'); })
     .catch(()=>{ procedureFlashRow(id,'err'); setSyncStatus('err'); });
 };
@@ -1532,7 +1592,9 @@ window.procedureAddStep=function(){
     : 0;
   const newRef=push(ref(db,ob(`procedures/${si}/steps`)));
   const id=newRef.key;
-  set(newRef,{ id, order:newOrder, shortDesc:'', longDesc:'', photoUrl:'' })
+  const actor=adminActor();
+  const today=localDateKey();
+  set(newRef,{ id, order:newOrder, shortDesc:'', longDesc:'', photoUrl:'', createdBy:actor, createdAt:today })
     .then(()=>{ setSyncStatus('ok'); showToast('Étape ajoutée ✓'); })
     .catch(()=>showToast('Erreur'));
 };
@@ -1625,7 +1687,9 @@ window.procedureValidateSuggestion=async function(suggestionId){
     const stepId=suggestionId;
     const stepRef=ref(db,ob(`procedures/${si}/steps/${stepId}`));
     const photoUrl=String(s.photoUrl||'').trim();
-    await set(stepRef,{ id:stepId, order:newOrder, shortDesc:s.shortDesc||'', longDesc:s.longDesc||'', photoUrl });
+    const sugBy=s.suggestedBy!=null?String(s.suggestedBy).trim():'';
+    const sugCreatedAt=dateFromSuggestionTimestamp(s.createdAt);
+    await set(stepRef,{ id:stepId, order:newOrder, shortDesc:s.shortDesc||'', longDesc:s.longDesc||'', photoUrl, createdBy:sugBy, createdAt:sugCreatedAt });
     await remove(ref(db,ob(`procedureSuggestions/${suggestionId}`)));
     pushActivity({ type:'admin', text:`Suggestion validée — nouvelle étape studio ${si}` });
     showToast('Suggestion intégrée ✓');
@@ -1764,7 +1828,14 @@ window.procedureCopyStepRun=async function(fromSi,stepId,toSi){
     : 0;
   const newRef=push(ref(db,ob(`procedures/${toSi}/steps`)));
   const newId=newRef.key;
-  const payload={ id:newId, order:newOrder, shortDesc:st.shortDesc||'', longDesc:st.longDesc||'', photoUrl:'' };
+  const payload={ id:newId, order:newOrder, shortDesc:st.shortDesc||'', longDesc:st.longDesc||'', photoUrl:'',
+    updatedBy:adminActor(), updatedAt:localDateKey() };
+  const srcCb=st.createdBy!=null?String(st.createdBy).trim():'';
+  if(srcCb){
+    payload.createdBy=srcCb;
+    const srcCat=st.createdAt!=null?String(st.createdAt).trim():'';
+    if(srcCat) payload.createdAt=srcCat;
+  }
   try{
     await set(newRef,payload);
     setSyncStatus('ok');
