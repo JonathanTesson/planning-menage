@@ -1,8 +1,8 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 4.5.1** — Avril 2026
+**Version : 4.5.3** — Avril 2026
 
-Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin. **Note d’assignation** côté calendrier (**`note`** + traçage **`noteBy`**, indicateur **📝** sur les départs, lecture seule pour les ménagères) — détail § **`/assignments`** et § **index.html** ci-dessous. **v4.5.x** : **indisponibilités** — saisie sur **`compte.html`**, pastilles + filtre **Indispo** sur **`index.html`**, **vue admin** **`#indisponibilites`** (édition par intervenante **v4.5.1**), clés **`YYYY-MM-DD` en date locale** ; la **purge automatique** compare les mêmes clés au **seuil UTC** (voir § **`/unavailability`**).
+Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin. **Note d’assignation** côté calendrier (**`note`** + traçage **`noteBy`**, indicateur **point bleu pulsant** sur les départs, lecture seule pour les ménagères) — détail § **`/assignments`** et § **index.html** ci-dessous. **v4.5.x** : **indisponibilités** — saisie sur **`compte.html`**, pastilles + filtre **Indispo** sur **`index.html`**, **vue admin** **`#indisponibilites`** (édition par intervenante **v4.5.1**, résumé global **v4.5.2**, traçabilité **`by` v4.5.3**), clés **`YYYY-MM-DD` en date locale** ; la **purge automatique** compare les mêmes clés au **seuil UTC** (voir § **`/unavailability`**).
 
 ---
 
@@ -71,18 +71,20 @@ Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. Ancienne rac
     (même structure ; remplie selon sync iCal et utilisation)
 ```
 
-### `/unavailability` — indisponibilités (**v4.5.0**)
+### `/unavailability` — indisponibilités (**v4.5.0**, traçabilité **v4.5.3**)
 
 ```
-/orgs/{orgId}/unavailability/{prenom}/dates/{YYYY-MM-DD} → true
+/orgs/{orgId}/unavailability/{prenom}/dates/{YYYY-MM-DD} → true   (historique, encore pris en charge)
+                                                      → { "by": "Prénom ou libellé" }   (saisie actuelle)
 ```
 
-- **Absent** = disponible : pas de valeur **`false`** en base ; pour annuler une indispo, le nœud date est **supprimé** (`remove`).
+- **Absent** = disponible : pas de valeur **`false`** en base ; pour annuler une indispo, le nœud date est **supprimé** (`remove`) — la traçabilité disparaît avec.
+- **Rétrocompatibilité** : les entrées encore stockées comme **`true`** restent des indispos valides ; l’UI n’affiche pas de ligne **« par … »** pour ces dates. Les nouvelles écritures depuis **`compte.html`** / **`admin.html`** utilisent **`{ by: … }`** (`by` = prénom de la ménagère, prénom de l’admin connecté, ou la chaîne **`"admin"`** en mode sans authentification sur l’admin).
 - **Saisie (app)** : les clés **`YYYY-MM-DD`** sont celles du **calendrier local** du navigateur (même convention que le reste du planning : jour civil local). **`compte.html`** limite la navigation mois à **± 3 ans** autour du mois courant (local) ; les **jours passés** sont en lecture seule sur le mini-calendrier.
-- **Affichage (`index.html`)** : listener sur **`/orgs/{orgId}/unavailability/`** ; les données sont **normalisées** en mémoire en montant d’un niveau **`dates`** :  
-  `S.unavailability = { 'Emmy': { '2026-05-03': true }, … }`.  
-  Les pastilles ne concernent que les comptes **`adminConfig.accounts.filter(a => a.menage)`** (pas les clés orphelines Firebase).
-- **Purge (`purge-unavailability.js`)** : compare chaque clé **`YYYY-MM-DD`** au seuil **aujourd’hui UTC − 3 ans** (chaînes **`YYYY-MM-DD`** comparées lexicographiquement). C’est **volontairement UTC** côté cron, alors que la **saisie** est **locale** : en pratique les écarts de fuseau n’affectent que les entrées proches de la frontière des 3 ans ; documenté ici pour éviter toute confusion.
+- **Affichage (`index.html`)** : listener sur **`/orgs/{orgId}/unavailability/`** ; normalisation en mémoire : pour chaque date indispo, **`{ by: string | null }`** (le **`by`** est **`null`** si la base contenait encore **`true`**). Pastilles et modale d’info ; si **`by`** est renseigné, la modale affiche **« par … »**.
+- **Calendriers indispo (`compte.html`, `admin.html`)** : cases rouges avec libellé **« par [by] »** (petit texte gris) lorsque la valeur a un auteur ; pas de texte pour l’ancien format **`true`**. Le **résumé des indispos futures** (**v4.5.2**) compte uniquement les **dates**, pas le champ **`by`**.
+- **Purge (`purge-unavailability.js`)** : inchangé — supprime le **nœud date** entier ; compatible **`true`** et **`{ by }`**.
+- **Purge (détail)** : compare chaque clé **`YYYY-MM-DD`** au seuil **aujourd’hui UTC − 3 ans** (chaînes **`YYYY-MM-DD`** comparées lexicographiquement). C’est **volontairement UTC** côté cron, alors que la **saisie** est **locale** : en pratique les écarts de fuseau n’affectent que les entrées proches de la frontière des 3 ans ; documenté ici pour éviter toute confusion.
 - Si le nœud **`unavailability`** est **absent** pour une org, le script de purge **ignore** silencieusement cette org ; l’UI fonctionne avec un objet vide.
 
 ### `/assignments` — note d’assignation (**v4.3.4**)
@@ -223,10 +225,10 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
 
 **Calendrier**
 - Affichage **S1 / S2** inchangé (noms de studios viennent de `/orgs/{orgId}/config`).
-- **Départs** : si l’assignation a une **`note`** non vide (après trim), le bloc départ affiche **📝** après le libellé (ex. `Départ S1 📝`) — visible par tous (admin et ménagères).
-- **Comptes rendus (rôle ménage, départ où l’on est assignée)** : modale avec onglets **Mon intervention** et **Procédure** (v4.3) — durée personnelle (heures + minutes), champs **communs** commande / commentaire, enregistrement dans **`cleaningReports`** ; onglet **Procédure** : étapes du studio, coches **Fait** (**`stepFeedback`**, temps réel), notes 1–3 persistantes (**`ratings/{Prénom}`**), suggestion d’étape (**+**) ; **v4.3.4** : si une **note d’assignation** existe, **3ᵉ onglet** **📝** (orange, largeur réduite — info optionnelle) : texte **en lecture seule** (« Note de [noteBy ou l’administration] »). Onglet par défaut : **Mon intervention**. Si non assignée, pop-up **M’assigner** uniquement (pas d’onglet procédure) ; **v4.3.4** : si une note existe, encart discret **lecture seule** sous les dates, avant les boutons. Croix de fermeture en haut à droite ; fermeture automatique après **Enregistrer** sur l’onglet intervention.
+- **Départs** : si l’assignation a une **`note`** non vide (après trim), le bloc départ affiche un **point bleu pulsant** après le libellé (ex. `Départ S1` + point) — visible par tous (admin et ménagères).
+- **Comptes rendus (rôle ménage, départ où l’on est assignée)** : modale avec onglets **Mon intervention** et **Procédure** (v4.3) — durée personnelle (heures + minutes), champs **communs** commande / commentaire, enregistrement dans **`cleaningReports`** ; onglet **Procédure** : étapes du studio, coches **Fait** (**`stepFeedback`**, temps réel), notes 1–3 persistantes (**`ratings/{Prénom}`**), suggestion d’étape (**+**) ; **v4.3.4** : si une **note d’assignation** existe, **3ᵉ onglet** (orange, largeur réduite — libellé = **point bleu pulsant**, info optionnelle) : texte **en lecture seule** (« Note de [noteBy ou l’administration] »). Onglet par défaut : **Mon intervention**. Si non assignée, pop-up **M’assigner** uniquement (pas d’onglet procédure) ; **v4.3.4** : si une note existe, encart discret **lecture seule** sous les dates, avant les boutons (point pulsant en haut à droite du cadre). Croix de fermeture en haut à droite ; fermeture automatique après **Enregistrer** sur l’onglet intervention.
 - **Badge** du prénom sous le départ : **contour noir** si des heures ont été enregistrées pour cette personne sur ce départ.
-- **Indisponibilités (v4.5.0)** : troisième bouton **Indispo** dans la carte filtres (**Arrivées** / **Départs** / **Indispo**), état **`S.showUnavailability`** (désactivé par défaut) ; actif en rouge **`#E24B4A`**. Listener **`/orgs/{orgId}/unavailability/`** → **`S.unavailability`** aplati (niveau **`dates`**). **Pastilles** en haut à droite de chaque case jour si **Indispo** est actif : **indépendant** de **`filterType`** (y compris si ni arrivées ni départs) ; périmètre = ménagère du **filtre prénom** si sélectionnée, sinon toutes les **`menage`**. Pastille : couleur **`cleanerColor`**, initiales blanches, barre oblique (indispo) ; clic → modale lecture seule (**`stopPropagation`**). Clés jour = **date locale** **`YYYY-MM-DD`**.
+- **Indisponibilités (v4.5.0)** : troisième bouton **Indispo** dans la carte filtres (**Arrivées** / **Départs** / **Indispo**), état **`S.showUnavailability`** (désactivé par défaut) ; actif en rouge **`#E24B4A`**. Listener **`/orgs/{orgId}/unavailability/`** → **`S.unavailability`** normalisé (**`dates`** → **`{ by }`**, rétrocompat **`true`**). **Pastilles** en haut à droite de chaque case jour si **Indispo** est actif : **indépendant** de **`filterType`** (y compris si ni arrivées ni départs) ; périmètre = ménagère du **filtre prénom** si sélectionnée, sinon toutes les **`menage`**. Pastille : couleur **`cleanerColor`**, initiales blanches, barre oblique (indispo) ; clic → modale lecture seule (**`stopPropagation`**) avec **« par … »** si traçabilité présente (**v4.5.3**). Clés jour = **date locale** **`YYYY-MM-DD`**.
 
 ### compte.html — Espace intervenante
 
@@ -235,7 +237,7 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
 - **Menu burger** : **Dashboard** (défaut), **Compte**, **Indisponibilités** (**v4.5.0**) ; hashes **`#dashboard`**, **`#compte`**, **`#indisponibilites`**.
 - **Dashboard** : mois (← / libellé / → comme l’admin), KPIs **Interventions ce mois** (une réservation = une intervention si assignée en **c1** ou **c2**), **Prochain départ** (même libellés que le KPI calendrier *sans intervenante* : **Aujourd’hui**, **Demain**, **J-*n***, **Aucun**), **Heures totales ce mois** (somme **`cleaningReports`** pour ce prénom uniquement si **`assignSig`** correspond à l’assignation actuelle — comme **`cleaningReportViewFor`** sur **`index.html`**). Tableau d’historique du mois : date départ **jj/mm/aa**, studio **S1** / **S2**, heures ou **Non renseigné**.
 - **Vue Compte** : changement de mot de passe (même règles qu’avant sur **`index.html`**, écriture **`adminConfig`**, entrée journal **`activityLog`**).
-- **Vue Indisponibilités (v4.5.0)** : mois **découplé** du Dashboard ; navigation bornée **± 3 ans** (local) avec boutons **←** / **→** grisés aux limites. Calendrier mensuel : jours hors mois et passés non modifiables ; passés avec indispo en fond rouge pâle (lecture seule) ; **aujourd’hui et futur** : bascule **`set` / `remove`** sur **`…/unavailability/{prénom}/dates/{YYYY-MM-DD}`** avec **optimistic UI** et **toast + rollback** si erreur Firebase. Listener **`onValue`** sur le nœud **`dates`** de l’utilisatrice connectée.
+- **Vue Indisponibilités (v4.5.0)** : mois **découplé** du Dashboard ; navigation bornée **± 3 ans** (local) avec boutons **←** / **→** grisés aux limites. Calendrier mensuel : jours hors mois et passés non modifiables ; passés avec indispo en fond rouge pâle (lecture seule) ; **aujourd’hui et futur** : bascule **`set` / `remove`** sur **`…/unavailability/{prénom}/dates/{YYYY-MM-DD}`** — écriture **`{ by: prénom ménagère }`** (**v4.5.3**), rétrocompat lecture **`true`**. **Optimistic UI** + **toast + rollback** si erreur Firebase. Listener **`onValue`** sur **`dates`**. **v4.5.2** : sous la note d’aide, ligne **« Vous avez X … à venir »** si **X ≥ 1**. **v4.5.3** : dans chaque case rouge, **« par [by] »** si auteur connu.
 
 ### admin.html — Back-office
 
@@ -249,7 +251,7 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
   3. **Comptes** — authentification, **Org. par défaut**, Telegram, liste des comptes, **journal d’activité**.
   4. **Organisation** — **Studios** (noms affichés S1 / S2 sur le calendrier).
   5. **Légende** — **Légende & synchronisation** (points du calendrier, rôles 🧹 / 👑, sync, version affichée en bas).
-  6. **Indisponibilités** (**v4.5.1**) — liste déroulante des comptes **`menage: true`**, calendrier mensuel aligné sur **`compte.html`** (navigation **± 3 ans** locale, mêmes styles / contraintes / chemin Firebase **`unavailability/{prenom}/dates/{YYYY-MM-DD}`**) ; **`onValue`** sur le nœud **`dates`** de la personne sélectionnée, rebond lors du changement d’intervenante.
+  6. **Indisponibilités** (**v4.5.1**, résumé **v4.5.2**, traçabilité **v4.5.3**) — liste déroulante des comptes **`menage: true`**, calendrier mensuel aligné sur **`compte.html`** (navigation **± 3 ans** locale, mêmes styles / contraintes / chemin Firebase **`unavailability/{prenom}/dates/{YYYY-MM-DD}`**) ; **`onValue`** sur le nœud **`dates`** de la personne sélectionnée, rebond lors du changement d’intervenante. **Écriture** : **`{ by: prénom admin }`** ou **`"admin"`** si auth désactivée (**v4.5.3**). **v4.5.2** : en bas de la vue, **résumé global** (indépendant de la liste déroulante) : toutes les ménagères ayant au moins une indispo **à venir** (date **≥** aujourd’hui, local), tri décroissant par nombre de jours, libellé du type **« Prénom — N … à venir »** avec couleur **`cleanerColor`** ; données issues d’un **`onValue`** sur **`/orgs/{orgId}/unavailability/`** (normalisation **`dates`**, comme **`index.html`**). **v4.5.3** : **« par [by] »** dans les cases rouges lorsque applicable.
 - **Hashes d’URL** (optionnels) : **`#dashboard`** (équivalent page d’accueil admin), **`#procedures`**, **`#comptes`**, **`#organisation`**, **`#legend`**, **`#indisponibilites`** ; **`#general`** est encore accepté et équivalent à **`#dashboard`** ; sans hash, la vue par défaut est le **Dashboard**.
 - Rubrique **Comptes** : une ligne par réglage — **authentification** et **Notifications Telegram** sont des **cases à cocher** (même style), avec texte d’aide ; **Org. par défaut** avec liste déroulante dessous. **`telegramEnabled`** dans **`adminConfig`** : si désactivé pour une org, **`sync-ical.js`** et **`notify-departs.js`** n’envoient **pas** de messages Telegram pour cette org (Firebase reste mis à jour pour la sync iCal).
 - La signification des icônes **🧹** (ménage) et **👑** (admin) est rappelée dans la vue **Légende** (texte du type « Comptes (rubrique Comptes du menu) » pour renvoyer vers la bonne vue).
@@ -284,8 +286,10 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
 
 ### GitHub Actions — Secrets requis
 
-- `FIREBASE_SERVICE_ACCOUNT` : clé JSON compte de service Firebase  
-- `TELEGRAM_BOT_TOKEN` : token du bot @TessonLocationbot  
+Les workflows (`.github/workflows/*.yml`) lisent les valeurs sensibles **uniquement** via les [**secrets du dépôt GitHub**](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions) (*Settings → Secrets and variables → Actions*). Elles ne sont **pas** commitées dans le dépôt : chaque secret est injecté à l’exécution sous la forme `${{ secrets.NOM_DU_SECRET }}`.
+
+- `FIREBASE_SERVICE_ACCOUNT` : JSON complet du compte de service Firebase (utilisé par `sync-ical.js`, `notify-departs.js`, `purge-unavailability.js`)
+- `TELEGRAM_BOT_TOKEN` : token du bot @TessonLocationbot (utilisé par `sync-ical.js` et `notify-departs.js`)
 
 ### Telegram
 
@@ -295,7 +299,8 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
 ### Sécurité
 
 - Accès restreint au domaine de production (Google Cloud Console) quand configuré.  
-- Données sensibles : secrets uniquement côté GitHub Actions ; **`migrate.js`** en local avec la même variable `FIREBASE_SERVICE_ACCOUNT`.
+- Données sensibles : côté CI, tout passe par les **secrets GitHub** ci-dessus ; en local, **`migrate.js`** et les scripts Node utilisent la variable d’environnement `FIREBASE_SERVICE_ACCOUNT` (ou équivalent), sans la versionner.
+- **À traiter plus tard** : les **URLs iCal privées** Airbnb (paramètre `?s=…`) sont encore dans **`sync-ical.js`**, donc **versionnées avec le dépôt**. Ce n’est **pas** le cas du compte de service ni du token Telegram. Il faudra un moment **externaliser** cette config (secret GitHub contenant un JSON, variables d’environnement en Actions, fichier local ignoré par Git pour le développement, etc.), surtout si le dépôt est public ou partagé — voir aussi la liste **Améliorations prévues**.
 - Penser à inclure **`/orgs/{orgId}/cleaningReports`** (et sous-chemins **`stepFeedback`**, **`procedureSuggestions`**, **`procedures/.../ratings`**) dans les **règles Realtime Database** si elles ne sont pas déjà couvertes par une règle large (sinon les comptes rendus / procédure ne s’enregistrent pas). Idem pour **`unavailability`** (lecture utile pour le calendrier ; écriture par chaque ménagère sur son sous-chemin **`dates`** si vous affinez les règles).
 - **Firebase Storage** : autoriser **`orgs/{orgId}/procedures/...`** (un seul schéma : **`{studio}/{id}.jpg`** pour étape ou suggestion).
 
@@ -398,6 +403,7 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 5. ~~**Consultation des procédures** depuis le calendrier (`index.html`)~~ — **fait en v4.3** (onglet Procédure pour intervenantes assignées)  
 6. **Hub multi-plannings** (enfants, crèche, etc.)  
 7. **Application mobile native** — notifications push  
+8. **URLs iCal Airbnb** — sortir les liens privés de **`sync-ical.js`** vers des secrets / variables d’environnement (détail § **Sécurité**, puce *À traiter plus tard*)
 
 ---
 
@@ -405,7 +411,7 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 4.5.1
+Version : 4.5.3
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
@@ -417,6 +423,17 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ---
 
 ## Historique des versions
+
+### v4.5.3 — Avril 2026
+- **Firebase** : valeurs sous **`…/unavailability/{prenom}/dates/{YYYY-MM-DD}`** — **`{ by: string }`** pour la traçabilité ; **`true`** (historique) toujours lu et affiché comme indispo sans auteur.
+- **`compte.html`** / **`admin.html`** : **`set`** avec **`{ by }`** ; calendriers indispo : ligne **« par … »** (9px, italique, gris) en bas des cases rouges si **`by`** connu.
+- **`index.html`** : normalisation **`S.unavailability`** avec **`{ by }`** ; modale pastille **Indispo** : **« par … »** si présent.
+- **`APP_VERSION` : 4.5.3** dans **`index.html`**, **`admin.html`** et **`compte.html`**.
+
+### v4.5.2 — Avril 2026
+- **`admin.html`** : vue **Indisponibilités** — résumé en bas de page des ménagères ayant des indispos **futures** (tri par nombre décroissant, couleurs **`cleanerColor`**). Listener **`onValue`** sur **`/orgs/{orgId}/unavailability/`** pour alimenter ce résumé global (le calendrier par personne conserve son listener **`…/unavailability/{prenom}/dates`**).
+- **`compte.html`** : vue **Indisponibilités** — ligne **« Vous avez X … à venir »** si au moins une date future (données du listener **`dates`** existant).
+- **`APP_VERSION` : 4.5.2** dans **`index.html`**, **`admin.html`** et **`compte.html`**.
 
 ### v4.5.1 — Avril 2026
 - **`admin.html`** : entrée menu **Indisponibilités** (après **Légende**), hash **`#indisponibilites`** — calendrier d’indisponibilités par intervenante (**`menage: true`**), même logique / style que **`compte.html`** ; listener **`onValue`** rebond sur changement de sélection.

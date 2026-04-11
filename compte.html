@@ -70,14 +70,16 @@ body.compte-nav-ready .admin-burger{display:flex}
 .empty-hint{font-size:12px;color:#aaa;padding:8px 0}
 .compte-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}
 .unavail-cal-head{text-align:center;font-size:11px;color:#999;padding:6px 0;font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
-.unavail-cal-cell{min-height:48px;border-radius:8px;border:1px solid #e8e8e2;display:flex;align-items:flex-start;justify-content:flex-start;padding:6px 8px;cursor:default;background:#fff;font-size:14px;font-weight:600;color:#333;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+.unavail-cal-cell{min-height:48px;border-radius:8px;border:1px solid #e8e8e2;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;padding:6px 8px;cursor:default;background:#fff;font-size:14px;font-weight:600;color:#333;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
 .unavail-cal-cell--other{opacity:0.35;pointer-events:none;background:#fafaf8}
 .unavail-cal-cell--past{color:#aaa;background:#f3f3ef}
 .unavail-cal-cell--past-busy{background:#fde8ef;border-color:#f0c4d4;color:#999}
 .unavail-cal-cell--future{cursor:pointer}
 .unavail-cal-cell--future:active{opacity:0.92}
 .unavail-cal-cell--busy{background:#fde8e8;border-color:#e8a8a8;color:#8b2f2f}
+.unavail-cal-by{margin-top:auto;font-size:9px;font-style:italic;color:#aaa;line-height:1.2;width:100%;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;align-self:stretch;padding-top:2px}
 .unavail-cal-note{font-size:11px;color:#888;line-height:1.45;margin-top:12px}
+.unavail-future-summary-line{margin-top:12px;font-size:13px;font-weight:600;color:#555;line-height:1.45}
 .nav-btn:disabled{opacity:0.35;cursor:not-allowed}
 </style>
 </head>
@@ -180,6 +182,7 @@ body.compte-nav-ready .admin-burger{display:flex}
         </div>
         <div id="unavail-cal-host"></div>
         <p class="unavail-cal-note">Touchez un jour pour le marquer indisponible (rouge). Touchez à nouveau pour annuler. Les jours passés ne sont pas modifiables.</p>
+        <p id="compte-unavail-future-line" class="unavail-future-summary-line" style="display:none" aria-live="polite"></p>
       </div>
     </div>
 
@@ -212,7 +215,7 @@ const ORGANIZATIONS = [
   { id: 'tesson', label: 'Studio Tesson' },
   { id: 'nade', label: 'Studio Nade' }
 ];
-const APP_VERSION = '4.5.1';
+const APP_VERSION = '4.5.3';
 const MO_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const COMPTE_VIEW_IDS = ['dashboard','compte','indisponibilites'];
 
@@ -247,7 +250,7 @@ let C = {
   selectedYear: new Date().getFullYear(),
   unavailMonth: new Date().getMonth(),
   unavailYear: new Date().getFullYear(),
-  /** @type {Record<string, true>} dates locales YYYY-MM-DD */
+  /** @type {Record<string, { by: string|null }>} dates locales → traçabilité (`by` null si ancien `true` en base) */
   unavailMyDates: {},
   unlocked: false
 };
@@ -268,6 +271,20 @@ function localDateKey(d){
   const mo=String(d.getMonth()+1).padStart(2,'0');
   const day=String(d.getDate()).padStart(2,'0');
   return `${y}-${mo}-${day}`;
+}
+
+function isFirebaseIndispoRecord(v){
+  if(v===true) return true;
+  return v!=null&&typeof v==='object'&&!Array.isArray(v);
+}
+function unavailByFromFirebase(v){
+  if(v===true) return null;
+  if(v&&typeof v==='object'&&v.by!=null&&String(v.by).trim()) return String(v.by).trim();
+  return null;
+}
+function unavailLocalPresent(e){
+  if(e===true) return true;
+  return e!=null&&typeof e==='object'&&Object.prototype.hasOwnProperty.call(e,'by');
 }
 
 function unavailMonthIndex(yr,mo){ return yr*12+mo; }
@@ -476,14 +493,14 @@ window._unavailToggleDay=async function(y,m,day){
   const t0=new Date(); t0.setHours(0,0,0,0);
   if(d.getTime()<t0.getTime()) return;
   const key=localDateKey(d);
-  const was=!!C.unavailMyDates[key];
+  const was=unavailLocalPresent(C.unavailMyDates[key]);
   const backup={...C.unavailMyDates};
-  if(was) delete C.unavailMyDates[key]; else C.unavailMyDates[key]=true;
+  if(was) delete C.unavailMyDates[key]; else C.unavailMyDates[key]={by:C.userName};
   renderUnavailCal();
   const path=`${ob('unavailability')}/${C.userName}/dates/${key}`;
   try{
     if(was) await remove(ref(db,path));
-    else await set(ref(db,path),true);
+    else await set(ref(db,path),{by:C.userName});
     setSyncStatus('ok');
   }catch(_){
     C.unavailMyDates=backup;
@@ -512,17 +529,21 @@ function renderUnavailCal(){
   const today=new Date(); today.setHours(0,0,0,0);
   const DAYS=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
   let html=DAYS.map(d=>`<div class="unavail-cal-head">${d}</div>`).join('');
+  const escAttr=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
   const cell=(d,other)=>{
     const key=localDateKey(d);
     const isPast=!other&&d.getTime()<today.getTime();
-    const busy=!!C.unavailMyDates[key];
+    const entry=C.unavailMyDates[key];
+    const busy=unavailLocalPresent(entry);
+    const byRaw=busy&&entry&&typeof entry==='object'&&entry.by!=null?String(entry.by).trim():'';
+    const byHtml=busy&&byRaw?`<span class="unavail-cal-by">par ${escAttr(byRaw)}</span>`:'';
     let cls='unavail-cal-cell';
     if(other) cls+=' unavail-cal-cell--other';
     else if(isPast) cls+=busy?' unavail-cal-cell--past-busy':' unavail-cal-cell--past';
     else cls+=busy?' unavail-cal-cell--busy unavail-cal-cell--future':' unavail-cal-cell--future';
     const click=!other&&!isPast?` onclick="window._unavailToggleDay(${d.getFullYear()},${d.getMonth()},${d.getDate()})" role="button" tabindex="0"`:'';
-    return `<div class="${cls}"${click}><span class="unavail-cal-daynum">${d.getDate()}</span></div>`;
+    return `<div class="${cls}"${click}><span class="unavail-cal-daynum">${d.getDate()}</span>${byHtml}</div>`;
   };
 
   for(let i=1;i<sd;i++) html+=cell(new Date(yr,mo,1-sd+i),true);
@@ -530,6 +551,27 @@ function renderUnavailCal(){
   const rem=7-((sd-1+last.getDate())%7);
   if(rem<7) for(let i=1;i<=rem;i++) html+=cell(new Date(yr,mo+1,i),true);
   host.innerHTML=`<div class="compte-cal-grid">${html}</div>`;
+  renderCompteUnavailFutureLine();
+}
+
+function renderCompteUnavailFutureLine(){
+  const p=el('compte-unavail-future-line');
+  if(!p||!C.unlocked) return;
+  const t=new Date();
+  t.setHours(0,0,0,0);
+  const todayKey=localDateKey(t);
+  let n=0;
+  for(const dk of Object.keys(C.unavailMyDates||{})){
+    if(unavailLocalPresent(C.unavailMyDates[dk])&&/^\d{4}-\d{2}-\d{2}$/.test(dk)&&dk>=todayKey) n++;
+  }
+  if(n<=0){
+    p.style.display='none';
+    p.textContent='';
+    return;
+  }
+  p.style.display='';
+  const lab=n===1?'indisponibilité':'indisponibilités';
+  p.textContent=`Vous avez ${n} ${lab} à venir`;
 }
 
 function renderCompteDashboard(){
@@ -597,7 +639,10 @@ window.setCompteView=function(view,opts){
     history.replaceState(null,'',v==='dashboard'?base:(base+'#'+v));
   }catch(_){}
   if(!(opts&&opts.noScroll)) window.scrollTo(0,0);
-  if(v==='indisponibilites') renderUnavailCal();
+  if(v==='indisponibilites'){
+    renderUnavailCal();
+    renderCompteUnavailFutureLine();
+  }
 };
 
 function setCompteNavOpen(open){
@@ -679,7 +724,9 @@ onValue(ref(db,`${ob('unavailability')}/${C.userName}/dates`), snap=>{
   const v=snap.val()||{};
   const next={};
   for(const k of Object.keys(v)){
-    if(v[k]) next[k]=true;
+    const val=v[k];
+    if(!isFirebaseIndispoRecord(val)) continue;
+    next[k]={by:unavailByFromFirebase(val)};
   }
   C.unavailMyDates=next;
   if(C.unlocked) renderUnavailCal();

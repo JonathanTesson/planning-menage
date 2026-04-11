@@ -72,11 +72,14 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 .resa-block.s1{background:#daeafe;color:#1047a0}
 .resa-block.s2{background:#c6f0df;color:#075c3a}
 .resa-block.checkout{background:#fde8b0;color:#7a4a00}
+.depart-note-pip{width:6px;height:6px;border-radius:50%;display:inline-block;background:#378ADD;margin-left:3px;vertical-align:middle;animation:depart-note-pulse 1.5s ease-in-out infinite}
+@keyframes depart-note-pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+@keyframes unavail-pip-inset-pulse{0%,100%{box-shadow:inset 0 0 0 1px rgba(232,168,168,1)}50%{box-shadow:inset 0 0 0 1px rgba(232,168,168,0)}}
 .assign-wrap{margin-top:1px;margin-bottom:2px}
 .assign-badge{display:inline-block;font-size:9px;background:#f0f0eb;border-radius:3px;padding:1px 4px;color:#555;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
 .assign-badge-hours{box-shadow:0 0 0 1px #1a1a1a}
 .unavail-pips{position:absolute;top:2px;right:2px;display:flex;flex-direction:row-reverse;flex-wrap:wrap;justify-content:flex-end;align-items:flex-start;gap:2px;max-width:58%;z-index:2;pointer-events:none;line-height:0}
-.unavail-pip{position:relative;pointer-events:auto;width:13px;height:13px;min-width:13px;min-height:13px;border-radius:50%;border:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;background:#fde8e8;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.unavail-pip{position:relative;pointer-events:auto;width:13px;height:13px;min-width:13px;min-height:13px;border-radius:50%;border:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;background:#fde8e8;flex-shrink:0;display:flex;align-items:center;justify-content:center;animation:unavail-pip-inset-pulse 2s ease-in-out infinite}
 .unavail-pip:active{opacity:0.88;transform:scale(0.96)}
 .unavail-pip-text{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:8px;font-weight:400;color:#1a1a1a;line-height:0;text-align:center;pointer-events:none;user-select:none;transform:translateY(-0.5px)}
 
@@ -130,14 +133,18 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
   flex:0 0 auto;
   min-width:0;
   width:auto;
-  padding:6px 5px;
+  padding:6px 8px;
   color:#F59E0B;
-  font-size:15px;
   line-height:1;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
 }
+.menage-tab--note .depart-note-pip{margin-left:0}
 .menage-tab--note.menage-tab--active{border-color:#F59E0B;color:#F59E0B;box-shadow:0 0 0 1px rgba(245,158,11,0.15)}
 .menage-note-panel{margin-top:0.25rem}
-.assign-note-readonly{background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 12px;margin:0 0 1rem;font-size:12px;color:#666;line-height:1.45}
+.assign-note-readonly{position:relative;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 26px 10px 12px;margin:0 0 1rem;font-size:12px;color:#666;line-height:1.45}
+.assign-note-readonly .depart-note-pip{position:absolute;top:10px;right:10px;margin:0;vertical-align:initial}
 .assign-note-readonly-by{font-size:11px;color:#92400e;font-weight:600;margin-bottom:6px}
 .assign-note-readonly-text{color:#555;white-space:pre-wrap;word-break:break-word}
 .menage-procedure-panel{margin-top:0.25rem}
@@ -226,6 +233,7 @@ html[data-menage-org-gate="1"] #main-app{display:none!important}
   .month-title{font-size:16px}
   .chip{font-size:10px;padding:3px 8px}
   .status-pip{width:5px;height:5px}
+  .depart-note-pip{width:5px;height:5px}
   .kpi-value{font-size:16px}
   .unavail-pip{width:12px;height:12px;min-width:12px;min-height:12px}
   .unavail-pip-text{font-size:7px}
@@ -394,7 +402,7 @@ const ORGANIZATIONS = [
   { id: 'nade', label: 'Studio Nade' }
 ];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.5.1';
+const APP_VERSION = '4.5.3';
 
 function getStoredOrgId(){
   try{
@@ -423,7 +431,7 @@ let S = {
   currentUser: null,  // { name, menage, admin }
   cleaningReports: {},
   procedures: {},
-  /** @type {Record<string, Record<string, true>>} prénom → { 'YYYY-MM-DD': true } (dates locales, cf. normalizeUnavailability) */
+  /** @type {Record<string, Record<string, { by: string|null }>>} prénom → date locale → { by } (cf. normalizeUnavailability) */
   unavailability: {}
 };
 
@@ -568,9 +576,23 @@ function localDateKey(d){
   return `${y}-${mo}-${day}`;
 }
 
+/** Ancienne base : `true` ; traçabilité : `{ by: string }`. */
+function isFirebaseIndispoRecord(v){
+  if(v===true) return true;
+  return v!=null&&typeof v==='object'&&!Array.isArray(v);
+}
+function unavailByFromFirebase(v){
+  if(v===true) return null;
+  if(v&&typeof v==='object'&&v.by!=null&&String(v.by).trim()) return String(v.by).trim();
+  return null;
+}
+function unavailLocalPresent(e){
+  if(e===true) return true;
+  return e!=null&&typeof e==='object'&&Object.prototype.hasOwnProperty.call(e,'by');
+}
+
 /**
- * RTDB : /unavailability/{prenom}/dates/{YYYY-MM-DD} → objet aplati { prénom: { date: true } }.
- * Si un jour les prénoms contiennent `. # $ [ ]`, Firebase impose d’encoder les segments de chemin — pas le cas actuellement.
+ * RTDB : /unavailability/{prenom}/dates/{YYYY-MM-DD} → `true` ou `{ by }` → aplati { prénom: { date: { by } } } (`by` null si ancien `true`).
  */
 function normalizeUnavailability(raw){
   const out={};
@@ -580,7 +602,9 @@ function normalizeUnavailability(raw){
     if(!node||typeof node!=='object'||!node.dates||typeof node.dates!=='object') continue;
     const flat={};
     for(const dk of Object.keys(node.dates)){
-      if(node.dates[dk]) flat[dk]=true;
+      const v=node.dates[dk];
+      if(!isFirebaseIndispoRecord(v)) continue;
+      flat[dk]={by:unavailByFromFirebase(v)};
     }
     if(Object.keys(flat).length) out[prenom]=flat;
   }
@@ -1172,7 +1196,7 @@ function buildUnavailPipsHtml(d){
   const list=S.filterCleaner?cleaners.filter(c=>c===S.filterCleaner):cleaners;
   const names=[];
   for(const n of list){
-    if(S.unavailability[n]?.[dateKey]) names.push(n);
+    if(unavailLocalPresent(S.unavailability[n]?.[dateKey])) names.push(n);
   }
   if(!names.length) return '';
   const btns=names.map(n=>{
@@ -1208,8 +1232,7 @@ function renderCalendar(){
         for(const r of getCheckouts(d,si)){
           const {c1,c2,note}=getAssignment(r);
           if(S.filterCleaner && c1!==S.filterCleaner && c2!==S.filterCleaner) continue;
-          const noteMark=assignNoteTrimmed(note)?' 📝':'';
-          inner+=`<div class="resa-block checkout" onclick="window._oa('${getKey(r)}')" title="Départ — ${S.studioNames[si]}">Départ S${si+1}${noteMark}</div>`;
+          inner+=`<div class="resa-block checkout" onclick="window._oa('${getKey(r)}')" title="Départ — ${S.studioNames[si]}">Départ S${si+1}${assignNoteTrimmed(note)?'<span class="depart-note-pip" aria-hidden="true"></span>':''}</div>`;
           // Tout le monde voit les noms assignés
           if(c1||c2){
             const rk=getKey(r);
@@ -1589,12 +1612,13 @@ window._oa = function(key){
     : 'l\'administration';
   const assignNoteReadonlyBlock=hasAssignNote
     ? `<div class="assign-note-readonly" role="region" aria-label="Note d’assignation">
+        <span class="depart-note-pip" aria-hidden="true"></span>
         <div class="assign-note-readonly-by">Note de ${assignNoteAuthorHtml}</div>
         <div class="assign-note-readonly-text">${escHtml(note)}</div>
       </div>`
     : '';
   const menageNoteTabBtn=hasAssignNote
-    ? `<button type="button" class="menage-tab menage-tab--note" id="menage-tab-btn-n" role="tab" aria-selected="false" onclick="window._menageTab('n')" title="Note d’assignation" aria-label="Note d’assignation">📝</button>`
+    ? `<button type="button" class="menage-tab menage-tab--note" id="menage-tab-btn-n" role="tab" aria-selected="false" onclick="window._menageTab('n')" title="Note d’assignation" aria-label="Note d’assignation"><span class="depart-note-pip" aria-hidden="true"></span></button>`
     : '';
   const menageNotePanel=hasAssignNote
     ? `<div id="menage-panel-n" class="menage-note-panel" style="display:none" role="tabpanel">
@@ -1856,6 +1880,9 @@ window._indispoModal=function(name,dateKey){
   const parts=String(dateKey||'').split('-');
   const nice=parts.length===3?`${parts[2]}/${parts[1]}/${parts[0]}`:escHtml(String(dateKey||''));
   const n=escHtml(name||'');
+  const entry=name&&dateKey?S.unavailability[name]?.[dateKey]:null;
+  const byRaw=entry&&typeof entry==='object'&&entry.by!=null?String(entry.by).trim():'';
+  const parLine=byRaw?`<p class="modal-shared-hint" style="margin-top:8px;font-size:11px;font-style:italic;color:#aaa">par ${escHtml(byRaw)}</p>`:'';
   document.getElementById('modal-container').innerHTML=`
     <div class="modal-overlay" onclick="if(event.target===this)window._cm()">
       <div class="modal">
@@ -1864,6 +1891,7 @@ window._indispoModal=function(name,dateKey){
           <button type="button" class="modal-close-x" onclick="window._cm()" aria-label="Fermer" title="Fermer">×</button>
         </div>
         <p class="modal-shared-hint" style="margin-top:0"><strong style="color:#555">${n}</strong> indisponible sur cette date (${nice}).</p>
+        ${parLine}
       </div>
     </div>`;
 };
