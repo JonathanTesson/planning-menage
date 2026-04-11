@@ -69,15 +69,18 @@ body.compte-nav-ready .admin-burger{display:flex}
 .toast.show{opacity:1}
 .empty-hint{font-size:12px;color:#aaa;padding:8px 0}
 .compte-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}
+/* Indisponibilités : pas de carte blanche (évite décalage si la grille s’élargit avec « par … ») ; colonnes peuvent grandir. */
+.section.section--unavail{background:transparent;border:none;padding-left:0;padding-right:0}
+.section.section--unavail .compte-cal-grid{grid-template-columns:repeat(7,minmax(min-content,1fr))}
 .unavail-cal-head{text-align:center;font-size:11px;color:#999;padding:6px 0;font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
-.unavail-cal-cell{min-height:48px;min-width:0;width:100%;border-radius:8px;border:1px solid #e8e8e2;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:6px 8px;cursor:default;background:#fff;font-size:14px;font-weight:600;color:#333;-webkit-tap-highlight-color:transparent;box-sizing:border-box;overflow:hidden}
+.unavail-cal-cell{min-height:48px;border-radius:8px;border:1px solid #e8e8e2;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;padding:6px 8px;cursor:default;background:#fff;font-size:14px;font-weight:600;color:#333;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
 .unavail-cal-cell--other{opacity:0.35;pointer-events:none;background:#fafaf8}
 .unavail-cal-cell--past{color:#aaa;background:#f3f3ef}
 .unavail-cal-cell--past-busy{background:#fde8ef;border-color:#f0c4d4;color:#999}
 .unavail-cal-cell--future{cursor:pointer}
 .unavail-cal-cell--future:active{opacity:0.92}
 .unavail-cal-cell--busy{background:#fde8e8;border-color:#e8a8a8;color:#8b2f2f}
-.unavail-cal-by{margin-top:auto;font-size:9px;font-style:italic;color:#aaa;line-height:1.2;width:100%;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;align-self:stretch;padding-top:2px}
+.unavail-cal-by{margin-top:auto;font-size:9px;font-style:italic;color:#aaa;line-height:1.2;max-width:100%;text-align:left;white-space:nowrap;padding-top:2px}
 .unavail-cal-note{font-size:11px;color:#888;line-height:1.45;margin-top:12px}
 .unavail-future-summary-line{margin-top:12px;font-size:13px;font-weight:600;color:#555;line-height:1.45}
 .nav-btn:disabled{opacity:0.35;cursor:not-allowed}
@@ -173,7 +176,7 @@ body.compte-nav-ready .admin-burger{display:flex}
     </div>
 
     <div id="compte-view-indisponibilites" role="region" aria-label="Indisponibilités" style="display:none">
-      <div class="section">
+      <div class="section section--unavail">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
           <h3 style="margin-bottom:0"><span>🗓️</span> <span id="unavail-month-title">…</span></h3>
           <div style="display:flex;align-items:center;gap:6px">
