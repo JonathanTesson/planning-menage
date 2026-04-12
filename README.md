@@ -424,6 +424,8 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 6. ~~**URLs iCal Airbnb** — stockage hors `sync-ical.js`~~ — **fait en v4.6.x** (`/orgs/{orgId}/icalFeeds` + Super Admin + **`init-ical-feeds.js`**)  
 7. ~~**Phase 2 — Studios dynamiques**~~ — **fait en v4.6.1** (N studios, iCal par studio, suppression d’org, calendrier N + palette, admin N champs)  
 8. **Phase 3** — **« Visible sur calendrier »** par studio (filtrage affichage) ; **gestion `sharedWith`** (UI + règles) ; **hub multi-plannings** (enfants, crèche, etc., réutilisation du socle multi-org)
+9. Vues Comptes et Paramètres du menu Super Admin masquées (code conservé) — à supprimer proprement une fois la vue Organisations validée en production
+10. `defaultOrgId` dans adminConfig : paramètre prévu mais sans effet réel dans l'implémentation actuelle — à revoir en Phase 3 (paramètre global à la racine Firebase)
 
 ---
 

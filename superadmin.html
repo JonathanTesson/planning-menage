@@ -82,23 +82,37 @@ body.sa-nav-ready .admin-burger{display:flex}
 .toggle-slider:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:0.2s}
 .toggle input:checked+.toggle-slider{background:#1D9E75}
 .toggle input:checked+.toggle-slider:before{transform:translateX(20px)}
+.toggle.toggle--mini{width:32px;height:18px}
+.toggle.toggle--mini .toggle-slider{border-radius:18px}
+.toggle.toggle--mini .toggle-slider:before{width:12px;height:12px;left:2px;top:3px}
+.toggle.toggle--mini input:checked+.toggle-slider:before{transform:translateX(16px)}
 .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0eb}
 .toggle-row:last-child{border-bottom:none}
 .toggle-label{font-size:13px;color:#333}
 .sa-org-acc{border-bottom:1px solid #f0f0eb}
 .sa-org-acc:last-child{border-bottom:none}
-.sa-org-acc-head{display:flex;align-items:center;gap:10px;padding:10px 0;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+.sa-org-acc-head{display:grid;grid-template-columns:1fr 160px auto auto;align-items:center;column-gap:10px;padding:10px 0;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
 .sa-org-acc-head:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
 .sa-org-acc-arrow{flex-shrink:0;width:1.25rem;text-align:center;transition:transform .2s ease;display:inline-block;font-size:11px;line-height:1;color:#555}
 .sa-org-acc.is-open .sa-org-acc-arrow{transform:rotate(90deg)}
+.sa-org-acc-left{display:flex;align-items:center;gap:10px;min-width:0}
 .sa-org-acc-titles{flex:0 1 auto;min-width:0}
+.sa-org-acc-toggles{display:flex;align-items:center;justify-content:center;gap:14px}
+.sa-org-toggle-item{display:flex;align-items:center;gap:6px}
+.sa-org-toggle-emoji{font-size:14px;line-height:1;user-select:none;flex-shrink:0}
 .sa-org-del.btn-danger{color:#fff;background:#E24B4A;border:1px solid #c0392b;border-radius:6px;padding:4px 8px}
 .sa-org-del.btn-danger:hover{background:#c0392b}
 .sa-org-acc-panel{padding:4px 0 14px 1.75rem;display:none}
 .sa-studio-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;padding:6px 0;border-bottom:1px solid #f5f5f0}
 .sa-studio-row:last-of-type{border-bottom:none}
-.sa-studio-row input[type=text]{flex:1;min-width:140px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
-.sa-org-add-studio{margin-top:10px;padding-top:4px}
+.sa-studio-line-main input[type=text]{flex:1;min-width:140px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
+.sa-org-add-studio{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:4px}
+.sa-steps-badge{display:inline-block;font-size:12px;padding:3px 8px;border-radius:12px;background:#f0f0eb;color:#555;user-select:none;pointer-events:none;white-space:nowrap;flex-shrink:0}
+.sa-studio-line-main{display:flex;gap:8px;align-items:center;flex:1;min-width:0;flex-wrap:wrap}
+.sa-org-panel-sep{border:none;border-top:1px solid #e8e8e2;margin:8px 0}
+.sa-org-acc-accounts{border:none;background:transparent;padding:2px 6px;font-size:14px;line-height:1.2;cursor:pointer;color:#555;border-radius:6px;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.sa-org-acc-accounts:hover{background:#f0f0eb}
+.sa-org-acc-accounts:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
 </style>
 </head>
 <body>
@@ -106,9 +120,9 @@ body.sa-nav-ready .admin-burger{display:flex}
 <div id="sa-nav-overlay" class="admin-nav-overlay" aria-hidden="true"></div>
 <nav id="sa-nav-panel" class="admin-nav-panel" aria-label="Super administration" aria-hidden="true">
   <div class="admin-nav-panel-inner">
-    <button type="button" class="admin-nav-link" data-sa-view="comptes">Comptes</button>
+    <button type="button" class="admin-nav-link" data-sa-view="comptes" style="display:none">Comptes</button>
     <button type="button" class="admin-nav-link" data-sa-view="organisations">Organisations</button>
-    <button type="button" class="admin-nav-link" data-sa-view="parametres">Paramètres</button>
+    <button type="button" class="admin-nav-link" data-sa-view="parametres" style="display:none">Paramètres</button>
     <button type="button" class="admin-nav-link" data-sa-view="securite">Sécurité</button>
   </div>
 </nav>
@@ -366,7 +380,107 @@ function escHtml(s){
 let orgEntries = [];
 const studioCache = {};
 const icalCache = {};
+/** @type {Record<string, Record<number, number>>} */
+const stepsCountCache = {};
+/** @type {Record<string, { authEnabled: boolean, telegramEnabled: boolean, accountsCount: number }>} */
+const orgParamsCache = {};
+const studiosOpen = {};
+const accountsOpen = {};
+/** Après le premier chargement studios réussi pour l’org (évite de re-câbler wireStudiosPanel à chaque réouverture). */
+const studiosHydrated = {};
+const lastAppliedStudiosOpen = {};
+const lastAppliedAccountsOpen = {};
 let saNavOnce = false;
+
+const SA_ORG_TITLE_AUTH = 'Authentification — si activée, les intervenantes doivent se connecter avec un mot de passe';
+const SA_ORG_TITLE_TG = 'Notifications Telegram — si activées, les nouvelles réservations et départs sont notifiés sur Telegram';
+
+function paintOrgRow(host, orgId, p){
+  if(!host || !p) return;
+  const acc = host.querySelector(`.sa-org-acc[data-org-id="${CSS.escape(orgId)}"]`);
+  if(!acc) return;
+  const aInp = acc.querySelector('input[data-sa-org-auth]');
+  const tInp = acc.querySelector('input[data-sa-org-tg]');
+  if(aInp) aInp.checked = !!p.authEnabled;
+  if(tInp) tInp.checked = !!p.telegramEnabled;
+  const accBtn = acc.querySelector('[data-sa-org-accounts-btn]');
+  if(accBtn) accBtn.textContent = '👤' + (Number(p.accountsCount) || 0);
+}
+
+async function applyOrgPanelState(orgId, refreshAccountsIfOpen){
+  const acc = document.querySelector(`.sa-org-acc[data-org-id="${CSS.escape(orgId)}"]`);
+  if(!acc) return;
+  const panel = acc.querySelector('.sa-org-acc-panel');
+  const head = acc.querySelector('.sa-org-acc-head');
+  const root = panel && panel.querySelector('.sa-org-studios-root');
+  const accPane = document.getElementById('sa-accounts-panel-' + orgId);
+  const sep = panel && panel.querySelector('.sa-org-panel-sep');
+  if(!panel || !head || !root || !accPane || !sep) return;
+
+  const prevS = !!lastAppliedStudiosOpen[orgId];
+  const prevA = !!lastAppliedAccountsOpen[orgId];
+  const sOpen = !!studiosOpen[orgId];
+  const aOpen = !!accountsOpen[orgId];
+  const panelVisible = sOpen || aOpen;
+
+  panel.style.display = panelVisible ? 'block' : 'none';
+  acc.classList.toggle('is-open', sOpen);
+  head.setAttribute('aria-expanded', String(sOpen));
+  root.style.display = sOpen ? 'block' : 'none';
+  accPane.style.display = aOpen ? 'block' : 'none';
+  sep.style.display = sOpen && aOpen ? 'block' : 'none';
+
+  if(sOpen && !studiosHydrated[orgId]){
+    try{
+      await ensureStudioCacheLoaded(orgId);
+      await loadStepsCountsForOrg(orgId);
+      renderStudiosPanel(panel, orgId);
+      wireStudiosPanel(panel, orgId);
+      studiosHydrated[orgId] = true;
+    }catch(err){
+      console.warn(err);
+      showToast('Erreur de chargement des studios');
+      studiosOpen[orgId] = false;
+      const keepAcc = !!accountsOpen[orgId];
+      panel.style.display = keepAcc ? 'block' : 'none';
+      acc.classList.toggle('is-open', false);
+      head.setAttribute('aria-expanded', 'false');
+      root.style.display = 'none';
+      accPane.style.display = keepAcc ? 'block' : 'none';
+      sep.style.display = 'none';
+      lastAppliedStudiosOpen[orgId] = false;
+      lastAppliedAccountsOpen[orgId] = keepAcc;
+      return;
+    }
+  }
+
+  if(aOpen && (!prevA || refreshAccountsIfOpen)){
+    await renderAccountsForSelectedOrg({ host: accPane, orgId });
+  }
+
+  lastAppliedStudiosOpen[orgId] = sOpen;
+  lastAppliedAccountsOpen[orgId] = aOpen;
+}
+
+async function loadOrgParamsForOrgRow(host, orgId){
+  if(orgParamsCache[orgId]){
+    paintOrgRow(host, orgId, orgParamsCache[orgId]);
+    return;
+  }
+  try{
+    const snap = await get(ref(db, `orgs/${orgId}/adminConfig`));
+    const d = snap.val() || {};
+    orgParamsCache[orgId] = {
+      authEnabled: !!d.authEnabled,
+      telegramEnabled: d.telegramEnabled !== false,
+      accountsCount: normalizeAccounts(d.accounts).length
+    };
+  }catch(e){
+    console.warn(e);
+    return;
+  }
+  paintOrgRow(host, orgId, orgParamsCache[orgId]);
+}
 
 let pendingDeleteStudioOrgId = '';
 let pendingDeleteStudioIndex = -1;
@@ -481,7 +595,7 @@ async function doLogin(){
     renderOrgList();
     renderParamsForSelectedOrg();
     setupNav();
-    setSaView('comptes');
+    setSaView('organisations');
   }catch(e){
     console.warn(e);
     el('sa-login-error').style.display = '';
@@ -537,6 +651,8 @@ function openDeleteOrgModal(orgId, label){
 }
 
 let pendingDeleteAccountIndex = -1;
+let pendingDeleteAccountOrgId = '';
+let pendingAddAccountOrgId = '';
 
 async function getAccountsForOrg(orgId){
   if(!orgId) return [];
@@ -549,23 +665,81 @@ async function saveAccountsArray(orgId, accounts){
   await set(ref(db, `orgs/${orgId}/adminConfig/accounts`), accounts);
 }
 
+function formatStepsBadgeLabel(n){
+  const x = Number(n) || 0;
+  if(x <= 0) return '';
+  if(x === 1) return '1 étape';
+  return x + ' étapes';
+}
+
+async function loadStepsCountsForOrg(orgId){
+  const names = studioCache[orgId];
+  if(!names || !names.length){
+    stepsCountCache[orgId] = {};
+    return;
+  }
+  const counts = {};
+  await Promise.all(
+    names.map(async (_, i) => {
+      try{
+        const snap = await get(ref(db, `orgs/${orgId}/procedures/${i}/steps`));
+        const v = snap.val();
+        counts[i] = v && typeof v === 'object' ? Object.keys(v).length : 0;
+      }catch(_){
+        counts[i] = 0;
+      }
+    })
+  );
+  stepsCountCache[orgId] = counts;
+}
+
+async function afterOrgAccountsChanged(orgId){
+  if(!orgId) return;
+  try{
+    const list = await getAccountsForOrg(orgId);
+    const n = list.length;
+    if(!orgParamsCache[orgId]) orgParamsCache[orgId] = { authEnabled: false, telegramEnabled: false, accountsCount: n };
+    else orgParamsCache[orgId].accountsCount = n;
+    const listHost = el('sa-org-list');
+    if(listHost) paintOrgRow(listHost, orgId, orgParamsCache[orgId]);
+    if(selectedComptesOrgId() === orgId) await renderAccountsForSelectedOrg();
+    await applyOrgPanelState(orgId, true);
+  }catch(e){
+    console.warn(e);
+  }
+}
+
 function selectedComptesOrgId(){
   const s = el('sa-comptes-org');
   return s && s.value ? s.value : '';
 }
 
-async function renderAccountsForSelectedOrg(){
-  const host = el('sa-accounts-list');
-  const oid = selectedComptesOrgId();
+async function renderAccountsForSelectedOrg(ctx){
+  const host = ctx && ctx.host ? ctx.host : el('sa-accounts-list');
+  const oid = ctx && ctx.orgId != null ? ctx.orgId : selectedComptesOrgId();
   if(!host) return;
   if(!oid){
     host.innerHTML = '<p class="empty-hint">Choisissez une organisation.</p>';
     return;
   }
+  const nextCtx = host.id === 'sa-accounts-list' ? null : { host, orgId: oid };
   try{
     const accounts = await getAccountsForOrg(oid);
+    if(!orgParamsCache[oid]) orgParamsCache[oid] = { authEnabled: false, telegramEnabled: false, accountsCount: accounts.length };
+    else orgParamsCache[oid].accountsCount = accounts.length;
+    const listHost = el('sa-org-list');
+    if(listHost) paintOrgRow(listHost, oid, orgParamsCache[oid]);
     if(!accounts.length){
       host.innerHTML = '<p class="empty-hint">Aucun compte — ajoutez le premier ci-dessous.</p>';
+      if(nextCtx) host.innerHTML += `<button type="button" class="btn-primary" style="margin-top:12px" data-inline-add-acc="${escHtml(oid)}">+ Ajouter un compte</button>`;
+      if(nextCtx){
+        host.querySelector('[data-inline-add-acc]')?.addEventListener('click', ()=>{
+          pendingAddAccountOrgId = oid;
+          el('sa-modal-add-name').value = '';
+          el('sa-modal-add-pwd').value = '';
+          openModal('sa-modal-add-account');
+        });
+      }
       return;
     }
     host.innerHTML = accounts.map((acc,i)=>{
@@ -579,6 +753,9 @@ async function renderAccountsForSelectedOrg(){
         <button type="button" class="btn-danger" data-del-acc="${i}">Supprimer</button>
       </div>`;
     }).join('');
+    if(nextCtx){
+      host.innerHTML += `<button type="button" class="btn-primary" style="margin-top:12px" data-inline-add-acc="${escHtml(oid)}">+ Ajouter un compte</button>`;
+    }
 
     host.querySelectorAll('.account-role').forEach(span=>{
       span.addEventListener('click', async ()=>{
@@ -590,7 +767,7 @@ async function renderAccountsForSelectedOrg(){
         list[i] = { ...list[i], [role]: !list[i][role] };
         await saveAccountsArray(oid, list);
         showToast('Rôle mis à jour');
-        renderAccountsForSelectedOrg();
+        await afterOrgAccountsChanged(oid);
       });
     });
     host.querySelectorAll('[data-save-pwd]').forEach(btn=>{
@@ -605,18 +782,27 @@ async function renderAccountsForSelectedOrg(){
         await saveAccountsArray(oid, list);
         if(inp) inp.value = '';
         showToast('Mot de passe enregistré');
+        await afterOrgAccountsChanged(oid);
       });
     });
     host.querySelectorAll('[data-del-acc]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const i = Number(btn.getAttribute('data-del-acc'));
+        pendingDeleteAccountOrgId = oid;
         pendingDeleteAccountIndex = i;
         openModal('sa-modal-del-account');
-        const list = accounts;
-        const name = list[i] && list[i].name ? list[i].name : '';
+        const name = accounts[i] && accounts[i].name ? accounts[i].name : '';
         el('sa-modal-del-acc-text').textContent = `Supprimer le compte « ${name} » ? Cette action est immédiate.`;
       });
     });
+    if(nextCtx){
+      host.querySelector('[data-inline-add-acc]')?.addEventListener('click', ()=>{
+        pendingAddAccountOrgId = oid;
+        el('sa-modal-add-name').value = '';
+        el('sa-modal-add-pwd').value = '';
+        openModal('sa-modal-add-account');
+      });
+    }
   }catch(e){
     console.warn(e);
     host.innerHTML = '<p class="empty-hint">Erreur de chargement.</p>';
@@ -626,14 +812,19 @@ async function renderAccountsForSelectedOrg(){
 el('sa-comptes-org').addEventListener('change', ()=>renderAccountsForSelectedOrg());
 
 el('sa-add-account-btn').addEventListener('click', ()=>{
-  if(!selectedComptesOrgId()){ showToast('Choisissez une organisation'); return; }
+  const oid = selectedComptesOrgId();
+  if(!oid){ showToast('Choisissez une organisation'); return; }
+  pendingAddAccountOrgId = oid;
   el('sa-modal-add-name').value = '';
   el('sa-modal-add-pwd').value = '';
   openModal('sa-modal-add-account');
 });
-el('sa-modal-add-cancel').addEventListener('click', ()=>closeModal('sa-modal-add-account'));
+el('sa-modal-add-cancel').addEventListener('click', ()=>{
+  pendingAddAccountOrgId = '';
+  closeModal('sa-modal-add-account');
+});
 el('sa-modal-add-ok').addEventListener('click', async ()=>{
-  const oid = selectedComptesOrgId();
+  const oid = pendingAddAccountOrgId || selectedComptesOrgId();
   if(!oid){ showToast('Choisissez une organisation'); return; }
   const name = String(el('sa-modal-add-name').value||'').trim();
   const pwd = el('sa-modal-add-pwd').value||'';
@@ -644,9 +835,10 @@ el('sa-modal-add-ok').addEventListener('click', async ()=>{
     if(list.find(a=>a.name===name)){ showToast('Ce prénom existe déjà'); return; }
     list = [...list, { name, pwdHash: hashSimple(pwd), menage:true, admin:false, sharedWith:[] }];
     await saveAccountsArray(oid, list);
+    pendingAddAccountOrgId = '';
     closeModal('sa-modal-add-account');
     showToast('Compte ajouté');
-    renderAccountsForSelectedOrg();
+    await afterOrgAccountsChanged(oid);
   }catch(e){
     console.warn(e);
     showToast('Erreur d’enregistrement');
@@ -655,13 +847,15 @@ el('sa-modal-add-ok').addEventListener('click', async ()=>{
 
 el('sa-modal-del-acc-cancel').addEventListener('click', ()=>{
   pendingDeleteAccountIndex = -1;
+  pendingDeleteAccountOrgId = '';
   closeModal('sa-modal-del-account');
 });
 el('sa-modal-del-acc-ok').addEventListener('click', async ()=>{
-  const oid = selectedComptesOrgId();
+  const oid = pendingDeleteAccountOrgId || selectedComptesOrgId();
   const i = pendingDeleteAccountIndex;
   closeModal('sa-modal-del-account');
   pendingDeleteAccountIndex = -1;
+  pendingDeleteAccountOrgId = '';
   if(!oid || i<0) return;
   try{
     let list = await getAccountsForOrg(oid);
@@ -669,7 +863,7 @@ el('sa-modal-del-acc-ok').addEventListener('click', async ()=>{
     list = list.filter((_,j)=>j!==i);
     await saveAccountsArray(oid, list);
     showToast('Compte supprimé');
-    renderAccountsForSelectedOrg();
+    await afterOrgAccountsChanged(oid);
   }catch(e){
     console.warn(e);
     showToast('Erreur');
@@ -771,29 +965,47 @@ async function refreshStudiosPanelForOrg(orgId){
   if(!acc) return;
   const panel = acc.querySelector('.sa-org-acc-panel');
   delete studioCache[orgId];
-  if(!panel || panel.style.display === 'none') return;
+  delete stepsCountCache[orgId];
+  if(!studiosOpen[orgId] && !accountsOpen[orgId]) return;
   await ensureStudioCacheLoaded(orgId);
+  await loadStepsCountsForOrg(orgId);
   renderStudiosPanel(panel, orgId);
   wireStudiosPanel(panel, orgId);
 }
 
 function renderStudiosPanel(panel, orgId){
+  const root = panel.querySelector('.sa-org-studios-root');
+  if(!root) return;
   const names = studioCache[orgId];
   if(!names || !Array.isArray(names)){
-    panel.innerHTML = '<p class="empty-hint">Chargement…</p>';
+    root.innerHTML = '<p class="empty-hint">Chargement…</p>';
+    const sep0 = panel.querySelector('.sa-org-panel-sep');
+    if(sep0) sep0.style.display = (!!studiosOpen[orgId] && !!accountsOpen[orgId]) ? 'block' : 'none';
     return;
   }
+  const stepMap = stepsCountCache[orgId] || {};
   const onlyOne = names.length <= 1;
   const rows = names.map((name, i)=>{
     const v = escHtml(name);
+    const sc = Number(stepMap[i]) || 0;
+    const badge = sc >= 1 ? `<span class="sa-steps-badge">${escHtml(formatStepsBadgeLabel(sc))}</span>` : '';
     return `<div class="sa-studio-row" data-studio-row="${i}">
-      <input type="text" data-studio-inp="${i}" value="${v}" aria-label="Nom du studio ${i+1}">
-      <button type="button" class="btn-sm" data-studio-ical="${i}" title="URL iCal">🔗 URL iCal</button>
+      <div class="sa-studio-line-main">
+        <input type="text" data-studio-inp="${i}" value="${v}" aria-label="Nom du studio ${i+1}">
+        ${badge}
+        <button type="button" class="btn-sm" data-studio-ical="${i}" title="URL iCal">🔗 URL iCal</button>
+      </div>
       <button type="button" class="btn-sm" data-studio-save="${i}">💾 Enregistrer</button>
       <button type="button" class="btn-danger" data-studio-del="${i}"${onlyOne?' disabled':''} title="${onlyOne?'Au moins un studio requis':'Supprimer ce studio'}">🗑️</button>
     </div>`;
   }).join('');
-  panel.innerHTML = rows + `<div class="sa-org-add-studio"><button type="button" class="btn-primary btn-sm" data-org-add-studio="${escHtml(orgId)}">+ Ajouter un studio</button></div>`;
+  root.innerHTML =
+    rows +
+    `    <div class="sa-org-add-studio">
+      <button type="button" class="btn-primary btn-sm" data-org-add-studio="${escHtml(orgId)}">+ Ajouter un studio</button>
+    </div>`;
+  const sep1 = panel.querySelector('.sa-org-panel-sep');
+  if(sep1) sep1.style.display = (!!studiosOpen[orgId] && !!accountsOpen[orgId]) ? 'block' : 'none';
 }
 
 function wireStudiosPanel(panel, orgId){
@@ -874,45 +1086,109 @@ function renderOrgList(){
     host.innerHTML = '<p class="empty-hint">Aucune organisation. Créez-en une.</p>';
     return;
   }
-  host.innerHTML = orgEntries.map(o=>`<div class="sa-org-acc" data-org-id="${escHtml(o.id)}">
+  const accPanelTitle = 'Gérer les comptes de cette organisation';
+  host.innerHTML = orgEntries.map(o=>{
+    const p = orgParamsCache[o.id];
+    const authCh = p && p.authEnabled ? 'checked' : '';
+    const tgCh = p && p.telegramEnabled ? 'checked' : '';
+    const accN = p && p.accountsCount != null ? Number(p.accountsCount) || 0 : 0;
+    return `<div class="sa-org-acc" data-org-id="${escHtml(o.id)}">
     <div class="sa-org-acc-head" role="button" tabindex="0" aria-expanded="false">
-      <span class="sa-org-acc-arrow" aria-hidden="true">▶</span>
-      <div class="sa-org-acc-titles">
-        <div class="org-list-label">${escHtml(o.label)}</div>
-        <div class="org-list-id">${escHtml(o.id)}</div>
+      <div class="sa-org-acc-left">
+        <span class="sa-org-acc-arrow" aria-hidden="true">▶</span>
+        <div class="sa-org-acc-titles">
+          <div class="org-list-label">${escHtml(o.label)}</div>
+          <div class="org-list-id">${escHtml(o.id)}</div>
+        </div>
       </div>
+      <div class="sa-org-acc-toggles">
+        <div class="sa-org-toggle-item">
+          <span class="sa-org-toggle-emoji" title="${escHtml(SA_ORG_TITLE_AUTH)}">🔐</span>
+          <label class="toggle toggle--mini" title="${escHtml(SA_ORG_TITLE_AUTH)}">
+            <input type="checkbox" data-sa-org-auth="${escHtml(o.id)}" title="${escHtml(SA_ORG_TITLE_AUTH)}" ${authCh}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="sa-org-toggle-item">
+          <span class="sa-org-toggle-emoji" title="${escHtml(SA_ORG_TITLE_TG)}">💬</span>
+          <label class="toggle toggle--mini" title="${escHtml(SA_ORG_TITLE_TG)}">
+            <input type="checkbox" data-sa-org-tg="${escHtml(o.id)}" title="${escHtml(SA_ORG_TITLE_TG)}" ${tgCh}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <button type="button" class="sa-org-acc-accounts" data-sa-org-accounts-btn="${escHtml(o.id)}" title="${escHtml(accPanelTitle)}" aria-label="${escHtml(accPanelTitle)}">👤${accN}</button>
       <button type="button" class="btn-danger sa-org-del" data-del-org="${escHtml(o.id)}" title="Supprimer l’organisation" aria-label="Supprimer ${escHtml(o.label)}">🗑️ ⚠️</button>
     </div>
-    <div class="sa-org-acc-panel" style="display:none"></div>
-  </div>`).join('');
+    <div class="sa-org-acc-panel" style="display:none">
+      <div id="sa-accounts-panel-${escHtml(o.id)}" style="display:none"></div>
+      <hr class="sa-org-panel-sep" style="display:none" aria-hidden="true">
+      <div class="sa-org-studios-root"></div>
+    </div>
+  </div>`;
+  }).join('');
+
+  if(!host._saOrgListDelegateWired){
+    host._saOrgListDelegateWired = true;
+    host.addEventListener('click', (e)=>{
+      if(e.target.closest('.sa-org-acc-toggles')) e.stopPropagation();
+      if(e.target.closest('.sa-org-acc-accounts')) e.stopPropagation();
+    });
+    host.addEventListener('change', async (e)=>{
+      const t = e.target;
+      if(!(t instanceof HTMLInputElement)) return;
+      const oidAuth = t.getAttribute('data-sa-org-auth');
+      if(oidAuth){
+        e.stopPropagation();
+        const prev = !t.checked;
+        try{
+          await update(ref(db, `orgs/${oidAuth}/adminConfig`), { authEnabled: t.checked });
+          if(!orgParamsCache[oidAuth]) orgParamsCache[oidAuth] = { authEnabled: false, telegramEnabled: false, accountsCount: 0 };
+          orgParamsCache[oidAuth].authEnabled = t.checked;
+        }catch(err){
+          console.warn(err);
+          t.checked = prev;
+          showToast('Erreur');
+          return;
+        }
+        showToast('Enregistré');
+        return;
+      }
+      const oidTg = t.getAttribute('data-sa-org-tg');
+      if(oidTg){
+        e.stopPropagation();
+        const prev = !t.checked;
+        try{
+          await update(ref(db, `orgs/${oidTg}/adminConfig`), { telegramEnabled: t.checked });
+          if(!orgParamsCache[oidTg]) orgParamsCache[oidTg] = { authEnabled: false, telegramEnabled: false, accountsCount: 0 };
+          orgParamsCache[oidTg].telegramEnabled = t.checked;
+        }catch(err){
+          console.warn(err);
+          t.checked = prev;
+          showToast('Erreur');
+          return;
+        }
+        showToast('Enregistré');
+      }
+    });
+  }
+
+  void Promise.all(orgEntries.map(o=>loadOrgParamsForOrgRow(host, o.id)));
 
   host.querySelectorAll('.sa-org-acc-head').forEach(head=>{
     head.addEventListener('click', async (e)=>{
       if(e.target.closest('[data-del-org]')) return;
+      if(e.target.closest('.sa-org-acc-toggles')) return;
+      if(e.target.closest('[data-sa-org-accounts-btn]')) return;
       const acc = head.closest('.sa-org-acc');
-      const panel = acc.querySelector('.sa-org-acc-panel');
       const orgId = acc.getAttribute('data-org-id');
-      const opening = !acc.classList.contains('is-open');
-      if(opening){
-        acc.classList.add('is-open');
-        panel.style.display = 'block';
-        head.setAttribute('aria-expanded', 'true');
-        try{
-          await ensureStudioCacheLoaded(orgId);
-          renderStudiosPanel(panel, orgId);
-          wireStudiosPanel(panel, orgId);
-        }catch(err){
-          console.warn(err);
-          showToast('Erreur de chargement des studios');
-          acc.classList.remove('is-open');
-          panel.style.display = 'none';
-          head.setAttribute('aria-expanded', 'false');
-        }
+      if(studiosOpen[orgId]){
+        studiosOpen[orgId] = false;
+        accountsOpen[orgId] = false;
       }else{
-        acc.classList.remove('is-open');
-        panel.style.display = 'none';
-        head.setAttribute('aria-expanded', 'false');
+        studiosOpen[orgId] = true;
       }
+      await applyOrgPanelState(orgId);
     });
     head.addEventListener('keydown', (e)=>{
       if(e.key !== 'Enter' && e.key !== ' ') return;
@@ -927,6 +1203,16 @@ function renderOrgList(){
       const id = btn.getAttribute('data-del-org');
       const o = orgEntries.find(x=>x.id===id);
       if(o) openDeleteOrgModal(o.id, o.label);
+    });
+  });
+
+  host.querySelectorAll('[data-sa-org-accounts-btn]').forEach(btn=>{
+    btn.addEventListener('click', async (ev)=>{
+      ev.stopPropagation();
+      const oid = btn.getAttribute('data-sa-org-accounts-btn');
+      if(!oid) return;
+      accountsOpen[oid] = !accountsOpen[oid];
+      await applyOrgPanelState(oid);
     });
   });
 }
@@ -951,6 +1237,12 @@ el('sa-modal-org-ok').addEventListener('click', async ()=>{
     await set(ref(db, `organizations/${slug}`), { label });
     await set(ref(db, `orgs/${slug}/config`), { studioNames: [] });
     await set(ref(db, `orgs/${slug}/adminConfig`), { authEnabled: false, telegramEnabled: true, accounts: [] });
+    delete orgParamsCache[slug];
+    delete studiosOpen[slug];
+    delete accountsOpen[slug];
+    delete studiosHydrated[slug];
+    delete lastAppliedStudiosOpen[slug];
+    delete lastAppliedAccountsOpen[slug];
     closeModal('sa-modal-create-org');
     showToast('Organisation créée. Ajoute les URLs iCal dans Firebase sous /orgs/{orgId}/icalFeeds.');
     await fetchOrganizations();
@@ -1128,6 +1420,12 @@ el('sa-modal-del-org-ok').addEventListener('click', async ()=>{
       return;
     }
     await performOrgCascadeDelete(orgId);
+    delete orgParamsCache[orgId];
+    delete studiosOpen[orgId];
+    delete accountsOpen[orgId];
+    delete studiosHydrated[orgId];
+    delete lastAppliedStudiosOpen[orgId];
+    delete lastAppliedAccountsOpen[orgId];
     pendingDeleteOrgId = '';
     pendingDeleteOrgLabel = '';
     closeModal('sa-modal-del-org');
@@ -1166,8 +1464,6 @@ async function renderParamsForSelectedOrg(){
     const d = snap.val() || {};
     const authEnabled = !!d.authEnabled;
     const telegramEnabled = d.telegramEnabled !== false;
-    const defaultOrgId = d.defaultOrgId || oid;
-    const defaultOpts = orgEntries.map(o=>`<option value="${escHtml(o.id)}"${o.id===defaultOrgId?' selected':''}>${escHtml(o.label)}</option>`).join('');
     body.innerHTML = `
       <div class="toggle-row">
         <div><div class="toggle-label">Authentification activée</div></div>
@@ -1176,10 +1472,6 @@ async function renderParamsForSelectedOrg(){
       <div class="toggle-row">
         <div><div class="toggle-label">Notifications Telegram</div></div>
         <label class="toggle"><input type="checkbox" id="sa-p-tg" ${telegramEnabled?'checked':''}><span class="toggle-slider"></span></label>
-      </div>
-      <div class="field-row" style="margin-top:12px">
-        <label for="sa-p-deforg">Organisation par défaut</label>
-        <select id="sa-p-deforg">${defaultOpts}</select>
       </div>`;
     const savePartial = async (patch)=>{
       await update(ref(db, `orgs/${oid}/adminConfig`), patch);
@@ -1193,12 +1485,6 @@ async function renderParamsForSelectedOrg(){
     el('sa-p-tg').addEventListener('change', async e=>{
       try{
         await savePartial({ telegramEnabled: e.target.checked });
-        showToast('Enregistré');
-      }catch(err){ console.warn(err); showToast('Erreur'); }
-    });
-    el('sa-p-deforg').addEventListener('change', async e=>{
-      try{
-        await savePartial({ defaultOrgId: e.target.value });
         showToast('Enregistré');
       }catch(err){ console.warn(err); showToast('Erreur'); }
     });
@@ -1241,7 +1527,7 @@ el('sa-sec-save').addEventListener('click', async ()=>{
         setupNav();
         const h = location.hash.slice(1);
         if(['comptes','organisations','parametres','securite'].includes(h)) setSaView(h);
-        else setSaView('comptes');
+        else setSaView('organisations');
       });
     }
   }catch(_){}
