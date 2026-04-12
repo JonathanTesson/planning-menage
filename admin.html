@@ -320,14 +320,7 @@ body.admin-nav-ready .admin-burger{display:flex}
     <!-- Studios -->
     <div class="section" id="section-studios">
       <h3><span>🏠</span> Studios</h3>
-      <div class="field-row">
-        <label>Studio 1</label>
-        <input type="text" id="name-s1">
-      </div>
-      <div class="field-row">
-        <label>Studio 2</label>
-        <input type="text" id="name-s2">
-      </div>
+      <div id="studios-fields"></div>
       <div style="margin-top:10px">
         <button class="btn-primary" onclick="saveNames()">Enregistrer</button>
       </div>
@@ -468,7 +461,7 @@ let orgId = localStorage.getItem(ORG_STORAGE_KEY) || '';
 const ob = p => `orgs/${orgId}/${p}`;
 
 let A = {
-  studioNames: ['Studio 1','Studio 2'],
+  studioNames: [],
   assignments: {},
   reservations: [],
   cleaningReports: {},
@@ -805,6 +798,8 @@ async function loadOrganizations(){
     if(d){ A.studioNames=d.studioNames||A.studioNames; }
     setSyncStatus('ok');
     if(A.unlocked) renderAdminContent();
+    const studiosHost=document.getElementById('studios-fields');
+    if(A.unlocked&&studiosHost&&adminCurrentView==='organisation') renderStudioFields();
   });
 
   onValue(ref(db,ob('assignments')), snap=>{ A.assignments=snap.val()||{}; if(A.unlocked) renderStats(); });
@@ -969,8 +964,7 @@ function renderAdminContent(){
   }
   renderStats();
   renderAccounts();
-  document.getElementById('name-s1').value=A.studioNames[0];
-  document.getElementById('name-s2').value=A.studioNames[1];
+  renderStudioFields();
   document.getElementById('toggle-auth').checked=A.adminConfig.authEnabled||false;
   const tg=document.getElementById('toggle-telegram');
   if(tg) tg.checked=A.adminConfig.telegramEnabled!==false;
@@ -998,6 +992,17 @@ const ACTIVITY_TYPE_LABEL={ login:'Connexion', logout:'Déconnexion', assign:'As
 
 function escHtml(s){
   return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderStudioFields(){
+  const host=document.getElementById('studios-fields');
+  if(!host) return;
+  host.innerHTML=A.studioNames.map((name,i)=>
+    `<div class="field-row">
+      <label>Studio ${i+1}</label>
+      <input type="text" id="name-s${i}" value="${escHtml(name)}">
+    </div>`
+  ).join('');
 }
 
 /** Résumé global des indispos futures (toutes les ménagères), sous le calendrier admin. */
@@ -1256,8 +1261,10 @@ window.saveAdminConfig = function(){
 };
 
 window.saveNames = function(){
-  A.studioNames[0]=document.getElementById('name-s1').value||'Studio 1';
-  A.studioNames[1]=document.getElementById('name-s2').value||'Studio 2';
+  A.studioNames=A.studioNames.map((_,i)=>{
+    const inp=document.getElementById('name-s'+i);
+    return (inp&&inp.value.trim())?inp.value.trim():('Studio '+(i+1));
+  });
   syncCleanersToConfig();
   showToast('Studios enregistrés ✓');
 };

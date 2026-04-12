@@ -958,7 +958,7 @@ el('sa-modal-org-ok').addEventListener('click', async ()=>{
     const ex = await get(ref(db, `organizations/${slug}`));
     if(ex.val()!=null){ showToast('Cet identifiant existe déjà'); return; }
     await set(ref(db, `organizations/${slug}`), { label });
-    await set(ref(db, `orgs/${slug}/config`), { studioNames: ['Studio 1', 'Studio 2'] });
+    await set(ref(db, `orgs/${slug}/config`), { studioNames: [] });
     await set(ref(db, `orgs/${slug}/adminConfig`), { authEnabled: false, telegramEnabled: true, accounts: [] });
     closeModal('sa-modal-create-org');
     showToast('Organisation créée. Ajoute les URLs iCal dans Firebase sous /orgs/{orgId}/icalFeeds.');
