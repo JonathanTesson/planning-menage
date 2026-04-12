@@ -85,6 +85,20 @@ body.sa-nav-ready .admin-burger{display:flex}
 .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0eb}
 .toggle-row:last-child{border-bottom:none}
 .toggle-label{font-size:13px;color:#333}
+.sa-org-acc{border-bottom:1px solid #f0f0eb}
+.sa-org-acc:last-child{border-bottom:none}
+.sa-org-acc-head{display:flex;align-items:center;gap:10px;padding:10px 0;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+.sa-org-acc-head:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
+.sa-org-acc-arrow{flex-shrink:0;width:1.25rem;text-align:center;transition:transform .2s ease;display:inline-block;font-size:11px;line-height:1;color:#555}
+.sa-org-acc.is-open .sa-org-acc-arrow{transform:rotate(90deg)}
+.sa-org-acc-titles{flex:0 1 auto;min-width:0}
+.sa-org-del.btn-danger{color:#fff;background:#E24B4A;border:1px solid #c0392b;border-radius:6px;padding:4px 8px}
+.sa-org-del.btn-danger:hover{background:#c0392b}
+.sa-org-acc-panel{padding:4px 0 14px 1.75rem;display:none}
+.sa-studio-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;padding:6px 0;border-bottom:1px solid #f5f5f0}
+.sa-studio-row:last-of-type{border-bottom:none}
+.sa-studio-row input[type=text]{flex:1;min-width:140px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
+.sa-org-add-studio{margin-top:10px;padding-top:4px}
 </style>
 </head>
 <body>
@@ -258,6 +272,17 @@ body.sa-nav-ready .admin-burger{display:flex}
   </div>
 </div>
 
+<div class="modal-overlay" id="sa-modal-del-studio" role="dialog" aria-modal="true" aria-labelledby="sa-modal-del-studio-title">
+  <div class="modal">
+    <h3 id="sa-modal-del-studio-title">Supprimer le studio</h3>
+    <p class="empty-hint" style="color:#555;line-height:1.45">Supprimer ce studio ? Les étapes et photos associées seront effacées.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="sa-modal-del-studio-cancel">Annuler</button>
+      <button type="button" class="btn-danger" id="sa-modal-del-studio-ok" style="border:1px solid #f0c0c0;padding:8px 16px">Supprimer</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="sa-toast"></div>
 
 <script type="module">
@@ -313,7 +338,11 @@ function escHtml(s){
 }
 
 let orgEntries = [];
+const studioCache = {};
 let saNavOnce = false;
+
+let pendingDeleteStudioOrgId = '';
+let pendingDeleteStudioIndex = -1;
 
 async function fetchOrganizations(){
   try{
@@ -617,6 +646,104 @@ el('sa-modal-del-acc-ok').addEventListener('click', async ()=>{
   }
 });
 
+function normalizeStudioNames(raw){
+  if(raw==null) return [];
+  if(Array.isArray(raw)) return raw.map(x=>String(x==null?'':x).trim());
+  if(typeof raw === 'object'){
+    return Object.keys(raw)
+      .filter(k=>/^\d+$/.test(k))
+      .sort((a,b)=>Number(a)-Number(b))
+      .map(k=>String(raw[k]==null?'':raw[k]).trim());
+  }
+  return [];
+}
+
+async function ensureStudioCacheLoaded(orgId){
+  if(studioCache[orgId] !== undefined) return;
+  const snap = await get(ref(db, `orgs/${orgId}/config/studioNames`));
+  studioCache[orgId] = normalizeStudioNames(snap.val());
+}
+
+async function refreshStudiosPanelForOrg(orgId){
+  const acc = document.querySelector(`.sa-org-acc[data-org-id="${orgId}"]`);
+  if(!acc) return;
+  const panel = acc.querySelector('.sa-org-acc-panel');
+  delete studioCache[orgId];
+  if(!panel || panel.style.display === 'none') return;
+  await ensureStudioCacheLoaded(orgId);
+  renderStudiosPanel(panel, orgId);
+  wireStudiosPanel(panel, orgId);
+}
+
+function renderStudiosPanel(panel, orgId){
+  const names = studioCache[orgId];
+  if(!names || !Array.isArray(names)){
+    panel.innerHTML = '<p class="empty-hint">Chargement…</p>';
+    return;
+  }
+  const onlyOne = names.length <= 1;
+  const rows = names.map((name, i)=>{
+    const v = escHtml(name);
+    return `<div class="sa-studio-row" data-studio-row="${i}">
+      <input type="text" data-studio-inp="${i}" value="${v}" aria-label="Nom du studio ${i+1}">
+      <button type="button" class="btn-sm" data-studio-save="${i}">💾 Enregistrer</button>
+      <button type="button" class="btn-danger" data-studio-del="${i}"${onlyOne?' disabled':''} title="${onlyOne?'Au moins un studio requis':'Supprimer ce studio'}">🗑️</button>
+    </div>`;
+  }).join('');
+  panel.innerHTML = rows + `<div class="sa-org-add-studio"><button type="button" class="btn-primary btn-sm" data-org-add-studio="${escHtml(orgId)}">+ Ajouter un studio</button></div>`;
+}
+
+function wireStudiosPanel(panel, orgId){
+  panel.querySelectorAll('[data-studio-save]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const i = Number(btn.getAttribute('data-studio-save'));
+      const inp = panel.querySelector(`[data-studio-inp="${i}"]`);
+      const name = inp ? String(inp.value||'').trim() : '';
+      if(!name){ showToast('Indiquez un nom de studio'); return; }
+      try{
+        const snap = await get(ref(db, `orgs/${orgId}/config/studioNames`));
+        const arr = normalizeStudioNames(snap.val());
+        if(i < 0 || i >= arr.length) return;
+        arr[i] = name;
+        await set(ref(db, `orgs/${orgId}/config/studioNames`), arr);
+        delete studioCache[orgId];
+        await refreshStudiosPanelForOrg(orgId);
+        showToast('Studio enregistré');
+      }catch(e){
+        console.warn(e);
+        showToast('Erreur d’enregistrement');
+      }
+    });
+  });
+  panel.querySelectorAll('[data-studio-del]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(btn.disabled) return;
+      const i = Number(btn.getAttribute('data-studio-del'));
+      pendingDeleteStudioOrgId = orgId;
+      pendingDeleteStudioIndex = i;
+      openModal('sa-modal-del-studio');
+    });
+  });
+  const addBtn = panel.querySelector('[data-org-add-studio]');
+  if(addBtn){
+    addBtn.addEventListener('click', async ()=>{
+      try{
+        const snap = await get(ref(db, `orgs/${orgId}/config/studioNames`));
+        const arr = normalizeStudioNames(snap.val());
+        const n = arr.length + 1;
+        arr.push(`Studio ${n}`);
+        await set(ref(db, `orgs/${orgId}/config/studioNames`), arr);
+        delete studioCache[orgId];
+        await refreshStudiosPanelForOrg(orgId);
+        showToast('Studio ajouté');
+      }catch(e){
+        console.warn(e);
+        showToast('Erreur');
+      }
+    });
+  }
+}
+
 function renderOrgList(){
   const host = el('sa-org-list');
   if(!host) return;
@@ -624,9 +751,56 @@ function renderOrgList(){
     host.innerHTML = '<p class="empty-hint">Aucune organisation. Créez-en une.</p>';
     return;
   }
-  host.innerHTML = orgEntries.map(o=>`<div class="org-list-row"><div><div class="org-list-label">${escHtml(o.label)}</div><div class="org-list-id">${escHtml(o.id)}</div></div><button type="button" class="btn-danger" data-del-org="${escHtml(o.id)}" title="Supprimer l’organisation" aria-label="Supprimer ${escHtml(o.label)}">🗑️</button></div>`).join('');
+  host.innerHTML = orgEntries.map(o=>`<div class="sa-org-acc" data-org-id="${escHtml(o.id)}">
+    <div class="sa-org-acc-head" role="button" tabindex="0" aria-expanded="false">
+      <span class="sa-org-acc-arrow" aria-hidden="true">▶</span>
+      <div class="sa-org-acc-titles">
+        <div class="org-list-label">${escHtml(o.label)}</div>
+        <div class="org-list-id">${escHtml(o.id)}</div>
+      </div>
+      <button type="button" class="btn-danger sa-org-del" data-del-org="${escHtml(o.id)}" title="Supprimer l’organisation" aria-label="Supprimer ${escHtml(o.label)}">🗑️ ⚠️</button>
+    </div>
+    <div class="sa-org-acc-panel" style="display:none"></div>
+  </div>`).join('');
+
+  host.querySelectorAll('.sa-org-acc-head').forEach(head=>{
+    head.addEventListener('click', async (e)=>{
+      if(e.target.closest('[data-del-org]')) return;
+      const acc = head.closest('.sa-org-acc');
+      const panel = acc.querySelector('.sa-org-acc-panel');
+      const orgId = acc.getAttribute('data-org-id');
+      const opening = !acc.classList.contains('is-open');
+      if(opening){
+        acc.classList.add('is-open');
+        panel.style.display = 'block';
+        head.setAttribute('aria-expanded', 'true');
+        try{
+          await ensureStudioCacheLoaded(orgId);
+          renderStudiosPanel(panel, orgId);
+          wireStudiosPanel(panel, orgId);
+        }catch(err){
+          console.warn(err);
+          showToast('Erreur de chargement des studios');
+          acc.classList.remove('is-open');
+          panel.style.display = 'none';
+          head.setAttribute('aria-expanded', 'false');
+        }
+      }else{
+        acc.classList.remove('is-open');
+        panel.style.display = 'none';
+        head.setAttribute('aria-expanded', 'false');
+      }
+    });
+    head.addEventListener('keydown', (e)=>{
+      if(e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      head.click();
+    });
+  });
+
   host.querySelectorAll('[data-del-org]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
+    btn.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
       const id = btn.getAttribute('data-del-org');
       const o = orgEntries.find(x=>x.id===id);
       if(o) openDeleteOrgModal(o.id, o.label);
@@ -659,9 +833,40 @@ el('sa-modal-org-ok').addEventListener('click', async ()=>{
     await fetchOrganizations();
     fillOrgSelects();
     renderOrgList();
+    renderAccountsForSelectedOrg();
+    renderParamsForSelectedOrg();
   }catch(e){
     console.warn(e);
     showToast('Erreur à la création');
+  }
+});
+
+el('sa-modal-del-studio-cancel').addEventListener('click', ()=>{
+  pendingDeleteStudioOrgId = '';
+  pendingDeleteStudioIndex = -1;
+  closeModal('sa-modal-del-studio');
+});
+el('sa-modal-del-studio-ok').addEventListener('click', async ()=>{
+  const orgId = pendingDeleteStudioOrgId;
+  const i = pendingDeleteStudioIndex;
+  if(!orgId || i < 0) return;
+  try{
+    await set(ref(db, `orgs/${orgId}/procedures/${i}`), null);
+    await deleteStorageTree(sRef(storage, `orgs/${orgId}/procedures/${i}`));
+    const snap = await get(ref(db, `orgs/${orgId}/config/studioNames`));
+    const arr = normalizeStudioNames(snap.val());
+    if(i < 0 || i >= arr.length) return;
+    arr.splice(i, 1);
+    await set(ref(db, `orgs/${orgId}/config/studioNames`), arr);
+    delete studioCache[orgId];
+    pendingDeleteStudioOrgId = '';
+    pendingDeleteStudioIndex = -1;
+    closeModal('sa-modal-del-studio');
+    await refreshStudiosPanelForOrg(orgId);
+    showToast('Studio supprimé');
+  }catch(e){
+    console.warn(e);
+    showToast('Erreur à la suppression');
   }
 });
 
