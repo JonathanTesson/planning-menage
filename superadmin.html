@@ -324,7 +324,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const storage = getStorage(app);
 
-const APP_VERSION = '4.6.0';
+const APP_VERSION = '4.6.1';
 const SA_SESSION_KEY = 'sa_session';
 
 function hashSimple(str){
@@ -682,12 +682,6 @@ function normalizeStudioNames(raw){
   return [];
 }
 
-function maskUrl(url){
-  const u = String(url||'');
-  if(u.length < 12) return '•'.repeat(u.length);
-  return u.slice(0, 5) + '•'.repeat(u.length - 10) + u.slice(-5);
-}
-
 function normalizeIcalFeeds(raw){
   let feeds = [];
   if(raw == null) feeds = [];
@@ -724,24 +718,9 @@ function getFeedUrlForStudio(feeds, i){
   return String(feeds[i].url || '').trim();
 }
 
-function updateIcalUrlDisplayInPanel(icalPanel, feeds, i){
-  const disp = icalPanel.querySelector('.sa-ical-url-display');
-  if(!disp) return;
-  const url = getFeedUrlForStudio(feeds, i);
-  disp.textContent = url ? maskUrl(url) : '— Aucune URL configurée —';
-}
-
 async function refreshOpenIcalDisplaysForOrg(orgId){
   delete icalCache[orgId];
   await ensureIcalCacheLoaded(orgId);
-  const acc = document.querySelector(`.sa-org-acc[data-org-id="${orgId}"]`);
-  const p = acc && acc.querySelector('.sa-org-acc-panel');
-  if(!p) return;
-  p.querySelectorAll('.sa-ical-panel').forEach(icalPanel => {
-    if(icalPanel.style.display === 'none') return;
-    const idx = Number(icalPanel.getAttribute('data-ical-panel'));
-    updateIcalUrlDisplayInPanel(icalPanel, icalCache[orgId], idx);
-  });
 }
 
 async function saveIcalUrlForStudio(orgId, studioIndex, newUrl){

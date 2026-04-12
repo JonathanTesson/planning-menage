@@ -1,8 +1,8 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 4.6.0** — Avril 2026
+**Version : 4.6.1** — Avril 2026
 
-Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin. **v4.6.0** : **Super Administration** (`superadmin.html`) — page autonome, login **SHA-256** contre **`/superAdmin/credentials`** (`username`, `pwdHash`), menu **Comptes** / **Organisations** / **Paramètres** / **Sécurité** ; liste des organisations chargée depuis **`/organizations`** dans **`index.html`**, **`admin.html`**, **`compte.html`** (fallback tesson/nade si besoin) ; flux iCal lus depuis **`/orgs/{orgId}/icalFeeds`** (`[{ url, studio }]`) par **`sync-ical.js`** ; **`notify-departs.js`** et **`purge-unavailability.js`** parcourent les orgs via **`/organizations`** (fallback tesson/nade si erreur ou liste vide) ; scripts d’init **`init-superadmin.js`**, **`init-ical-feeds.js`**. **v4.5.5** : calendriers **indisponibilités** sur **`compte.html`** et **`admin.html`** — la grille peut **s’élargir** pour afficher **« par … »** lisiblement (**`minmax(min-content, 1fr)`**) ; la vue utilise **`.section.section--unavail`** (**fond et bordure retirés**, sans barre de défilement) pour éviter tout décalage visuel ; case à cocher **« Afficher le détail (par qui) »** (défaut décochée), préférence **`localStorage`** **`menage_unavail_showby_v1`** (partagée entre les deux pages). **v4.5.4** : traçabilité des **étapes** de procédure (admin + calendrier), **copie** d’étape avec report des métadonnées, **indicateur** des suggestions en attente dans la modale ménage (onglet Procédure), **animation** des pastilles **Indispo**. **Note d’assignation** côté calendrier (**`note`** + traçage **`noteBy`**, indicateur **point bleu pulsant** sur les départs, lecture seule pour les ménagères) — détail § **`/assignments`** et § **index.html** ci-dessous. **v4.5.x** : **indisponibilités** — saisie sur **`compte.html`**, pastilles + filtre **Indispo** sur **`index.html`**, **vue admin** **`#indisponibilites`** (édition par intervenante **v4.5.1**, résumé global **v4.5.2**, traçabilité **`by` v4.5.3**), clés **`YYYY-MM-DD` en date locale** ; la **purge automatique** compare les mêmes clés au **seuil UTC** (voir § **`/unavailability`**).
+Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin. **v4.6.0** : **Super Administration** (`superadmin.html`) — page autonome, login **SHA-256** contre **`/superAdmin/credentials`** (`username`, `pwdHash`), menu **Comptes** / **Organisations** / **Paramètres** / **Sécurité** ; liste des organisations chargée depuis **`/organizations`** dans **`index.html`**, **`admin.html`**, **`compte.html`** (fallback tesson/nade si besoin) ; flux iCal lus depuis **`/orgs/{orgId}/icalFeeds`** (`[{ url, studio }]`) par **`sync-ical.js`** ; **`notify-departs.js`** et **`purge-unavailability.js`** parcourent les orgs via **`/organizations`** (fallback tesson/nade si erreur ou liste vide) ; scripts d’init **`init-superadmin.js`**, **`init-ical-feeds.js`**. **v4.6.1 (Phase 2 complète)** : suppression d’**organisation** (cascade RTDB ciblée + **Storage** `orgs/{orgId}/`, re-auth Super Admin) ; **N studios** — création / renommage / suppression (**Super Admin**), renommage seul (**admin.html** vue Organisation, champs **`#studios-fields`**) ; **URLs iCal** par studio depuis **Super Admin** (re-auth) ; **`index.html`** — calendrier **N** studios, palette **`STUDIO_COLORS`** (couleurs cycliques) ; **`admin.html`** — procédures et exports alignés sur **`A.studioNames`**. **v4.5.5** : calendriers **indisponibilités** sur **`compte.html`** et **`admin.html`** — la grille peut **s’élargir** pour afficher **« par … »** lisiblement (**`minmax(min-content, 1fr)`**) ; la vue utilise **`.section.section--unavail`** (**fond et bordure retirés**, sans barre de défilement) pour éviter tout décalage visuel ; case à cocher **« Afficher le détail (par qui) »** (défaut décochée), préférence **`localStorage`** **`menage_unavail_showby_v1`** (partagée entre les deux pages). **v4.5.4** : traçabilité des **étapes** de procédure (admin + calendrier), **copie** d’étape avec report des métadonnées, **indicateur** des suggestions en attente dans la modale ménage (onglet Procédure), **animation** des pastilles **Indispo**. **Note d’assignation** côté calendrier (**`note`** + traçage **`noteBy`**, indicateur **point bleu pulsant** sur les départs, lecture seule pour les ménagères) — détail § **`/assignments`** et § **index.html** ci-dessous. **v4.5.x** : **indisponibilités** — saisie sur **`compte.html`**, pastilles + filtre **Indispo** sur **`index.html`**, **vue admin** **`#indisponibilites`** (édition par intervenante **v4.5.1**, résumé global **v4.5.2**, traçabilité **`by` v4.5.3**), clés **`YYYY-MM-DD` en date locale** ; la **purge automatique** compare les mêmes clés au **seuil UTC** (voir § **`/unavailability`**).
 
 ---
 
@@ -23,7 +23,8 @@ Application web de planning des interventions ménage pour plusieurs organisatio
 Page **autonome** (pas de session planning partagée) : accès depuis le **cadenas** sur l’écran login du calendrier, ou URL directe.
 
 - **Login** : champs **nom d’utilisateur** + **mot de passe** ; lecture **`/superAdmin/credentials`** (`username`, **`pwdHash`** en **SHA-256** hex) ; session **`sessionStorage`** clé **`sa_session`** (`'1'`) ; **déconnexion** → redirection **`index.html`** (efface la session).
-- **Menu latéral** : **Comptes** (par org : liste **`adminConfig.accounts`**, rôles 🧹/👑, MDP **`hashSimple`**, ajout / suppression) — **Organisations** (liste **`/organizations`**, création d’org + init `config` / `adminConfig`) — **Paramètres** (`authEnabled`, `telegramEnabled`, `defaultOrgId`) — **Sécurité** (changement identifiants Super Admin, double saisie du MDP).
+- **Menu latéral** : **Comptes** (par org : liste **`adminConfig.accounts`**, rôles 🧹/👑, MDP **`hashSimple`**, ajout / suppression) — **Organisations** (liste **`/organizations`**, création d’org avec **`config.studioNames`** initialement vide puis **N** studios gérés ici : renommage, **+** ajout, suppression avec purge **`procedures/{i}`** RTDB + Storage ; accordéon par org ; suppression d’**org** entière 🗑️ avec re-auth, cascade partielle RTDB + tout le préfixe Storage **`orgs/{orgId}/`**) — **Paramètres** (`authEnabled`, `telegramEnabled`, `defaultOrgId`) — **Sécurité** (changement identifiants Super Admin, double saisie du MDP).
+- **iCal** : bouton **🔗 URL iCal** par studio → modale **re-auth** Super Admin + saisie URL ; données **`/orgs/{orgId}/icalFeeds`**.
 - **Initialisation** : **`init-superadmin.js`** (one-shot) pour **`/superAdmin/credentials`** et **`/organizations/tesson`** & **`nade`** si absents.
 
 ---
@@ -79,8 +80,8 @@ Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. La **liste d
 
 /orgs
   /tesson
-    /config        → studioNames, cleaners
-    /icalFeeds     → [{ url, studio }] (sync iCal — v4.6.0)
+    /config        → studioNames[] (N libellés, cleaners), peut être [] à la création d’org
+    /icalFeeds     → [{ url, studio }] (sync iCal — v4.6.x)
     /reservations  → réservations Airbnb
     /assignments   → assignations
     /adminConfig     → comptes, auth, defaultOrgId, telegramEnabled, …
@@ -106,7 +107,7 @@ Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. La **liste d
 - **Saisie (app)** : les clés **`YYYY-MM-DD`** sont celles du **calendrier local** du navigateur (même convention que le reste du planning : jour civil local). **`compte.html`** limite la navigation mois à **± 3 ans** autour du mois courant (local) ; les **jours passés** sont en lecture seule sur le mini-calendrier.
 - **Affichage (`index.html`)** : listener sur **`/orgs/{orgId}/unavailability/`** ; normalisation en mémoire : pour chaque date indispo, **`{ by: string | null }`** (le **`by`** est **`null`** si la base contenait encore **`true`**). Pastilles et modale d’info ; si **`by`** est renseigné, la modale affiche **« par … »**.
 - **Calendriers indispo (`compte.html`, `admin.html`)** : cases rouges ; libellé **« par [by] »** (petit texte gris) **uniquement si** la case **« Afficher le détail (par qui) »** est cochée (**v4.5.5**, préférence **`menage_unavail_showby_v1`** — défaut décoché) **et** que la valeur a un auteur **`by`** ; pas de texte pour l’ancien format **`true`**. Colonnes **`minmax(min-content, 1fr)`** ; **`.section.section--unavail`** : pas de fond ni bordure de carte autour de cette vue (pas de barre de défilement). Côté **admin**, une seule préférence pour toute la vue (indépendante de l’intervenante sélectionnée). Le **résumé des indispos futures** (**v4.5.2**) compte uniquement les **dates**, pas le champ **`by`**.
-- **Purge (`purge-unavailability.js`)** : supprime le **nœud date** entier ; compatible **`true`** et **`{ by }`** ; parcourt les orgs depuis **`/organizations`** (**v4.6.0**, avec fallback tesson/nade).
+- **Purge (`purge-unavailability.js`)** : supprime le **nœud date** entier ; compatible **`true`** et **`{ by }`** ; parcourt les orgs depuis **`/organizations`** (**v4.6.x**, avec fallback tesson/nade).
 - **Purge (détail)** : compare chaque clé **`YYYY-MM-DD`** au seuil **aujourd’hui UTC − 3 ans** (chaînes **`YYYY-MM-DD`** comparées lexicographiquement). C’est **volontairement UTC** côté cron, alors que la **saisie** est **locale** : en pratique les écarts de fuseau n’affectent que les entrées proches de la frontière des 3 ans ; documenté ici pour éviter toute confusion.
 - Si le nœud **`unavailability`** est **absent** pour une org, le script de purge **ignore** silencieusement cette org ; l’UI fonctionne avec un objet vide.
 
@@ -294,7 +295,7 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
 - Lit **`/orgs/{orgId}/reservations`**, **`assignments`**, **`config`**, **`adminConfig`** (pour **`telegramEnabled`**).
 - Un message Telegram par départ du jour, avec le **libellé org** dans le titre (sauf si Telegram est désactivé pour cette org).
 
-### purge-unavailability.js (**v4.4.0**, orgs dynamiques **v4.6.0**)
+### purge-unavailability.js (**v4.4.0**, orgs dynamiques **v4.6.x**)
 
 - Parcourt les orgs renvoyées par **`loadOrgs(token)`** (même logique que **`notify-departs.js`** : **`/organizations`** + fallback tesson/nade).
 - Lit **`/orgs/{orgId}/unavailability`** ; si le nœud est absent, **aucune** action pour cette org.
@@ -321,7 +322,7 @@ Les workflows (`.github/workflows/*.yml`) lisent les valeurs sensibles **uniquem
 
 - Accès restreint au domaine de production (Google Cloud Console) quand configuré.  
 - Données sensibles : côté CI, tout passe par les **secrets GitHub** ci-dessus ; en local, **`migrate.js`** et les scripts Node utilisent la variable d’environnement `FIREBASE_SERVICE_ACCOUNT` (ou équivalent), sans la versionner.
-- **URLs iCal** : depuis **v4.6.0**, elles sont stockées dans **`/orgs/{orgId}/icalFeeds`** (plus dans **`sync-ical.js`**). Pensez aux **règles RTDB** (accès compte de service / CI). Pour un dépôt public, évitez toutefois de **committer** des secrets ailleurs ; voir **Améliorations prévues** (Phase 2).
+- **URLs iCal** : depuis **v4.6.x**, elles sont stockées dans **`/orgs/{orgId}/icalFeeds`** (plus dans **`sync-ical.js`**), éditables aussi depuis **Super Admin**. Pensez aux **règles RTDB** et **Storage** (liste / suppression sous **`orgs/{orgId}/`**). Pour un dépôt public, évitez toutefois de **committer** des secrets ailleurs ; voir **Améliorations prévues** (Phase 3).
 - Penser à inclure **`/organizations`**, **`/orgs/{orgId}/icalFeeds`**, **`/superAdmin/credentials`** (selon votre modèle de sécurité), **`/orgs/{orgId}/cleaningReports`** (et sous-chemins **`stepFeedback`**, **`procedureSuggestions`**, **`procedures/.../ratings`**) dans les **règles Realtime Database** si elles ne sont pas déjà couvertes par une règle large (sinon les comptes rendus / procédure ne s’enregistrent pas). Idem pour **`unavailability`** (lecture utile pour le calendrier ; écriture par chaque ménagère sur son sous-chemin **`dates`** si vous affinez les règles).
 - **Firebase Storage** : autoriser **`orgs/{orgId}/procedures/...`** (un seul schéma : **`{studio}/{id}.jpg`** pour étape ou suggestion).
 
@@ -401,11 +402,9 @@ Si des **uploads** ou appels Storage depuis l’admin **ou le calendrier** (sugg
 
 ## Studios (affichage calendrier)
 
-Les **libellés** Studio 1 / Studio 2 sont modifiables dans **admin.html** → vue **Organisation** (enregistrés dans **`/orgs/{orgId}/config`**).
+Le **nombre** de studios et les **libellés** par défaut sont fixés dans **Super Admin** (vue Organisations). Les **libellés** sont **renommables** dans **admin.html** → vue **Organisation** (champs dynamiques **`#studios-fields`**, enregistrés dans **`/orgs/{orgId}/config/studioNames`** — pas d’ajout / suppression côté admin).
 
-| | Studio 1 | Studio 2 |
-|--|----------|----------|
-| Couleur calendrier | Bleu | Vert |
+Sur **`index.html`**, le calendrier boucle sur **`S.studioNames.length`** ; les couleurs d’arrivée par studio viennent de la palette **`STUDIO_COLORS`** (six couleurs, cyclées par index). Les **départs** restent en style global **checkout** (ambre). La **légende** sous le calendrier liste les **N** studios avec la pastille de couleur correspondante.
 
 ---
 
@@ -417,15 +416,14 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 
 ## Améliorations prévues
 
-1. **Studio 3** / troisième flux iCal par org  
-2. **Code d'accès simple** sur index.html  
-3. **Sécurisation Firebase** — règles RTDB plus strictes  
-4. **Exploitation de `sharedWith`** — UI et agrégation multi-org  
-5. ~~**Consultation des procédures** depuis le calendrier (`index.html`)~~ — **fait en v4.3** (onglet Procédure pour intervenantes assignées)  
-6. **Hub multi-plannings** (enfants, crèche, etc.)  
-7. **Application mobile native** — notifications push  
-8. ~~**URLs iCal Airbnb** — stockage hors `sync-ical.js`~~ — **fait en v4.6.0** (`/orgs/{orgId}/icalFeeds` + **`init-ical-feeds.js`**)  
-9. **Phase 2 — Studios dynamiques** : gestion des **URLs iCal** et des **studios** (noms, nombre) depuis le **Super Admin** sans passer par la console Firebase / scripts d’init
+1. **Code d'accès simple** sur index.html  
+2. **Sécurisation Firebase** — règles RTDB / Storage plus strictes  
+3. ~~**Exploitation de `sharedWith`**~~ — reporté sous **Phase 3** (UI + agrégation multi-org)  
+4. ~~**Consultation des procédures** depuis le calendrier (`index.html`)~~ — **fait en v4.3** (onglet Procédure pour intervenantes assignées)  
+5. **Application mobile native** — notifications push  
+6. ~~**URLs iCal Airbnb** — stockage hors `sync-ical.js`~~ — **fait en v4.6.x** (`/orgs/{orgId}/icalFeeds` + Super Admin + **`init-ical-feeds.js`**)  
+7. ~~**Phase 2 — Studios dynamiques**~~ — **fait en v4.6.1** (N studios, iCal par studio, suppression d’org, calendrier N + palette, admin N champs)  
+8. **Phase 3** — **« Visible sur calendrier »** par studio (filtrage affichage) ; **gestion `sharedWith`** (UI + règles) ; **hub multi-plannings** (enfants, crèche, etc., réutilisation du socle multi-org)
 
 ---
 
@@ -433,7 +431,7 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 4.6.0
+Version : 4.6.1
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
@@ -447,13 +445,18 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 
 ## Historique des versions
 
+### v4.6.1 — Avril 2026
+- **Phase 2 complète** : **`superadmin.html`** — suppression d’**organisation** (cascade RTDB partielle : hors réservations / assignations / comptes rendus ; **Storage** sous **`orgs/{orgId}/`**) ; **N studios** (liste dynamique, ajout / renommage / suppression avec procédures + Storage par index) ; **URLs iCal** par studio (modale + re-auth **SHA-256**), cache **`icalCache`** ; création d’org avec **`studioNames: []`**.
+- **`index.html`** — boucles calendrier sur **`S.studioNames.length`** ; **`STUDIO_COLORS`** + **`studioColor(si)`** (styles inline arrivées) ; légende **N** studios ; état initial **`studioNames: []`** jusqu’à sync **`config`**.
+- **`admin.html`** — vue Organisation : **`renderStudioFields()`** / **`#studios-fields`** ; **`A.studioNames`** initial **`[]`** ; fallbacks procédures **`||[]`**.
+- **`APP_VERSION` : 4.6.1** dans **`index.html`**, **`admin.html`**, **`compte.html`**, **`superadmin.html`**.
+
 ### v4.6.0 — Avril 2026
 - **`superadmin.html`** — Super Administration : login (**SHA-256** vs **`/superAdmin/credentials`** : `username`, `pwdHash`), session **`sessionStorage`** `sa_session`, menu **Comptes** / **Organisations** / **Paramètres** / **Sécurité** ; déconnexion → **`index.html`** ; comptes org avec **`hashSimple`** (compat calendrier).
 - **`/organizations`** — liste dynamique pour **`index.html`**, **`admin.html`**, **`compte.html`** (fallback tesson/nade).
 - **`/orgs/{orgId}/icalFeeds`** — **`[{ url, studio }]`** consommé par **`sync-ical.js`** ; **`init-ical-feeds.js`** (init one-shot, SKIP si déjà présent).
 - **`notify-departs.js`**, **`purge-unavailability.js`** — orgs via **`loadOrgs`** / **`/organizations`** (fallback tesson/nade).
 - **`init-superadmin.js`** — credentials Super Admin + entrées **`/organizations`** tesson/nade (documenté § architecture).
-- **`APP_VERSION` : 4.6.0** dans **`index.html`**, **`admin.html`**, **`compte.html`**, **`superadmin.html`** (topbar).
 
 ### v4.5.5 — Avril 2026
 - **`compte.html`** / **`admin.html`** — calendriers **Indisponibilités** : la grille peut **s’élargir** (colonnes **`minmax(min-content, 1fr)`**) pour afficher **« par … »** sans tronquer ; **`.section.section--unavail`** retire le **fond blanc** et la **bordure** de la carte sur cette vue uniquement (**pas de barre de défilement**).

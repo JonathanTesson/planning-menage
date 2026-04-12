@@ -405,7 +405,7 @@ const ORG_STORAGE_KEY = 'menage_org_v1';
 const ORG_CHANGE_GATE_KEY = 'menage_org_change_gate';
 let ORGANIZATIONS = [];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.6.0';
+const APP_VERSION = '4.6.1';
 
 const STUDIO_COLORS = [
   { bg: '#daeafe', text: '#1047a0' },
@@ -447,7 +447,7 @@ async function loadOrganizations(){
 
 let S = {
   cleaners: [],
-  studioNames: ['Studio 1','Studio 2'],
+  studioNames: [],
   assignments: {},
   reservations: [],
   adminConfig: { authEnabled: false, accounts: [], defaultOrgId: 'tesson' },
