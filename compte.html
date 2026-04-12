@@ -224,10 +224,7 @@ const db = getDatabase(app);
 const MAX_ACTIVITY_LOG_ENTRIES = 450;
 const SESSION_KEY = 'menage_session_v1';
 const ORG_STORAGE_KEY = 'menage_org_v1';
-const ORGANIZATIONS = [
-  { id: 'tesson', label: 'Studio Tesson' },
-  { id: 'nade', label: 'Studio Nade' }
-];
+let ORGANIZATIONS = [];
 const APP_VERSION = '4.5.5';
 const UNAVAIL_SHOWBY_KEY = 'menage_unavail_showby_v1';
 const MO_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
@@ -245,29 +242,23 @@ function loadSession(){
   try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch(e){ return null; }
 }
 
-const orgId = getStoredOrgId();
-const session = loadSession();
-if (!orgId || !session?.name) {
-  window.location.replace('index.html');
-  throw new Error('no-access');
+async function loadOrganizations(){
+  try{
+    const orgsSnap = await get(ref(db, 'organizations'));
+    const orgsData = orgsSnap.val() || {};
+    ORGANIZATIONS = Object.entries(orgsData).map(([id, v]) => ({ id, label: (v && v.label) || id }));
+    ORGANIZATIONS.sort((a, b) => a.label.localeCompare(b.label));
+  }catch(e){
+    console.warn('Impossible de charger les organisations depuis Firebase:', e);
+  }
+  if(!ORGANIZATIONS.length){
+    ORGANIZATIONS = [{ id: 'tesson', label: 'Studio Tesson' }, { id: 'nade', label: 'Studio Nade' }];
+  }
 }
 
+let orgId;
 const ob = p => `orgs/${orgId}/${p}`;
-
-let C = {
-  userName: session.name,
-  assignments: {},
-  reservations: [],
-  cleaningReports: {},
-  adminConfig: { authEnabled: false, accounts: [], defaultOrgId: 'tesson' },
-  selectedMonth: new Date().getMonth(),
-  selectedYear: new Date().getFullYear(),
-  unavailMonth: new Date().getMonth(),
-  unavailYear: new Date().getFullYear(),
-  /** @type {Record<string, { by: string|null }>} dates locales → traçabilité (`by` null si ancien `true` en base) */
-  unavailMyDates: {},
-  unlocked: false
-};
+let C;
 
 let compteUiHashApplied = false;
 
@@ -715,60 +706,83 @@ function setupCompteNavOnce(){
   });
 }
 
-onValue(ref(db,ob('assignments')), snap=>{
-  C.assignments=snap.val()||{};
-  if(C.unlocked) renderCompteDashboard();
-}, ()=>setSyncStatus('err'));
-
-onValue(ref(db,ob('reservations')), snap=>{
-  const data=snap.val()||{};
-  C.reservations=Object.values(data).map(r=>({...r,start:new Date(r.start),end:new Date(r.end)}));
-  if(C.unlocked) renderCompteDashboard();
-}, ()=>setSyncStatus('err'));
-
-onValue(ref(db,ob('cleaningReports')), snap=>{
-  C.cleaningReports=snap.val()||{};
-  if(C.unlocked) renderCompteDashboard();
-}, ()=>setSyncStatus('err'));
-
-onValue(ref(db,ob('adminConfig')), snap=>{
-  const d=snap.val();
-  if(d){
-    C.adminConfig={...C.adminConfig,...d, accounts:d.accounts||[], defaultOrgId:d.defaultOrgId||C.adminConfig.defaultOrgId||'tesson'};
-  }else{
-    C.adminConfig={ authEnabled:false, accounts:[], defaultOrgId:orgId||'tesson' };
+(async () => {
+  await loadOrganizations();
+  orgId = getStoredOrgId();
+  const session = loadSession();
+  if (!orgId || !session?.name) {
+    window.location.replace('index.html');
+    return;
   }
-  if(!C.unlocked) verifyAndUnlock();
-  else{
-    setupAccountForm();
-    renderCompteDashboard();
-  }
-}, ()=>{
-  setSyncStatus('err');
-  if(!C.unlocked) window.location.replace('index.html');
-});
+  C = {
+    userName: session.name,
+    assignments: {},
+    reservations: [],
+    cleaningReports: {},
+    adminConfig: { authEnabled: false, accounts: [], defaultOrgId: 'tesson' },
+    selectedMonth: new Date().getMonth(),
+    selectedYear: new Date().getFullYear(),
+    unavailMonth: new Date().getMonth(),
+    unavailYear: new Date().getFullYear(),
+    /** @type {Record<string, { by: string|null }>} dates locales → traçabilité (`by` null si ancien `true` en base) */
+    unavailMyDates: {},
+    unlocked: false
+  };
+  onValue(ref(db,ob('assignments')), snap=>{
+    C.assignments=snap.val()||{};
+    if(C.unlocked) renderCompteDashboard();
+  }, ()=>setSyncStatus('err'));
 
-/**
- * Indisponibilités de l’utilisateur : …/unavailability/{prenom}/dates/{YYYY-MM-DD}.
- * Prénoms avec caractères réservés Firebase (. # $ [ ]) non prévus aujourd’hui.
- */
-onValue(ref(db,`${ob('unavailability')}/${C.userName}/dates`), snap=>{
-  const v=snap.val()||{};
-  const next={};
-  for(const k of Object.keys(v)){
-    const val=v[k];
-    if(!isFirebaseIndispoRecord(val)) continue;
-    next[k]={by:unavailByFromFirebase(val)};
-  }
-  C.unavailMyDates=next;
-  if(C.unlocked) renderUnavailCal();
-}, ()=>setSyncStatus('err'));
+  onValue(ref(db,ob('reservations')), snap=>{
+    const data=snap.val()||{};
+    C.reservations=Object.values(data).map(r=>({...r,start:new Date(r.start),end:new Date(r.end)}));
+    if(C.unlocked) renderCompteDashboard();
+  }, ()=>setSyncStatus('err'));
 
-window.addEventListener('hashchange',()=>{
-  if(!C.unlocked) return;
-  const h=location.hash.slice(1);
-  if(COMPTE_VIEW_IDS.includes(h)) window.setCompteView(h,{noScroll:true});
-});
+  onValue(ref(db,ob('cleaningReports')), snap=>{
+    C.cleaningReports=snap.val()||{};
+    if(C.unlocked) renderCompteDashboard();
+  }, ()=>setSyncStatus('err'));
+
+  onValue(ref(db,ob('adminConfig')), snap=>{
+    const d=snap.val();
+    if(d){
+      C.adminConfig={...C.adminConfig,...d, accounts:d.accounts||[], defaultOrgId:d.defaultOrgId||C.adminConfig.defaultOrgId||'tesson'};
+    }else{
+      C.adminConfig={ authEnabled:false, accounts:[], defaultOrgId:orgId||'tesson' };
+    }
+    if(!C.unlocked) verifyAndUnlock();
+    else{
+      setupAccountForm();
+      renderCompteDashboard();
+    }
+  }, ()=>{
+    setSyncStatus('err');
+    if(!C.unlocked) window.location.replace('index.html');
+  });
+
+  /**
+   * Indisponibilités de l’utilisateur : …/unavailability/{prenom}/dates/{YYYY-MM-DD}.
+   * Prénoms avec caractères réservés Firebase (. # $ [ ]) non prévus aujourd’hui.
+   */
+  onValue(ref(db,`${ob('unavailability')}/${C.userName}/dates`), snap=>{
+    const v=snap.val()||{};
+    const next={};
+    for(const k of Object.keys(v)){
+      const val=v[k];
+      if(!isFirebaseIndispoRecord(val)) continue;
+      next[k]={by:unavailByFromFirebase(val)};
+    }
+    C.unavailMyDates=next;
+    if(C.unlocked) renderUnavailCal();
+  }, ()=>setSyncStatus('err'));
+
+  window.addEventListener('hashchange',()=>{
+    if(!C.unlocked) return;
+    const h=location.hash.slice(1);
+    if(COMPTE_VIEW_IDS.includes(h)) window.setCompteView(h,{noScroll:true});
+  });
+})();
 </script>
 </body>
 </html>
