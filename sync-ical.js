@@ -181,7 +181,7 @@ async function syncOneOrg(org, token) {
   const base = `orgs/${org.id}`;
   const validFeeds = org.feeds.filter(f => f.url && String(f.url).trim());
   if (!validFeeds.length) {
-    console.log(`⏭️ ${org.id} (${org.label}) : aucune URL iCal — sync ignorée (À compléter dans sync-ical.js)`);
+    console.log(`⏭️ ${org.id} (${org.label}) : aucune URL iCal — ajouter les feeds dans Firebase sous /orgs/{orgId}/icalFeeds`);
     return;
   }
 

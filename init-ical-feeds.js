@@ -11,7 +11,7 @@ const https = require('https');
 
 const FIREBASE_DB_URL = 'https://planning-menage-18b09-default-rtdb.firebaseio.com';
 
-/** Données alignées sur sync-ical.js (ORG_SYNC → feeds). */
+/** Données à écrire sous /orgs/{orgId}/icalFeeds (tableau [{ url, studio }]). */
 const ICAL_FEEDS_BY_ORG = {
   tesson: [
     { url: 'https://www.airbnb.fr/calendar/ical/23714051.ics?s=1c507a926f8f63d87b20fea875da704e', studio: 0 },

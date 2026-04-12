@@ -123,6 +123,7 @@ body.sa-nav-ready .admin-burger{display:flex}
       <div style="min-width:0">
         <div class="topbar-title">Super Administration</div>
         <div class="topbar-sub">Planning Ménage</div>
+        <div class="topbar-sub" id="sa-app-version"></div>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
@@ -256,6 +257,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+const APP_VERSION = '4.6.0';
 const SA_SESSION_KEY = 'sa_session';
 
 function hashSimple(str){
@@ -368,15 +370,8 @@ function showAppShell(){
   el('sa-login').style.display = 'none';
   el('sa-app').style.display = '';
   document.body.classList.add('sa-nav-ready');
-}
-
-function showLoginScreen(){
-  el('sa-app').style.display = 'none';
-  el('sa-login').style.display = '';
-  document.body.classList.remove('sa-nav-ready');
-  try{ sessionStorage.removeItem(SA_SESSION_KEY); }catch(_){}
-  el('sa-login-error').style.display = 'none';
-  el('sa-login-pwd').value = '';
+  const vEl = el('sa-app-version');
+  if(vEl) vEl.textContent = 'Planning Ménage · v '+APP_VERSION;
 }
 
 async function doLogin(){
@@ -593,7 +588,7 @@ el('sa-modal-org-ok').addEventListener('click', async ()=>{
     await set(ref(db, `orgs/${slug}/config`), { studioNames: ['Studio 1', 'Studio 2'] });
     await set(ref(db, `orgs/${slug}/adminConfig`), { authEnabled: false, telegramEnabled: true, accounts: [] });
     closeModal('sa-modal-create-org');
-    showToast('Organisation créée. Pense à ajouter les URLs iCal dans sync-ical.js.');
+    showToast('Organisation créée. Ajoute les URLs iCal dans Firebase sous /orgs/{orgId}/icalFeeds.');
     await fetchOrganizations();
     fillOrgSelects();
     renderOrgList();

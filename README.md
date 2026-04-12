@@ -1,8 +1,8 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 4.5.5** — Avril 2026
+**Version : 4.6.0** — Avril 2026
 
-Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin. **v4.5.5** : calendriers **indisponibilités** sur **`compte.html`** et **`admin.html`** — la grille peut **s’élargir** pour afficher **« par … »** lisiblement (**`minmax(min-content, 1fr)`**) ; la vue utilise **`.section.section--unavail`** (**fond et bordure retirés**, sans barre de défilement) pour éviter tout décalage visuel ; case à cocher **« Afficher le détail (par qui) »** (défaut décochée), préférence **`localStorage`** **`menage_unavail_showby_v1`** (partagée entre les deux pages). **v4.5.4** : traçabilité des **étapes** de procédure (admin + calendrier), **copie** d’étape avec report des métadonnées, **indicateur** des suggestions en attente dans la modale ménage (onglet Procédure), **animation** des pastilles **Indispo**. **Note d’assignation** côté calendrier (**`note`** + traçage **`noteBy`**, indicateur **point bleu pulsant** sur les départs, lecture seule pour les ménagères) — détail § **`/assignments`** et § **index.html** ci-dessous. **v4.5.x** : **indisponibilités** — saisie sur **`compte.html`**, pastilles + filtre **Indispo** sur **`index.html`**, **vue admin** **`#indisponibilites`** (édition par intervenante **v4.5.1**, résumé global **v4.5.2**, traçabilité **`by` v4.5.3**), clés **`YYYY-MM-DD` en date locale** ; la **purge automatique** compare les mêmes clés au **seuil UTC** (voir § **`/unavailability`**).
+Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin. **v4.6.0** : **Super Administration** (`superadmin.html`) — page autonome, login **SHA-256** contre **`/superAdmin/credentials`** (`username`, `pwdHash`), menu **Comptes** / **Organisations** / **Paramètres** / **Sécurité** ; liste des organisations chargée depuis **`/organizations`** dans **`index.html`**, **`admin.html`**, **`compte.html`** (fallback tesson/nade si besoin) ; flux iCal lus depuis **`/orgs/{orgId}/icalFeeds`** (`[{ url, studio }]`) par **`sync-ical.js`** ; **`notify-departs.js`** et **`purge-unavailability.js`** parcourent les orgs via **`/organizations`** (fallback tesson/nade si erreur ou liste vide) ; scripts d’init **`init-superadmin.js`**, **`init-ical-feeds.js`**. **v4.5.5** : calendriers **indisponibilités** sur **`compte.html`** et **`admin.html`** — la grille peut **s’élargir** pour afficher **« par … »** lisiblement (**`minmax(min-content, 1fr)`**) ; la vue utilise **`.section.section--unavail`** (**fond et bordure retirés**, sans barre de défilement) pour éviter tout décalage visuel ; case à cocher **« Afficher le détail (par qui) »** (défaut décochée), préférence **`localStorage`** **`menage_unavail_showby_v1`** (partagée entre les deux pages). **v4.5.4** : traçabilité des **étapes** de procédure (admin + calendrier), **copie** d’étape avec report des métadonnées, **indicateur** des suggestions en attente dans la modale ménage (onglet Procédure), **animation** des pastilles **Indispo**. **Note d’assignation** côté calendrier (**`note`** + traçage **`noteBy`**, indicateur **point bleu pulsant** sur les départs, lecture seule pour les ménagères) — détail § **`/assignments`** et § **index.html** ci-dessous. **v4.5.x** : **indisponibilités** — saisie sur **`compte.html`**, pastilles + filtre **Indispo** sur **`index.html`**, **vue admin** **`#indisponibilites`** (édition par intervenante **v4.5.1**, résumé global **v4.5.2**, traçabilité **`by` v4.5.3**), clés **`YYYY-MM-DD` en date locale** ; la **purge automatique** compare les mêmes clés au **seuil UTC** (voir § **`/unavailability`**).
 
 ---
 
@@ -13,18 +13,31 @@ Application web de planning des interventions ménage pour plusieurs organisatio
 | [Calendrier](https://jonathantesson.github.io/planning-menage/) | Interface principale |
 | [Administration](https://jonathantesson.github.io/planning-menage/admin.html) | Back-office (session + rôle admin + org choisie sur le calendrier) |
 | [Mon compte](https://jonathantesson.github.io/planning-menage/compte.html) | Espace intervenante (session ménagère, hors admin) — lien depuis le prénom sur le calendrier |
+| [Super Administration](https://jonathantesson.github.io/planning-menage/superadmin.html) | Interface Super Admin (login dédié, hors session planning) — lien cadenas sur l’écran login du calendrier |
 | [GitHub Actions](https://github.com/JonathanTesson/planning-menage/actions) | Sync iCal, notifications, purge indisponibilités |
+
+---
+
+## Super Administration (`superadmin.html`)
+
+Page **autonome** (pas de session planning partagée) : accès depuis le **cadenas** sur l’écran login du calendrier, ou URL directe.
+
+- **Login** : champs **nom d’utilisateur** + **mot de passe** ; lecture **`/superAdmin/credentials`** (`username`, **`pwdHash`** en **SHA-256** hex) ; session **`sessionStorage`** clé **`sa_session`** (`'1'`) ; **déconnexion** → redirection **`index.html`** (efface la session).
+- **Menu latéral** : **Comptes** (par org : liste **`adminConfig.accounts`**, rôles 🧹/👑, MDP **`hashSimple`**, ajout / suppression) — **Organisations** (liste **`/organizations`**, création d’org + init `config` / `adminConfig`) — **Paramètres** (`authEnabled`, `telegramEnabled`, `defaultOrgId`) — **Sécurité** (changement identifiants Super Admin, double saisie du MDP).
+- **Initialisation** : **`init-superadmin.js`** (one-shot) pour **`/superAdmin/credentials`** et **`/organizations/tesson`** & **`nade`** si absents.
 
 ---
 
 ## Organisations (orgId → libellé)
 
-| orgId   | Libellé affiché   |
-|---------|-------------------|
-| `tesson` | Studio Tesson    |
-| `nade`   | Studio Nade      |
+La **liste canonique** est **`/organizations/{orgId}`** → objet **`{ label }`**. Les pages **`index.html`**, **`admin.html`** et **`compte.html`** chargent cette liste au démarrage (Firebase) ; en cas d’erreur ou de nœud vide, **fallback** tesson / nade. Les scripts **`sync-ical.js`**, **`notify-departs.js`** et **`purge-unavailability.js`** lisent **`/organizations`** avec le même **fallback** si la liste est vide ou illisible.
 
-Ces paires sont définies **en dur** dans `index.html`, `admin.html`, `compte.html`, `sync-ical.js`, `notify-departs.js` et `purge-unavailability.js`. L’**organisation par défaut** sur l’écran de connexion / premier choix est **`tesson`** ; l’admin peut fixer une autre valeur via **`defaultOrgId`** dans `adminConfig` (liste « Org. par défaut » dans l’admin).
+| orgId (exemples) | Libellé affiché (exemples) |
+|--------------------|----------------------------|
+| `tesson`           | Studio Tesson              |
+| `nade`             | Studio Nade                |
+
+L’**organisation par défaut** proposée à la connexion dépend de **`defaultOrgId`** dans **`adminConfig`** et de la liste chargée ; la valeur **`tesson`** reste un **défaut** courant dans le code lorsque rien n’est configuré. L’admin peut fixer **`defaultOrgId`** via la liste « Org. par défaut » (vue Comptes ou Super Admin → Paramètres).
 
 ---
 
@@ -35,10 +48,13 @@ planning-menage/
 ├── index.html           → Calendrier principal
 ├── admin.html           → Back-office administration
 ├── compte.html          → Tableau de bord + compte (intervenantes, hors admin)
+├── superadmin.html      → Super Administration (login / orgs / comptes / paramètres / sécurité)
 ├── storage-cors.example.json → Exemple CORS bucket Storage (optionnel, si uploads / SDK bloqués en local)
 ├── sync-ical.js         → Sync iCal → Firebase par organisation (cron)
 ├── notify-departs.js    → Notifications Telegram départs du jour (cron)
 ├── purge-unavailability.js → Supprime indisponibilités > 3 ans (UTC) sous /unavailability/ (cron mensuel)
+├── init-superadmin.js   → Init one-shot : /superAdmin/credentials + /organizations (tesson, nade)
+├── init-ical-feeds.js   → Init one-shot : /orgs/{orgId}/icalFeeds (SKIP si déjà présent)
 ├── migrate.js           → Script one-shot : copie racine → /orgs/tesson/ (manuel)
 ├── .gitignore           → Ignore les JSON de compte de service dans Firebase/ (local)
 ├── .github/workflows/
@@ -52,12 +68,19 @@ planning-menage/
 
 ## Firebase multi-organisations
 
-Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. Ancienne racine (`/config`, `/reservations`, …) : **ne pas supprimer** tant que la migration n’est pas validée ; utiliser **`migrate.js`** pour copier vers **`/orgs/tesson/`**.
+Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. La **liste des organisations** (ids + libellés) est sous **`/organizations/{orgId}`** → **`{ label }`**. Les **URLs des flux iCal** par org sont sous **`/orgs/{orgId}/icalFeeds`** → tableau **`[{ url, studio }]`** (consommé par **`sync-ical.js`**). Ancienne racine (`/config`, `/reservations`, …) : **ne pas supprimer** tant que la migration n’est pas validée ; utiliser **`migrate.js`** pour copier vers **`/orgs/tesson/`**.
 
 ```
+/organizations
+  /{orgId}       → { label }
+
+/superAdmin
+  /credentials   → { username, pwdHash } (mot de passe Super Admin : SHA-256 hex)
+
 /orgs
   /tesson
     /config        → studioNames, cleaners
+    /icalFeeds     → [{ url, studio }] (sync iCal — v4.6.0)
     /reservations  → réservations Airbnb
     /assignments   → assignations
     /adminConfig     → comptes, auth, defaultOrgId, telegramEnabled, …
@@ -68,7 +91,7 @@ Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. Ancienne rac
     /procedureSuggestions → suggestions d’étapes en attente de validation (v4.3)
     /unavailability     → indisponibilités par prénom (v4.5.0 — UI calendrier + compte)
   /nade
-    (même structure ; remplie selon sync iCal et utilisation)
+    (même structure, dont **icalFeeds** ; remplie selon sync iCal et utilisation)
 ```
 
 ### `/unavailability` — indisponibilités (**v4.5.0**, traçabilité **v4.5.3**)
@@ -83,7 +106,7 @@ Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. Ancienne rac
 - **Saisie (app)** : les clés **`YYYY-MM-DD`** sont celles du **calendrier local** du navigateur (même convention que le reste du planning : jour civil local). **`compte.html`** limite la navigation mois à **± 3 ans** autour du mois courant (local) ; les **jours passés** sont en lecture seule sur le mini-calendrier.
 - **Affichage (`index.html`)** : listener sur **`/orgs/{orgId}/unavailability/`** ; normalisation en mémoire : pour chaque date indispo, **`{ by: string | null }`** (le **`by`** est **`null`** si la base contenait encore **`true`**). Pastilles et modale d’info ; si **`by`** est renseigné, la modale affiche **« par … »**.
 - **Calendriers indispo (`compte.html`, `admin.html`)** : cases rouges ; libellé **« par [by] »** (petit texte gris) **uniquement si** la case **« Afficher le détail (par qui) »** est cochée (**v4.5.5**, préférence **`menage_unavail_showby_v1`** — défaut décoché) **et** que la valeur a un auteur **`by`** ; pas de texte pour l’ancien format **`true`**. Colonnes **`minmax(min-content, 1fr)`** ; **`.section.section--unavail`** : pas de fond ni bordure de carte autour de cette vue (pas de barre de défilement). Côté **admin**, une seule préférence pour toute la vue (indépendante de l’intervenante sélectionnée). Le **résumé des indispos futures** (**v4.5.2**) compte uniquement les **dates**, pas le champ **`by`**.
-- **Purge (`purge-unavailability.js`)** : inchangé — supprime le **nœud date** entier ; compatible **`true`** et **`{ by }`**.
+- **Purge (`purge-unavailability.js`)** : supprime le **nœud date** entier ; compatible **`true`** et **`{ by }`** ; parcourt les orgs depuis **`/organizations`** (**v4.6.0**, avec fallback tesson/nade).
 - **Purge (détail)** : compare chaque clé **`YYYY-MM-DD`** au seuil **aujourd’hui UTC − 3 ans** (chaînes **`YYYY-MM-DD`** comparées lexicographiquement). C’est **volontairement UTC** côté cron, alors que la **saisie** est **locale** : en pratique les écarts de fuseau n’affectent que les entrées proches de la frontière des 3 ans ; documenté ici pour éviter toute confusion.
 - Si le nœud **`unavailability`** est **absent** pour une org, le script de purge **ignore** silencieusement cette org ; l’UI fonctionne avec un objet vide.
 
@@ -197,14 +220,10 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
 
 ## Ajouter une nouvelle organisation
 
-1. **Firebase** : créer les nœuds vides ou initiaux sous `/orgs/{nouvelOrgId}/` (même schéma que `tesson`).
-2. **Code** : ajouter `{ id: 'nouvelOrgId', label: '…' }` dans **`ORGANIZATIONS`** / listes équivalentes dans :
-   - `index.html`
-   - `admin.html`
-   - `notify-departs.js` (tableau `ORGS`)
-   - `sync-ical.js` (tableau `ORG_SYNC` + URLs iCal par flux `studio`)
-3. **Admin** : l’option « Org. par défaut » proposera automatiquement le nouvel id si `defaultOrgId` est synchronisé avec la liste.
-4. **Comptes** : créer les comptes et mots de passe dans l’admin **de cette org** (données séparées par organisation).
+1. **Super Admin** (`superadmin.html`) : vue **Organisations** — **+ Créer une organisation** (slug + libellé) écrit **`/organizations/{orgId}`**, initialise **`/orgs/{orgId}/config`** et **`/orgs/{orgId}/adminConfig`**, ou bien créer les nœuds équivalents à la main dans Firebase.
+2. **Flux iCal** : renseigner **`/orgs/{orgId}/icalFeeds`** avec un tableau **`[{ url, studio }, …]`** (script **`init-ical-feeds.js`** pour les orgs existantes en one-shot, ou édition console).
+3. **Admin** : l’option « Org. par défaut » liste les orgs depuis **`/organizations`** ; fixer **`defaultOrgId`** si besoin.
+4. **Comptes** : créer les comptes dans l’**admin** de l’org ou via le **Super Admin** (vue Comptes).
 
 ---
 
@@ -264,21 +283,20 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
 
 ### sync-ical.js
 
-- Enchaîne les organisations définies dans **`ORG_SYNC`**.
-- **tesson** et **nade** : deux flux iCal (studio 0 et 1) chacun lorsque les URLs sont renseignées dans **`feeds`**.
-- Si une org n’a **aucune** URL dans **`feeds`**, la sync pour cette org est **ignorée** (aucune écriture réservations / lastSync pour elle).
+- Construit la liste des orgs via **`loadOrgSync(token)`** : lecture **`/organizations`**, puis pour chaque id lecture **`/orgs/{orgId}/icalFeeds`** → tableau **`[{ url, studio }]`** (normalisé en tableau côté script).
+- Si une org n’a **aucune** URL valide dans **`icalFeeds`**, la sync pour cette org est **ignorée** (aucune écriture réservations / lastSync pour elle).
 - Écrit sous **`/orgs/{orgId}/reservations`** et **`/orgs/{orgId}/lastSync`**.
 - Notifications Telegram : préfixe avec le **libellé** de l’organisation ; **désactivables par org** via **`adminConfig.telegramEnabled`** (défaut : activé si absent).
 
 ### notify-departs.js
 
-- Parcourt **`tesson`** puis **`nade`** (liste **`ORGS`**).
+- Parcourt les orgs renvoyées par **`loadOrgs(token)`** (lecture **`/organizations`**, tri par libellé ; **fallback** tesson/nade si erreur ou liste vide).
 - Lit **`/orgs/{orgId}/reservations`**, **`assignments`**, **`config`**, **`adminConfig`** (pour **`telegramEnabled`**).
 - Un message Telegram par départ du jour, avec le **libellé org** dans le titre (sauf si Telegram est désactivé pour cette org).
 
-### purge-unavailability.js (**v4.4.0**, inchangé en v4.5.0)
+### purge-unavailability.js (**v4.4.0**, orgs dynamiques **v4.6.0**)
 
-- Parcourt **`tesson`** puis **`nade`** (même liste que **`notify-departs.js`**).
+- Parcourt les orgs renvoyées par **`loadOrgs(token)`** (même logique que **`notify-departs.js`** : **`/organizations`** + fallback tesson/nade).
 - Lit **`/orgs/{orgId}/unavailability`** ; si le nœud est absent, **aucune** action pour cette org.
 - Supprime les entrées **`…/unavailability/{prenom}/dates/{YYYY-MM-DD}`** dont la date est **strictement &lt;** (aujourd’hui **UTC** − 3 ans). Secret **`FIREBASE_SERVICE_ACCOUNT`** uniquement.
 - Workflow : **`.github/workflows/purge-unavailability.yml`** — planification **1er de chaque mois à 3h00 UTC**, Node **20**, **`workflow_dispatch`** possible.
@@ -291,7 +309,7 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
 
 Les workflows (`.github/workflows/*.yml`) lisent les valeurs sensibles **uniquement** via les [**secrets du dépôt GitHub**](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions) (*Settings → Secrets and variables → Actions*). Elles ne sont **pas** commitées dans le dépôt : chaque secret est injecté à l’exécution sous la forme `${{ secrets.NOM_DU_SECRET }}`.
 
-- `FIREBASE_SERVICE_ACCOUNT` : JSON complet du compte de service Firebase (utilisé par `sync-ical.js`, `notify-departs.js`, `purge-unavailability.js`)
+- `FIREBASE_SERVICE_ACCOUNT` : JSON complet du compte de service Firebase (utilisé par `sync-ical.js`, `notify-departs.js`, `purge-unavailability.js`, `init-superadmin.js`, `init-ical-feeds.js`, `migrate.js`)
 - `TELEGRAM_BOT_TOKEN` : token du bot @TessonLocationbot (utilisé par `sync-ical.js` et `notify-departs.js`)
 
 ### Telegram
@@ -303,8 +321,8 @@ Les workflows (`.github/workflows/*.yml`) lisent les valeurs sensibles **uniquem
 
 - Accès restreint au domaine de production (Google Cloud Console) quand configuré.  
 - Données sensibles : côté CI, tout passe par les **secrets GitHub** ci-dessus ; en local, **`migrate.js`** et les scripts Node utilisent la variable d’environnement `FIREBASE_SERVICE_ACCOUNT` (ou équivalent), sans la versionner.
-- **À traiter plus tard** : les **URLs iCal privées** Airbnb (paramètre `?s=…`) sont encore dans **`sync-ical.js`**, donc **versionnées avec le dépôt**. Ce n’est **pas** le cas du compte de service ni du token Telegram. Il faudra un moment **externaliser** cette config (secret GitHub contenant un JSON, variables d’environnement en Actions, fichier local ignoré par Git pour le développement, etc.), surtout si le dépôt est public ou partagé — voir aussi la liste **Améliorations prévues**.
-- Penser à inclure **`/orgs/{orgId}/cleaningReports`** (et sous-chemins **`stepFeedback`**, **`procedureSuggestions`**, **`procedures/.../ratings`**) dans les **règles Realtime Database** si elles ne sont pas déjà couvertes par une règle large (sinon les comptes rendus / procédure ne s’enregistrent pas). Idem pour **`unavailability`** (lecture utile pour le calendrier ; écriture par chaque ménagère sur son sous-chemin **`dates`** si vous affinez les règles).
+- **URLs iCal** : depuis **v4.6.0**, elles sont stockées dans **`/orgs/{orgId}/icalFeeds`** (plus dans **`sync-ical.js`**). Pensez aux **règles RTDB** (accès compte de service / CI). Pour un dépôt public, évitez toutefois de **committer** des secrets ailleurs ; voir **Améliorations prévues** (Phase 2).
+- Penser à inclure **`/organizations`**, **`/orgs/{orgId}/icalFeeds`**, **`/superAdmin/credentials`** (selon votre modèle de sécurité), **`/orgs/{orgId}/cleaningReports`** (et sous-chemins **`stepFeedback`**, **`procedureSuggestions`**, **`procedures/.../ratings`**) dans les **règles Realtime Database** si elles ne sont pas déjà couvertes par une règle large (sinon les comptes rendus / procédure ne s’enregistrent pas). Idem pour **`unavailability`** (lecture utile pour le calendrier ; écriture par chaque ménagère sur son sous-chemin **`dates`** si vous affinez les règles).
 - **Firebase Storage** : autoriser **`orgs/{orgId}/procedures/...`** (un seul schéma : **`{studio}/{id}.jpg`** pour étape ou suggestion).
 
 #### Sécurité v4.3.0 — exemples de règles (console Firebase)
@@ -406,7 +424,8 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 5. ~~**Consultation des procédures** depuis le calendrier (`index.html`)~~ — **fait en v4.3** (onglet Procédure pour intervenantes assignées)  
 6. **Hub multi-plannings** (enfants, crèche, etc.)  
 7. **Application mobile native** — notifications push  
-8. **URLs iCal Airbnb** — sortir les liens privés de **`sync-ical.js`** vers des secrets / variables d’environnement (détail § **Sécurité**, puce *À traiter plus tard*)
+8. ~~**URLs iCal Airbnb** — stockage hors `sync-ical.js`~~ — **fait en v4.6.0** (`/orgs/{orgId}/icalFeeds` + **`init-ical-feeds.js`**)  
+9. **Phase 2 — Studios dynamiques** : gestion des **URLs iCal** et des **studios** (noms, nombre) depuis le **Super Admin** sans passer par la console Firebase / scripts d’init
 
 ---
 
@@ -414,18 +433,27 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 4.5.5
+Version : 4.6.0
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
 Compte : https://jonathantesson.github.io/planning-menage/compte.html
-Fichiers : index.html, admin.html, compte.html, sync-ical.js, notify-departs.js, purge-unavailability.js, migrate.js, .gitignore
+Super Admin : https://jonathantesson.github.io/planning-menage/superadmin.html
+Fichiers : index.html, admin.html, compte.html, superadmin.html, sync-ical.js, notify-departs.js, purge-unavailability.js, init-superadmin.js, init-ical-feeds.js, migrate.js, .gitignore
 README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ```
 
 ---
 
 ## Historique des versions
+
+### v4.6.0 — Avril 2026
+- **`superadmin.html`** — Super Administration : login (**SHA-256** vs **`/superAdmin/credentials`** : `username`, `pwdHash`), session **`sessionStorage`** `sa_session`, menu **Comptes** / **Organisations** / **Paramètres** / **Sécurité** ; déconnexion → **`index.html`** ; comptes org avec **`hashSimple`** (compat calendrier).
+- **`/organizations`** — liste dynamique pour **`index.html`**, **`admin.html`**, **`compte.html`** (fallback tesson/nade).
+- **`/orgs/{orgId}/icalFeeds`** — **`[{ url, studio }]`** consommé par **`sync-ical.js`** ; **`init-ical-feeds.js`** (init one-shot, SKIP si déjà présent).
+- **`notify-departs.js`**, **`purge-unavailability.js`** — orgs via **`loadOrgs`** / **`/organizations`** (fallback tesson/nade).
+- **`init-superadmin.js`** — credentials Super Admin + entrées **`/organizations`** tesson/nade (documenté § architecture).
+- **`APP_VERSION` : 4.6.0** dans **`index.html`**, **`admin.html`**, **`compte.html`**, **`superadmin.html`** (topbar).
 
 ### v4.5.5 — Avril 2026
 - **`compte.html`** / **`admin.html`** — calendriers **Indisponibilités** : la grille peut **s’élargir** (colonnes **`minmax(min-content, 1fr)`**) pour afficher **« par … »** sans tronquer ; **`.section.section--unavail`** retire le **fond blanc** et la **bordure** de la carte sur cette vue uniquement (**pas de barre de défilement**).

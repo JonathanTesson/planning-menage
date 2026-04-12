@@ -15,7 +15,7 @@
 
 const https = require('https');
 
-const ORGS = [
+const ORGS_FALLBACK = [
   { id: 'tesson', label: 'Studio Tesson' },
   { id: 'nade', label: 'Studio Nade' }
 ];
@@ -77,6 +77,27 @@ async function firebaseGet(path, token) {
     method: 'GET'
   });
   return res.body === 'null' ? null : JSON.parse(res.body);
+}
+
+/**
+ * Liste des organisations depuis /organizations, triée par label.
+ * En cas d’erreur ou de liste vide : tesson / nade (comportement historique).
+ */
+async function loadOrgs(token) {
+  try {
+    const raw = await firebaseGet('organizations', token);
+    const orgMap = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    const rows = Object.entries(orgMap).map(([id, v]) => ({
+      id,
+      label: (v && v.label) || id
+    }));
+    if (!rows.length) return ORGS_FALLBACK;
+    rows.sort((a, b) => a.label.localeCompare(b.label, 'fr'));
+    return rows;
+  } catch (e) {
+    console.warn('⚠️ loadOrgs:', e.message, '— fallback tesson/nade');
+    return ORGS_FALLBACK;
+  }
 }
 
 /** PATCH shallow merge : null supprime la clé ciblée. */
@@ -165,7 +186,8 @@ async function main() {
 
   const token = await getFirebaseToken();
 
-  for (const org of ORGS) {
+  const orgs = await loadOrgs(token);
+  for (const org of orgs) {
     const n = await purgeOrg(org, token, cutoffStr);
     console.log(`[${org.id}] ${n} entrée(s) supprimée(s)`);
   }
