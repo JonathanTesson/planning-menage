@@ -275,7 +275,13 @@ body.sa-nav-ready .admin-burger{display:flex}
 <div class="modal-overlay" id="sa-modal-del-studio" role="dialog" aria-modal="true" aria-labelledby="sa-modal-del-studio-title">
   <div class="modal">
     <h3 id="sa-modal-del-studio-title">Supprimer le studio</h3>
-    <p class="empty-hint" style="color:#555;line-height:1.45">Supprimer ce studio ? Les étapes et photos associées seront effacées.</p>
+    <p class="empty-hint" id="sa-modal-del-studio-studio" style="color:#555;line-height:1.45;font-weight:600"></p>
+    <p class="empty-hint" style="color:#555;line-height:1.45">Les étapes et photos associées à ce studio seront définitivement supprimées (RTDB et Storage).</p>
+    <div class="modal-field">
+      <label for="sa-modal-del-studio-pwd">Mot de passe Super Admin</label>
+      <input type="password" id="sa-modal-del-studio-pwd" autocomplete="current-password">
+    </div>
+    <div class="login-error" id="sa-modal-del-studio-error" style="display:none;margin-bottom:8px"></div>
     <div class="modal-actions">
       <button type="button" class="btn-secondary" id="sa-modal-del-studio-cancel">Annuler</button>
       <button type="button" class="btn-danger" id="sa-modal-del-studio-ok" style="border:1px solid #f0c0c0;padding:8px 16px">Supprimer</button>
@@ -818,6 +824,12 @@ function wireStudiosPanel(panel, orgId){
       const i = Number(btn.getAttribute('data-studio-del'));
       pendingDeleteStudioOrgId = orgId;
       pendingDeleteStudioIndex = i;
+      const errEl = el('sa-modal-del-studio-error');
+      errEl.style.display = 'none';
+      errEl.textContent = '';
+      el('sa-modal-del-studio-pwd').value = '';
+      const nm = studioCache[orgId] && studioCache[orgId][i] != null ? String(studioCache[orgId][i]) : 'Studio ' + (i + 1);
+      el('sa-modal-del-studio-studio').textContent = 'Studio concerné : « ' + nm + ' »';
       openModal('sa-modal-del-studio');
     });
   });
@@ -955,13 +967,45 @@ el('sa-modal-org-ok').addEventListener('click', async ()=>{
 el('sa-modal-del-studio-cancel').addEventListener('click', ()=>{
   pendingDeleteStudioOrgId = '';
   pendingDeleteStudioIndex = -1;
+  el('sa-modal-del-studio-pwd').value = '';
+  const errC = el('sa-modal-del-studio-error');
+  errC.style.display = 'none';
+  errC.textContent = '';
   closeModal('sa-modal-del-studio');
 });
 el('sa-modal-del-studio-ok').addEventListener('click', async ()=>{
+  const errEl = el('sa-modal-del-studio-error');
+  errEl.style.display = 'none';
+  errEl.textContent = '';
   const orgId = pendingDeleteStudioOrgId;
   const i = pendingDeleteStudioIndex;
+  const pwd = el('sa-modal-del-studio-pwd').value || '';
   if(!orgId || i < 0) return;
+  if(!pwd){
+    errEl.textContent = 'Saisissez le mot de passe Super Admin.';
+    errEl.style.display = '';
+    el('sa-modal-del-studio-pwd').value = '';
+    return;
+  }
+  const okBtn = el('sa-modal-del-studio-ok');
+  okBtn.disabled = true;
   try{
+    const snapCred = await get(ref(db, 'superAdmin/credentials'));
+    const c = snapCred.val();
+    if(!c || typeof c !== 'object'){
+      errEl.textContent = 'Identifiants Super Admin introuvables.';
+      errEl.style.display = '';
+      el('sa-modal-del-studio-pwd').value = '';
+      return;
+    }
+    const h = c.pwdHash != null ? String(c.pwdHash).trim() : '';
+    const pwdHash = await sha256Hex(pwd);
+    if(pwdHash !== h){
+      errEl.textContent = 'Mot de passe Super Admin incorrect.';
+      errEl.style.display = '';
+      el('sa-modal-del-studio-pwd').value = '';
+      return;
+    }
     await set(ref(db, `orgs/${orgId}/procedures/${i}`), null);
     await deleteStorageTree(sRef(storage, `orgs/${orgId}/procedures/${i}`));
     const snap = await get(ref(db, `orgs/${orgId}/config/studioNames`));
@@ -973,11 +1017,17 @@ el('sa-modal-del-studio-ok').addEventListener('click', async ()=>{
     pendingDeleteStudioOrgId = '';
     pendingDeleteStudioIndex = -1;
     closeModal('sa-modal-del-studio');
+    el('sa-modal-del-studio-pwd').value = '';
     await refreshStudiosPanelForOrg(orgId);
     showToast('Studio supprimé');
   }catch(e){
     console.warn(e);
+    errEl.textContent = e && e.message ? String(e.message) : 'Erreur à la suppression.';
+    errEl.style.display = '';
+    el('sa-modal-del-studio-pwd').value = '';
     showToast('Erreur à la suppression');
+  }finally{
+    okBtn.disabled = false;
   }
 });
 
