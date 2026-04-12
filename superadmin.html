@@ -283,6 +283,26 @@ body.sa-nav-ready .admin-burger{display:flex}
   </div>
 </div>
 
+<div class="modal-overlay" id="sa-modal-edit-ical" role="dialog" aria-modal="true" aria-labelledby="sa-modal-edit-ical-title">
+  <div class="modal">
+    <h3 id="sa-modal-edit-ical-title">Modifier l’URL iCal</h3>
+    <p class="empty-hint" id="sa-modal-edit-ical-info" style="color:#555;line-height:1.45"></p>
+    <div class="modal-field">
+      <label for="sa-modal-edit-ical-pwd">Mot de passe Super Admin</label>
+      <input type="password" id="sa-modal-edit-ical-pwd" autocomplete="current-password">
+    </div>
+    <div class="modal-field">
+      <label for="sa-modal-edit-ical-url">URL iCal</label>
+      <input type="text" id="sa-modal-edit-ical-url" autocomplete="off">
+    </div>
+    <div class="login-error" id="sa-modal-edit-ical-error" style="display:none;margin-bottom:8px"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="sa-modal-edit-ical-cancel">Annuler</button>
+      <button type="button" class="btn-primary" id="sa-modal-edit-ical-ok">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="sa-toast"></div>
 
 <script type="module">
@@ -339,10 +359,14 @@ function escHtml(s){
 
 let orgEntries = [];
 const studioCache = {};
+const icalCache = {};
 let saNavOnce = false;
 
 let pendingDeleteStudioOrgId = '';
 let pendingDeleteStudioIndex = -1;
+
+let pendingIcalOrgId = '';
+let pendingIcalStudioIndex = -1;
 
 async function fetchOrganizations(){
   try{
@@ -658,6 +682,99 @@ function normalizeStudioNames(raw){
   return [];
 }
 
+function maskUrl(url){
+  const u = String(url||'');
+  if(u.length < 12) return '•'.repeat(u.length);
+  return u.slice(0, 5) + '•'.repeat(u.length - 10) + u.slice(-5);
+}
+
+function normalizeIcalFeeds(raw){
+  let feeds = [];
+  if(raw == null) feeds = [];
+  else if(Array.isArray(raw)) feeds = raw;
+  else if(typeof raw === 'object'){
+    feeds = Object.keys(raw)
+      .sort((a, b) => Number(a) - Number(b))
+      .map(k => raw[k])
+      .filter(x => x != null && typeof x === 'object');
+  }
+  const slots = new Map();
+  feeds.forEach((x, j) => {
+    const studio = x.studio != null && Number.isFinite(Number(x.studio)) ? Number(x.studio) : j;
+    slots.set(studio, { url: x.url != null ? String(x.url) : '', studio });
+  });
+  if(!slots.size) return [];
+  const maxIdx = Math.max(...slots.keys());
+  const out = [];
+  for(let s = 0; s <= maxIdx; s++){
+    const ex = slots.get(s);
+    out[s] = ex ? { url: String(ex.url || '').trim(), studio: s } : { url: '', studio: s };
+  }
+  return out;
+}
+
+async function ensureIcalCacheLoaded(orgId){
+  if(icalCache[orgId] !== undefined) return;
+  const snap = await get(ref(db, `orgs/${orgId}/icalFeeds`));
+  icalCache[orgId] = normalizeIcalFeeds(snap.val());
+}
+
+function getFeedUrlForStudio(feeds, i){
+  if(!feeds || i < 0 || i >= feeds.length) return '';
+  return String(feeds[i].url || '').trim();
+}
+
+function updateIcalUrlDisplayInPanel(icalPanel, feeds, i){
+  const disp = icalPanel.querySelector('.sa-ical-url-display');
+  if(!disp) return;
+  const url = getFeedUrlForStudio(feeds, i);
+  disp.textContent = url ? maskUrl(url) : '— Aucune URL configurée —';
+}
+
+async function refreshOpenIcalDisplaysForOrg(orgId){
+  delete icalCache[orgId];
+  await ensureIcalCacheLoaded(orgId);
+  const acc = document.querySelector(`.sa-org-acc[data-org-id="${orgId}"]`);
+  const p = acc && acc.querySelector('.sa-org-acc-panel');
+  if(!p) return;
+  p.querySelectorAll('.sa-ical-panel').forEach(icalPanel => {
+    if(icalPanel.style.display === 'none') return;
+    const idx = Number(icalPanel.getAttribute('data-ical-panel'));
+    updateIcalUrlDisplayInPanel(icalPanel, icalCache[orgId], idx);
+  });
+}
+
+async function saveIcalUrlForStudio(orgId, studioIndex, newUrl){
+  const snap = await get(ref(db, `orgs/${orgId}/icalFeeds`));
+  let arr = normalizeIcalFeeds(snap.val());
+  const nNames = studioCache[orgId] && studioCache[orgId].length ? studioCache[orgId].length : 0;
+  const n = Math.max(nNames, arr.length, studioIndex + 1);
+  const newArr = [];
+  for(let j = 0; j < n; j++){
+    const prev = j < arr.length ? arr[j] : { url: '', studio: j };
+    newArr[j] =
+      j === studioIndex
+        ? { url: String(newUrl || '').trim(), studio: j }
+        : { url: String(prev.url || '').trim(), studio: j };
+  }
+  await set(ref(db, `orgs/${orgId}/icalFeeds`), newArr);
+}
+
+function openEditIcalModal(orgId, studioIndex){
+  pendingIcalOrgId = orgId;
+  pendingIcalStudioIndex = studioIndex;
+  const names = studioCache[orgId] || [];
+  const label = names[studioIndex] || `Studio ${studioIndex + 1}`;
+  el('sa-modal-edit-ical-info').textContent = `Organisation « ${orgId} » — studio « ${label} » (index ${studioIndex}).`;
+  const url = getFeedUrlForStudio(icalCache[orgId], studioIndex);
+  el('sa-modal-edit-ical-url').value = url;
+  el('sa-modal-edit-ical-pwd').value = '';
+  const err = el('sa-modal-edit-ical-error');
+  err.style.display = 'none';
+  err.textContent = '';
+  openModal('sa-modal-edit-ical');
+}
+
 async function ensureStudioCacheLoaded(orgId){
   if(studioCache[orgId] !== undefined) return;
   const snap = await get(ref(db, `orgs/${orgId}/config/studioNames`));
@@ -686,6 +803,7 @@ function renderStudiosPanel(panel, orgId){
     const v = escHtml(name);
     return `<div class="sa-studio-row" data-studio-row="${i}">
       <input type="text" data-studio-inp="${i}" value="${v}" aria-label="Nom du studio ${i+1}">
+      <button type="button" class="btn-sm" data-studio-ical="${i}" title="URL iCal">🔗 URL iCal</button>
       <button type="button" class="btn-sm" data-studio-save="${i}">💾 Enregistrer</button>
       <button type="button" class="btn-danger" data-studio-del="${i}"${onlyOne?' disabled':''} title="${onlyOne?'Au moins un studio requis':'Supprimer ce studio'}">🗑️</button>
     </div>`;
@@ -742,6 +860,20 @@ function wireStudiosPanel(panel, orgId){
       }
     });
   }
+
+  panel.querySelectorAll('[data-studio-ical]').forEach(btn=>{
+    btn.addEventListener('click', async (ev)=>{
+      ev.stopPropagation();
+      const i = Number(btn.getAttribute('data-studio-ical'));
+      try{
+        await ensureIcalCacheLoaded(orgId);
+        openEditIcalModal(orgId, i);
+      }catch(e){
+        console.warn(e);
+        showToast('Erreur');
+      }
+    });
+  });
 }
 
 function renderOrgList(){
@@ -867,6 +999,61 @@ el('sa-modal-del-studio-ok').addEventListener('click', async ()=>{
   }catch(e){
     console.warn(e);
     showToast('Erreur à la suppression');
+  }
+});
+
+el('sa-modal-edit-ical-cancel').addEventListener('click', ()=>{
+  pendingIcalOrgId = '';
+  pendingIcalStudioIndex = -1;
+  closeModal('sa-modal-edit-ical');
+});
+el('sa-modal-edit-ical-ok').addEventListener('click', async ()=>{
+  const errEl = el('sa-modal-edit-ical-error');
+  errEl.style.display = 'none';
+  errEl.textContent = '';
+  const orgId = pendingIcalOrgId;
+  const studioIndex = pendingIcalStudioIndex;
+  const pwd = el('sa-modal-edit-ical-pwd').value || '';
+  const urlVal = el('sa-modal-edit-ical-url').value || '';
+  if(!orgId || studioIndex < 0){
+    showToast('Erreur');
+    return;
+  }
+  if(!pwd){
+    errEl.textContent = 'Saisissez le mot de passe Super Admin.';
+    errEl.style.display = '';
+    return;
+  }
+  const okBtn = el('sa-modal-edit-ical-ok');
+  okBtn.disabled = true;
+  try{
+    const snap = await get(ref(db, 'superAdmin/credentials'));
+    const c = snap.val();
+    if(!c || typeof c !== 'object'){
+      errEl.textContent = 'Identifiants Super Admin introuvables.';
+      errEl.style.display = '';
+      return;
+    }
+    const h = c.pwdHash != null ? String(c.pwdHash).trim() : '';
+    const pwdHash = await sha256Hex(pwd);
+    if(pwdHash !== h){
+      errEl.textContent = 'Mot de passe Super Admin incorrect.';
+      errEl.style.display = '';
+      return;
+    }
+    await saveIcalUrlForStudio(orgId, studioIndex, urlVal);
+    pendingIcalOrgId = '';
+    pendingIcalStudioIndex = -1;
+    closeModal('sa-modal-edit-ical');
+    el('sa-modal-edit-ical-pwd').value = '';
+    showToast('URL iCal enregistrée');
+    await refreshOpenIcalDisplaysForOrg(orgId);
+  }catch(e){
+    console.warn(e);
+    errEl.textContent = e && e.message ? String(e.message) : 'Erreur d’enregistrement.';
+    errEl.style.display = '';
+  }finally{
+    okBtn.disabled = false;
   }
 });
 
