@@ -438,10 +438,7 @@ const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A
 const MO_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const SESSION_KEY = 'menage_session_v1';
 const ORG_STORAGE_KEY = 'menage_org_v1';
-const ORGANIZATIONS = [
-  { id: 'tesson', label: 'Studio Tesson' },
-  { id: 'nade', label: 'Studio Nade' }
-];
+let ORGANIZATIONS = [];
 /** Aligner avec README.md lors d’une release. */
 const APP_VERSION = '4.5.5';
 const UNAVAIL_SHOWBY_KEY = 'menage_unavail_showby_v1';
@@ -467,11 +464,7 @@ function getStoredOrgId(){
   return null;
 }
 
-const orgId = getStoredOrgId();
-if (!orgId || !ORGANIZATIONS.some(o => o.id === orgId)) {
-  window.location.replace('index.html');
-  throw new Error('no-org');
-}
+let orgId = localStorage.getItem(ORG_STORAGE_KEY) || '';
 const ob = p => `orgs/${orgId}/${p}`;
 
 let A = {
@@ -778,61 +771,82 @@ window._adminUnavailToggleDay=async function(y,m,day){
 
 // ─── Firebase listeners ───────────────────────────────────────────────────────
 
-onValue(ref(db,ob('lastSync')), snap=>{
-  const d=snap.val();
-  if(d&&d.ts){
-    const fmt=new Date(d.ts).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
-    const el=document.getElementById('last-sync-info');
-    if(el) el.textContent=`Dernière sync Airbnb : ${fmt} (${d.count} résa)`;
+async function loadOrganizations(){
+  try{
+    const orgsSnap = await get(ref(db, 'organizations'));
+    const orgsData = orgsSnap.val() || {};
+    ORGANIZATIONS = Object.entries(orgsData).map(([id, v]) => ({ id, label: (v && v.label) || id }));
+    ORGANIZATIONS.sort((a, b) => a.label.localeCompare(b.label));
+  }catch(e){
+    console.warn('Impossible de charger les organisations depuis Firebase:', e);
   }
-});
+  if(!ORGANIZATIONS.length){
+    ORGANIZATIONS = [{ id: 'tesson', label: 'Studio Tesson' }, { id: 'nade', label: 'Studio Nade' }];
+  }
+}
 
-onValue(ref(db,ob('config')), snap=>{
-  const d=snap.val();
-  if(d){ A.studioNames=d.studioNames||A.studioNames; }
-  setSyncStatus('ok');
-  if(A.unlocked) renderAdminContent();
-});
+(async () => {
+  await loadOrganizations();
+  if(!orgId || !ORGANIZATIONS.some(o => o.id === orgId)){
+    window.location.replace('index.html');
+    return;
+  }
+  onValue(ref(db,ob('lastSync')), snap=>{
+    const d=snap.val();
+    if(d&&d.ts){
+      const fmt=new Date(d.ts).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+      const el=document.getElementById('last-sync-info');
+      if(el) el.textContent=`Dernière sync Airbnb : ${fmt} (${d.count} résa)`;
+    }
+  });
 
-onValue(ref(db,ob('assignments')), snap=>{ A.assignments=snap.val()||{}; if(A.unlocked) renderStats(); });
+  onValue(ref(db,ob('config')), snap=>{
+    const d=snap.val();
+    if(d){ A.studioNames=d.studioNames||A.studioNames; }
+    setSyncStatus('ok');
+    if(A.unlocked) renderAdminContent();
+  });
 
-onValue(ref(db,ob('cleaningReports')), snap=>{
-  A.cleaningReports=snap.val()||{};
-  if(A.unlocked) renderHisto();
-});
+  onValue(ref(db,ob('assignments')), snap=>{ A.assignments=snap.val()||{}; if(A.unlocked) renderStats(); });
 
-onValue(ref(db,ob('reservations')), snap=>{
-  const data=snap.val()||{};
-  A.reservations=Object.values(data).map(r=>({...r,start:new Date(r.start),end:new Date(r.end)}));
-  if(A.unlocked) { renderStats(); renderHisto(); }
-});
+  onValue(ref(db,ob('cleaningReports')), snap=>{
+    A.cleaningReports=snap.val()||{};
+    if(A.unlocked) renderHisto();
+  });
 
-onValue(ref(db,ob('adminConfig')), snap=>{
-  const d=snap.val();
-  if(d) A.adminConfig={...A.adminConfig,...d, accounts: d.accounts||[], defaultOrgId:d.defaultOrgId||A.adminConfig.defaultOrgId||'tesson', telegramEnabled:d.telegramEnabled!==false};
-  verifyAdminAccess();
-});
+  onValue(ref(db,ob('reservations')), snap=>{
+    const data=snap.val()||{};
+    A.reservations=Object.values(data).map(r=>({...r,start:new Date(r.start),end:new Date(r.end)}));
+    if(A.unlocked) { renderStats(); renderHisto(); }
+  });
 
-onValue(ref(db,ob('activityLog')), snap=>{
-  const v=snap.val()||{};
-  A.activityEntries=Object.entries(v).map(([id,e])=>({id,...e}));
-  if(A.unlocked) renderActivityLog();
-});
+  onValue(ref(db,ob('adminConfig')), snap=>{
+    const d=snap.val();
+    if(d) A.adminConfig={...A.adminConfig,...d, accounts: d.accounts||[], defaultOrgId:d.defaultOrgId||A.adminConfig.defaultOrgId||'tesson', telegramEnabled:d.telegramEnabled!==false};
+    verifyAdminAccess();
+  });
 
-onValue(ref(db,ob('procedures')), snap=>{
-  A.procedures=snap.val()||{};
-  if(A.unlocked) renderProcedures();
-});
+  onValue(ref(db,ob('activityLog')), snap=>{
+    const v=snap.val()||{};
+    A.activityEntries=Object.entries(v).map(([id,e])=>({id,...e}));
+    if(A.unlocked) renderActivityLog();
+  });
 
-onValue(ref(db,ob('procedureSuggestions')), snap=>{
-  A.procedureSuggestions=snap.val()||{};
-  if(A.unlocked) renderProcedures();
-});
+  onValue(ref(db,ob('procedures')), snap=>{
+    A.procedures=snap.val()||{};
+    if(A.unlocked) renderProcedures();
+  });
 
-onValue(ref(db,ob('unavailability')), snap=>{
-  A.unavailabilityAll=normalizeUnavailabilityAdmin(snap.val());
-  if(A.unlocked) renderAdminUnavailFutureSummary();
-});
+  onValue(ref(db,ob('procedureSuggestions')), snap=>{
+    A.procedureSuggestions=snap.val()||{};
+    if(A.unlocked) renderProcedures();
+  });
+
+  onValue(ref(db,ob('unavailability')), snap=>{
+    A.unavailabilityAll=normalizeUnavailabilityAdmin(snap.val());
+    if(A.unlocked) renderAdminUnavailFutureSummary();
+  });
+})();
 
 // ─── Accès admin (session calendrier + rôle 👑) ────────────────────────────────
 
