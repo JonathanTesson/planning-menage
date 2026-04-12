@@ -69,8 +69,6 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 .status-pip.orange{background:#F59E0B}
 .resa-block{border-radius:4px;font-size:10px;padding:2px 5px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;user-select:none;line-height:1.3}
 .resa-block:active{opacity:0.75}
-.resa-block.s1{background:#daeafe;color:#1047a0}
-.resa-block.s2{background:#c6f0df;color:#075c3a}
 .resa-block.checkout{background:#fde8b0;color:#7a4a00}
 .depart-note-pip{width:6px;height:6px;border-radius:50%;display:inline-block;background:#378ADD;margin-left:3px;vertical-align:middle;animation:depart-note-pulse 1.5s ease-in-out infinite}
 @keyframes depart-note-pulse{0%,100%{opacity:1}50%{opacity:0.3}}
@@ -408,6 +406,18 @@ const ORG_CHANGE_GATE_KEY = 'menage_org_change_gate';
 let ORGANIZATIONS = [];
 /** Aligner avec README.md lors d’une release. */
 const APP_VERSION = '4.6.0';
+
+const STUDIO_COLORS = [
+  { bg: '#daeafe', text: '#1047a0' },
+  { bg: '#c6f0df', text: '#075c3a' },
+  { bg: '#fde8d8', text: '#7a3000' },
+  { bg: '#ede9fe', text: '#5b21b6' },
+  { bg: '#fce7f3', text: '#9d174d' },
+  { bg: '#fef9c3', text: '#713f12' }
+];
+function studioColor(si){
+  return STUDIO_COLORS[si % STUDIO_COLORS.length];
+}
 
 function getStoredOrgId(){
   try{
@@ -1199,7 +1209,7 @@ function getCheckouts(d,si){
 
 function getDayPip(d){
   const checkouts=[];
-  for(let si=0;si<2;si++) checkouts.push(...getCheckouts(d,si));
+  for(let si = 0; si < S.studioNames.length; si++) checkouts.push(...getCheckouts(d, si));
   if(!checkouts.length) return null;
   let assigned=0;
   for(const r of checkouts){ const {c1,c2}=getAssignment(r); if(c1||c2) assigned++; }
@@ -1300,12 +1310,13 @@ function renderCalendar(){
     const pipHtml=pip?`<span class="status-pip ${pip}"></span>`:'';
     let inner=`${buildUnavailPipsHtml(d)}<div class="day-num-row"><span class="day-num">${d.getDate()}</span>${pipHtml}</div>`;
 
-    for(let si=0;si<2;si++){
+    for(let si = 0; si < S.studioNames.length; si++){
+      const studioLabel = S.studioNames[si] || 'S' + (si + 1);
       if(showDep){
         for(const r of getCheckouts(d,si)){
           const {c1,c2,note}=getAssignment(r);
           if(S.filterCleaner && c1!==S.filterCleaner && c2!==S.filterCleaner) continue;
-          inner+=`<div class="resa-block checkout" onclick="window._oa('${getKey(r)}')" title="Départ — ${S.studioNames[si]}">Départ S${si+1}${assignNoteTrimmed(note)?'<span class="depart-note-pip" aria-hidden="true"></span>':''}</div>`;
+          inner+=`<div class="resa-block checkout" onclick="window._oa('${getKey(r)}')" title="Départ — ${escHtml(studioLabel)}">Départ ${escHtml(studioLabel)}${assignNoteTrimmed(note)?'<span class="depart-note-pip" aria-hidden="true"></span>':''}</div>`;
           // Tout le monde voit les noms assignés
           if(c1||c2){
             const rk=getKey(r);
@@ -1326,11 +1337,13 @@ function renderCalendar(){
           }
           const isStart=dayTime(d)===dayTime(r.start);
           if(isStart){
+            const sc = studioColor(si);
+            const resaStyle = `background:${sc.bg};color:${sc.text}`;
             // Arrivées : cliquables uniquement pour admin, lecture seule pour ménage
             if(isAdminOrNoAuth){
-              inner+=`<div class="resa-block s${si+1}" onclick="window._oa('${getKey(r)}')" title="${r.summary}">S${si+1}</div>`;
+              inner+=`<div class="resa-block" style="${resaStyle}" onclick="window._oa('${getKey(r)}')" title="${r.summary}">${escHtml(studioLabel)}</div>`;
             } else {
-              inner+=`<div class="resa-block s${si+1}" title="${r.summary}" style="cursor:default">S${si+1}</div>`;
+              inner+=`<div class="resa-block" style="${resaStyle};cursor:default" title="${r.summary}">${escHtml(studioLabel)}</div>`;
             }
           }
         }
@@ -1348,8 +1361,7 @@ function renderCalendar(){
 
 function renderLegend(){
   document.getElementById('legend-bar').innerHTML=`
-    <div class="legend-item"><div class="legend-dot" style="background:#daeafe"></div>${S.studioNames[0]}</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#c6f0df"></div>${S.studioNames[1]}</div>
+    ${S.studioNames.map((name, i) => `<div class="legend-item"><div class="legend-dot" style="background:${studioColor(i).bg}"></div>${escHtml(name)}</div>`).join('')}
     <div class="legend-item"><div class="legend-dot" style="background:#fde8b0"></div>Départ</div>
     <div class="legend-item"><span class="legend-pip" style="background:#E24B4A"></span>Non assigné</div>
     <div class="legend-item"><span class="legend-pip" style="background:#F59E0B"></span>Partiel</div>`;
