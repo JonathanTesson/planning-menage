@@ -45,4 +45,5 @@ Voir l’historique des commits
 --- Tes notes / autres commandes ---
 
 localStorage.clear()
+$env:FIREBASE_SERVICE_ACCOUNT = Get-Content ".\Firebase\planning-menage-18b09-firebase.json" -Raw; node init-superadmin.js
 
