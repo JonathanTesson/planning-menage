@@ -277,6 +277,7 @@ html[data-menage-org-gate="1"] #main-app{display:none!important}
   <div style="display:flex;align-items:center;gap:6px">
     <span class="sync-dot loading" id="sync-dot"></span>
     <span id="sync-label" style="font-size:11px;color:#aaa">Connexion...</span>
+    <a id="superadmin-lock-btn" href="superadmin.html" title="Super Administration" style="display:none;margin-left:4px;opacity:0.3;font-size:16px;text-decoration:none;line-height:1" aria-label="Super Administration">🔒</a>
   </div>
 </div>
 
@@ -404,10 +405,7 @@ const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A
 const SESSION_KEY = 'menage_session_v1';
 const ORG_STORAGE_KEY = 'menage_org_v1';
 const ORG_CHANGE_GATE_KEY = 'menage_org_change_gate';
-const ORGANIZATIONS = [
-  { id: 'tesson', label: 'Studio Tesson' },
-  { id: 'nade', label: 'Studio Nade' }
-];
+let ORGANIZATIONS = [];
 /** Aligner avec README.md lors d’une release. */
 const APP_VERSION = '4.5.5';
 
@@ -422,6 +420,20 @@ function setStoredOrgId(id){
   try{ if(id) localStorage.setItem(ORG_STORAGE_KEY, id); }catch(e){}
 }
 function orgLabel(id){ return (ORGANIZATIONS.find(o=>o.id===id)||{}).label || id || ''; }
+
+async function loadOrganizations(){
+  try{
+    const orgsSnap = await get(ref(db, 'organizations'));
+    const orgsData = orgsSnap.val() || {};
+    ORGANIZATIONS = Object.entries(orgsData).map(([id, v]) => ({ id, label: (v && v.label) || id }));
+    ORGANIZATIONS.sort((a, b) => a.label.localeCompare(b.label));
+  }catch(e){
+    console.warn('Impossible de charger les organisations depuis Firebase:', e);
+  }
+  if(!ORGANIZATIONS.length){
+    ORGANIZATIONS = [{ id: 'tesson', label: 'Studio Tesson' }, { id: 'nade', label: 'Studio Nade' }];
+  }
+}
 
 let S = {
   cleaners: [],
@@ -712,6 +724,8 @@ function showApp(){
   if(el('org-first-screen')) el('org-first-screen').style.display='none';
   if(el('login-screen')) el('login-screen').style.display='none';
   if(el('main-app')) el('main-app').style.display='';
+  const lockBtn = document.getElementById('superadmin-lock-btn');
+  if(lockBtn) lockBtn.style.display='none';
   const noAuth=S.currentUser?.noAuth;
   if(el('logout-btn')) el('logout-btn').style.display=noAuth?'none':'';
   const homeBtn=el('home-btn');
@@ -757,6 +771,8 @@ function fillOrgSelect(selectEl){
   selectEl.innerHTML=ORGANIZATIONS.map(o=>`<option value="${o.id}">${o.label}</option>`).join('');
 }
 function showLogin(){
+  const lockBtnLogin = document.getElementById('superadmin-lock-btn');
+  if(lockBtnLogin) lockBtnLogin.style.display='inline';
   hideOrgChangeGate();
   setVersionFootVisible(true);
   if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='none';
@@ -766,7 +782,7 @@ function showLogin(){
   const stored=getStoredOrgId();
   const defOrg=stored||(S.adminConfig.defaultOrgId&&ORGANIZATIONS.some(o=>o.id===S.adminConfig.defaultOrgId)
     ? S.adminConfig.defaultOrgId
-    : 'tesson');
+    : ORGANIZATIONS[0]?.id || 'tesson');
   const orgEl=el('login-org');
   fillOrgSelect(orgEl);
   if(orgEl) orgEl.value=defOrg;
@@ -889,6 +905,8 @@ function hideOrgUnconfiguredScreen(){
 }
 
 function showOrgUnconfigured(){
+  const lockBtnUn = document.getElementById('superadmin-lock-btn');
+  if(lockBtnUn) lockBtnUn.style.display='inline';
   hideOrgChangeGate();
   setVersionFootVisible(true);
   if(el('org-first-screen')) el('org-first-screen').style.display='none';
@@ -1007,6 +1025,8 @@ function initFirebaseAndApp(){
 }
 
 function showOrgFirst(){
+  const lockBtnFirst = document.getElementById('superadmin-lock-btn');
+  if(lockBtnFirst) lockBtnFirst.style.display='inline';
   hideOrgChangeGate();
   setVersionFootVisible(true);
   el('org-first-screen').style.display='';
@@ -1015,7 +1035,7 @@ function showOrgFirst(){
   if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='none';
   const s=el('org-first-select');
   fillOrgSelect(s);
-  if(s) s.value='tesson';
+  if(s) s.value=ORGANIZATIONS[0]?.id || 'tesson';
 }
 
 window.confirmOrgFirst=function(){
@@ -1026,7 +1046,8 @@ window.confirmOrgFirst=function(){
   initFirebaseAndApp();
 };
 
-function bootstrap(){
+async function bootstrap(){
+  await loadOrganizations();
   if(!getStoredOrgId()){
     showOrgFirst();
     return;
