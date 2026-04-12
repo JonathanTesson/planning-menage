@@ -238,11 +238,32 @@ body.sa-nav-ready .admin-burger{display:flex}
   </div>
 </div>
 
+<div class="modal-overlay" id="sa-modal-del-org" role="dialog" aria-modal="true" aria-labelledby="sa-modal-del-org-title">
+  <div class="modal">
+    <h3 id="sa-modal-del-org-title">Supprimer l’organisation</h3>
+    <p class="empty-hint" id="sa-modal-del-org-intro" style="color:#555;line-height:1.45"></p>
+    <div class="modal-field">
+      <label for="sa-modal-del-org-confirm">Tapez le libellé exact pour confirmer</label>
+      <input type="text" id="sa-modal-del-org-confirm" autocomplete="off">
+    </div>
+    <div class="modal-field">
+      <label for="sa-modal-del-org-pwd">Mot de passe Super Admin</label>
+      <input type="password" id="sa-modal-del-org-pwd" autocomplete="current-password">
+    </div>
+    <div class="login-error" id="sa-modal-del-org-error" style="display:none;margin-bottom:8px"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="sa-modal-del-org-cancel">Annuler</button>
+      <button type="button" class="btn-danger" id="sa-modal-del-org-ok" style="border:1px solid #f0c0c0;padding:8px 16px">Supprimer définitivement</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="sa-toast"></div>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, get, set, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getStorage, ref as sRef, deleteObject, listAll } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
@@ -256,6 +277,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const storage = getStorage(app);
 
 const APP_VERSION = '4.6.0';
 const SA_SESSION_KEY = 'sa_session';
@@ -417,6 +439,44 @@ el('sa-logout-btn').addEventListener('click', logout);
 function openModal(id){ el(id).classList.add('is-open'); }
 function closeModal(id){ el(id).classList.remove('is-open'); }
 
+let pendingDeleteOrgId = '';
+let pendingDeleteOrgLabel = '';
+
+async function deleteStorageTree(rootRef){
+  const page = await listAll(rootRef);
+  await Promise.all(page.items.map(item => deleteObject(item)));
+  await Promise.all(page.prefixes.map(prefix => deleteStorageTree(prefix)));
+}
+
+async function performOrgCascadeDelete(orgId){
+  const updates = {
+    [`organizations/${orgId}`]: null,
+    [`orgs/${orgId}/adminConfig`]: null,
+    [`orgs/${orgId}/config`]: null,
+    [`orgs/${orgId}/procedures`]: null,
+    [`orgs/${orgId}/procedureSuggestions`]: null,
+    [`orgs/${orgId}/unavailability`]: null,
+    [`orgs/${orgId}/icalFeeds`]: null,
+    [`orgs/${orgId}/activityLog`]: null,
+    [`orgs/${orgId}/lastSync`]: null
+  };
+  await update(ref(db), updates);
+  await deleteStorageTree(sRef(storage, `orgs/${orgId}`));
+}
+
+function openDeleteOrgModal(orgId, label){
+  pendingDeleteOrgId = orgId;
+  pendingDeleteOrgLabel = label;
+  el('sa-modal-del-org-confirm').value = '';
+  el('sa-modal-del-org-pwd').value = '';
+  const err = el('sa-modal-del-org-error');
+  err.style.display = 'none';
+  err.textContent = '';
+  el('sa-modal-del-org-intro').textContent =
+    `Organisation « ${label} » (${orgId}). Les nœuds réservations, assignations et comptes rendus ne sont pas supprimés ici ; le reste de la configuration et les fichiers Storage sous orgs/${orgId}/ seront effacés.`;
+  openModal('sa-modal-del-org');
+}
+
 let pendingDeleteAccountIndex = -1;
 
 async function getAccountsForOrg(orgId){
@@ -564,7 +624,14 @@ function renderOrgList(){
     host.innerHTML = '<p class="empty-hint">Aucune organisation. Créez-en une.</p>';
     return;
   }
-  host.innerHTML = orgEntries.map(o=>`<div class="org-list-row"><div><div class="org-list-label">${escHtml(o.label)}</div><div class="org-list-id">${escHtml(o.id)}</div></div></div>`).join('');
+  host.innerHTML = orgEntries.map(o=>`<div class="org-list-row"><div><div class="org-list-label">${escHtml(o.label)}</div><div class="org-list-id">${escHtml(o.id)}</div></div><button type="button" class="btn-danger" data-del-org="${escHtml(o.id)}" title="Supprimer l’organisation" aria-label="Supprimer ${escHtml(o.label)}">🗑️</button></div>`).join('');
+  host.querySelectorAll('[data-del-org]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.getAttribute('data-del-org');
+      const o = orgEntries.find(x=>x.id===id);
+      if(o) openDeleteOrgModal(o.id, o.label);
+    });
+  });
 }
 
 el('sa-create-org-btn').addEventListener('click', ()=>{
@@ -595,6 +662,68 @@ el('sa-modal-org-ok').addEventListener('click', async ()=>{
   }catch(e){
     console.warn(e);
     showToast('Erreur à la création');
+  }
+});
+
+el('sa-modal-del-org-cancel').addEventListener('click', ()=>{
+  pendingDeleteOrgId = '';
+  pendingDeleteOrgLabel = '';
+  closeModal('sa-modal-del-org');
+});
+el('sa-modal-del-org-ok').addEventListener('click', async ()=>{
+  const errEl = el('sa-modal-del-org-error');
+  errEl.style.display = 'none';
+  errEl.textContent = '';
+  const orgId = pendingDeleteOrgId;
+  const expectedLabel = pendingDeleteOrgLabel;
+  const typed = String(el('sa-modal-del-org-confirm').value||'').trim();
+  const pwd = el('sa-modal-del-org-pwd').value||'';
+  if(!orgId){ showToast('Erreur : organisation inconnue'); return; }
+  if(typed !== String(expectedLabel).trim()){
+    errEl.textContent = 'Le libellé ne correspond pas exactement.';
+    errEl.style.display = '';
+    return;
+  }
+  if(!pwd){
+    errEl.textContent = 'Saisissez le mot de passe Super Admin.';
+    errEl.style.display = '';
+    return;
+  }
+  const okBtn = el('sa-modal-del-org-ok');
+  okBtn.disabled = true;
+  try{
+    const snap = await get(ref(db, 'superAdmin/credentials'));
+    const c = snap.val();
+    if(!c || typeof c!=='object'){
+      errEl.textContent = 'Identifiants Super Admin introuvables.';
+      errEl.style.display = '';
+      return;
+    }
+    const h = c.pwdHash!=null ? String(c.pwdHash).trim() : '';
+    const pwdHash = await sha256Hex(pwd);
+    if(pwdHash !== h){
+      errEl.textContent = 'Mot de passe Super Admin incorrect.';
+      errEl.style.display = '';
+      return;
+    }
+    await performOrgCascadeDelete(orgId);
+    pendingDeleteOrgId = '';
+    pendingDeleteOrgLabel = '';
+    closeModal('sa-modal-del-org');
+    el('sa-modal-del-org-pwd').value = '';
+    showToast('Organisation supprimée (hors réservations / assignations / comptes rendus).');
+    await fetchOrganizations();
+    fillOrgSelects();
+    renderOrgList();
+    renderAccountsForSelectedOrg();
+    renderParamsForSelectedOrg();
+  }catch(e){
+    console.warn(e);
+    errEl.textContent = e && e.message ? String(e.message) : 'Erreur lors de la suppression.';
+    errEl.style.display = '';
+    showToast('Échec partiel possible — voir la console ou Firebase.');
+  }finally{
+    okBtn.disabled = false;
   }
 });
 
