@@ -1,26 +1,6 @@
 const https = require('https');
 const http = require('http');
 
-/** Multi-organisations : chaque org a ses flux iCal. Flux vides = sync ignorée pour cette org. */
-const ORG_SYNC = [
-  {
-    id: 'tesson',
-    label: 'Studio Tesson',
-    feeds: [
-      { url: 'https://www.airbnb.fr/calendar/ical/23714051.ics?s=1c507a926f8f63d87b20fea875da704e', studio: 0 },
-      { url: 'https://www.airbnb.fr/calendar/ical/846411261288811527.ics?s=998c515b74309dda07f768a2083cf270', studio: 1 }
-    ]
-  },
-  {
-    id: 'nade',
-    label: 'Studio Nade',
-    feeds: [
-      { url: 'https://www.airbnb.fr/calendar/ical/14100888.ics?s=8deacda46a0d8789fd490d36d2273c47', studio: 0 },
-      { url: 'https://www.airbnb.fr/calendar/ical/22488935.ics?s=c29e0c53f848194fac3b0fcb136157bd', studio: 1 }
-    ]
-  }
-];
-
 const STUDIO_NAMES_FALLBACK = ['Studio 1', 'Studio 2'];
 const FIREBASE_DB_URL = 'https://planning-menage-18b09-default-rtdb.firebaseio.com';
 const TELEGRAM_CHAT_ID = '-1002590523626';
@@ -105,6 +85,37 @@ async function firebaseGet(path, token) {
     method: 'GET'
   });
   return res.body === 'null' ? null : JSON.parse(res.body);
+}
+
+/**
+ * Construit la liste des orgs à synchroniser : /organizations + /orgs/{id}/icalFeeds par org.
+ * Retourne [{ id, label, feeds: [{ url, studio }] }] (feeds = [] si absent ou non tableau).
+ */
+async function loadOrgSync(token) {
+  const rawOrgs = await firebaseGet('organizations', token);
+  const orgMap = rawOrgs && typeof rawOrgs === 'object' && !Array.isArray(rawOrgs) ? rawOrgs : {};
+  const ids = Object.keys(orgMap).sort((a, b) => {
+    const la = (orgMap[a] && orgMap[a].label) || a;
+    const lb = (orgMap[b] && orgMap[b].label) || b;
+    return String(la).localeCompare(String(lb), 'fr');
+  });
+  const out = [];
+  for (const id of ids) {
+    const v = orgMap[id];
+    const label = (v && v.label) || id;
+    const feedsRaw = await firebaseGet(`orgs/${id}/icalFeeds`, token);
+    let feeds = [];
+    if (feedsRaw == null) feeds = [];
+    else if (Array.isArray(feedsRaw)) feeds = feedsRaw;
+    else if (typeof feedsRaw === 'object') {
+      feeds = Object.keys(feedsRaw)
+        .sort((a, b) => Number(a) - Number(b))
+        .map(k => feedsRaw[k])
+        .filter(x => x != null && typeof x === 'object');
+    }
+    out.push({ id, label, feeds });
+  }
+  return out;
 }
 
 async function firebasePut(path, data, token) {
@@ -276,7 +287,8 @@ async function main() {
     process.exit(1);
   }
 
-  for (const org of ORG_SYNC) {
+  const orgSync = await loadOrgSync(token);
+  for (const org of orgSync) {
     try {
       await syncOneOrg(org, token);
     } catch (e) {
