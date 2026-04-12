@@ -344,7 +344,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const storage = getStorage(app);
 
-const APP_VERSION = '4.6.1';
+const APP_VERSION = '4.6.2';
 const SA_SESSION_KEY = 'sa_session';
 
 function hashSimple(str){
@@ -515,17 +515,17 @@ function fillOrgSelects(){
   }
 }
 
-let currentSaView = 'comptes';
+let currentSaView = 'organisations';
 
 function setSaView(view){
-  const v = ['comptes','organisations','parametres','securite'].includes(view) ? view : 'comptes';
+  const v = ['comptes','organisations','parametres','securite'].includes(view) ? view : 'organisations';
   currentSaView = v;
   document.querySelectorAll('.sa-view').forEach(node=>{
     node.style.display = node.id === 'sa-view-'+v ? '' : 'none';
   });
   try{
     const base = location.pathname + location.search;
-    history.replaceState(null, '', v==='comptes' ? base : (base + '#'+v));
+    history.replaceState(null, '', v==='organisations' ? base : (base + '#'+v));
   }catch(_){}
   if(v==='organisations') renderOrgList();
   if(v==='parametres') renderParamsForSelectedOrg();

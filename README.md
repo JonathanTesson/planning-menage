@@ -1,8 +1,8 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 4.6.1** — Avril 2026
+**Version : 4.6.2** — Avril 2026
 
-Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin. **v4.6.0** : **Super Administration** (`superadmin.html`) — page autonome, login **SHA-256** contre **`/superAdmin/credentials`** (`username`, `pwdHash`), menu **Comptes** / **Organisations** / **Paramètres** / **Sécurité** ; liste des organisations chargée depuis **`/organizations`** dans **`index.html`**, **`admin.html`**, **`compte.html`** (fallback tesson/nade si besoin) ; flux iCal lus depuis **`/orgs/{orgId}/icalFeeds`** (`[{ url, studio }]`) par **`sync-ical.js`** ; **`notify-departs.js`** et **`purge-unavailability.js`** parcourent les orgs via **`/organizations`** (fallback tesson/nade si erreur ou liste vide) ; scripts d’init **`init-superadmin.js`**, **`init-ical-feeds.js`**. **v4.6.1 (Phase 2 complète)** : suppression d’**organisation** (cascade RTDB ciblée + **Storage** `orgs/{orgId}/`, re-auth Super Admin) ; **N studios** — création / renommage / suppression (**Super Admin**), renommage seul (**admin.html** vue Organisation, champs **`#studios-fields`**) ; **URLs iCal** par studio depuis **Super Admin** (re-auth) ; **`index.html`** — calendrier **N** studios, palette **`STUDIO_COLORS`** (couleurs cycliques) ; **`admin.html`** — procédures et exports alignés sur **`A.studioNames`**. **v4.5.5** : calendriers **indisponibilités** sur **`compte.html`** et **`admin.html`** — la grille peut **s’élargir** pour afficher **« par … »** lisiblement (**`minmax(min-content, 1fr)`**) ; la vue utilise **`.section.section--unavail`** (**fond et bordure retirés**, sans barre de défilement) pour éviter tout décalage visuel ; case à cocher **« Afficher le détail (par qui) »** (défaut décochée), préférence **`localStorage`** **`menage_unavail_showby_v1`** (partagée entre les deux pages). **v4.5.4** : traçabilité des **étapes** de procédure (admin + calendrier), **copie** d’étape avec report des métadonnées, **indicateur** des suggestions en attente dans la modale ménage (onglet Procédure), **animation** des pastilles **Indispo**. **Note d’assignation** côté calendrier (**`note`** + traçage **`noteBy`**, indicateur **point bleu pulsant** sur les départs, lecture seule pour les ménagères) — détail § **`/assignments`** et § **index.html** ci-dessous. **v4.5.x** : **indisponibilités** — saisie sur **`compte.html`**, pastilles + filtre **Indispo** sur **`index.html`**, **vue admin** **`#indisponibilites`** (édition par intervenante **v4.5.1**, résumé global **v4.5.2**, traçabilité **`by` v4.5.3**), clés **`YYYY-MM-DD` en date locale** ; la **purge automatique** compare les mêmes clés au **seuil UTC** (voir § **`/unavailability`**).
+Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin. **v4.6.0** : **Super Administration** (`superadmin.html`) — page autonome, login **SHA-256** contre **`/superAdmin/credentials`** (`username`, `pwdHash`), menu **Comptes** / **Organisations** / **Paramètres** / **Sécurité** ; liste des organisations chargée depuis **`/organizations`** dans **`index.html`**, **`admin.html`**, **`compte.html`** (fallback tesson/nade si besoin) ; flux iCal lus depuis **`/orgs/{orgId}/icalFeeds`** (`[{ url, studio }]`) par **`sync-ical.js`** ; **`notify-departs.js`** et **`purge-unavailability.js`** parcourent les orgs via **`/organizations`** (fallback tesson/nade si erreur ou liste vide) ; scripts d’init **`init-superadmin.js`**, **`init-ical-feeds.js`**. **v4.6.1 (Phase 2 complète)** : suppression d’**organisation** (cascade RTDB ciblée + **Storage** `orgs/{orgId}/`, re-auth Super Admin) ; **N studios** — création / renommage / suppression (**Super Admin**), renommage seul (**admin.html** vue Organisation, champs **`#studios-fields`**) ; **URLs iCal** par studio depuis **Super Admin** (re-auth) ; **`index.html`** — calendrier **N** studios, palette **`STUDIO_COLORS`** (couleurs cycliques) ; **`admin.html`** — procédures et exports alignés sur **`A.studioNames`**. **v4.6.2** : refonte **Super Admin** vue **Organisations** (accordéon **studios** / **comptes**, toggles **🔐💬** et badge **👤** sur la ligne org, badge **étapes** par studio) ; entrées menu **Comptes** / **Paramètres** **masquées** (code conservé) ; **`admin.html`** — retrait des réglages **auth** / **Telegram** / **org. par défaut** (gérés côté Super Admin / Firebase). **v4.5.5** : calendriers **indisponibilités** sur **`compte.html`** et **`admin.html`** — la grille peut **s’élargir** pour afficher **« par … »** lisiblement (**`minmax(min-content, 1fr)`**) ; la vue utilise **`.section.section--unavail`** (**fond et bordure retirés**, sans barre de défilement) pour éviter tout décalage visuel ; case à cocher **« Afficher le détail (par qui) »** (défaut décochée), préférence **`localStorage`** **`menage_unavail_showby_v1`** (partagée entre les deux pages). **v4.5.4** : traçabilité des **étapes** de procédure (admin + calendrier), **copie** d’étape avec report des métadonnées, **indicateur** des suggestions en attente dans la modale ménage (onglet Procédure), **animation** des pastilles **Indispo**. **Note d’assignation** côté calendrier (**`note`** + traçage **`noteBy`**, indicateur **point bleu pulsant** sur les départs, lecture seule pour les ménagères) — détail § **`/assignments`** et § **index.html** ci-dessous. **v4.5.x** : **indisponibilités** — saisie sur **`compte.html`**, pastilles + filtre **Indispo** sur **`index.html`**, **vue admin** **`#indisponibilites`** (édition par intervenante **v4.5.1**, résumé global **v4.5.2**, traçabilité **`by` v4.5.3**), clés **`YYYY-MM-DD` en date locale** ; la **purge automatique** compare les mêmes clés au **seuil UTC** (voir § **`/unavailability`**).
 
 ---
 
@@ -23,7 +23,7 @@ Application web de planning des interventions ménage pour plusieurs organisatio
 Page **autonome** (pas de session planning partagée) : accès depuis le **cadenas** sur l’écran login du calendrier, ou URL directe.
 
 - **Login** : champs **nom d’utilisateur** + **mot de passe** ; lecture **`/superAdmin/credentials`** (`username`, **`pwdHash`** en **SHA-256** hex) ; session **`sessionStorage`** clé **`sa_session`** (`'1'`) ; **déconnexion** → redirection **`index.html`** (efface la session).
-- **Menu latéral** : **Comptes** (par org : liste **`adminConfig.accounts`**, rôles 🧹/👑, MDP **`hashSimple`**, ajout / suppression) — **Organisations** (liste **`/organizations`**, création d’org avec **`config.studioNames`** initialement vide puis **N** studios gérés ici : renommage, **+** ajout, suppression avec purge **`procedures/{i}`** RTDB + Storage ; accordéon par org ; suppression d’**org** entière 🗑️ avec re-auth, cascade partielle RTDB + tout le préfixe Storage **`orgs/{orgId}/`**) — **Paramètres** (`authEnabled`, `telegramEnabled`, `defaultOrgId`) — **Sécurité** (changement identifiants Super Admin, double saisie du MDP).
+- **Menu latéral** : **Organisations** (vue par défaut) — **accordéon** par org sur **`/organizations`** : toggles **authentification** / **Telegram** sur la ligne d’org, badge **👤** ouvrant le panneau **comptes** (même logique que l’ancienne vue Comptes : **`adminConfig.accounts`**, rôles 🧹/👑, MDP **`hashSimple`**) ; **studios** (**N** noms, **+** ajout, enregistrement, suppression avec purge **`procedures/{i}`** RTDB + Storage) ; **badge étapes** par studio ; suppression d’**org** 🗑️ (re-auth, cascade partielle RTDB + Storage **`orgs/{orgId}/`**). Les entrées **Comptes** et **Paramètres** sont **masquées** depuis **v4.6.2** (`display:none` ; vues et JS inchangés, hash **`#comptes`** / **`#parametres`**). **Sécurité** : identifiants Super Admin.
 - **iCal** : bouton **🔗 URL iCal** par studio → modale **re-auth** Super Admin + saisie URL ; données **`/orgs/{orgId}/icalFeeds`**.
 - **Initialisation** : **`init-superadmin.js`** (one-shot) pour **`/superAdmin/credentials`** et **`/organizations/tesson`** & **`nade`** si absents.
 
@@ -38,7 +38,7 @@ La **liste canonique** est **`/organizations/{orgId}`** → objet **`{ label }`*
 | `tesson`           | Studio Tesson              |
 | `nade`             | Studio Nade                |
 
-L’**organisation par défaut** proposée à la connexion dépend de **`defaultOrgId`** dans **`adminConfig`** et de la liste chargée ; la valeur **`tesson`** reste un **défaut** courant dans le code lorsque rien n’est configuré. L’admin peut fixer **`defaultOrgId`** via la liste « Org. par défaut » (vue Comptes ou Super Admin → Paramètres).
+L’**organisation par défaut** proposée à la connexion dépend de **`defaultOrgId`** dans **`adminConfig`** et de la liste chargée ; la valeur **`tesson`** reste un **défaut** courant dans le code lorsque rien n’est configuré. Depuis **v4.6.2**, il n’y a **plus d’UI** dans **`admin.html`** pour ce champ (réglage via **Firebase** ou **Super Admin** → vue Paramètres, masquée dans le menu mais accessible en **`#parametres`**) ; effet applicatif à consolider en **Phase 3** (voir **Améliorations prévues**).
 
 ---
 
@@ -49,7 +49,7 @@ planning-menage/
 ├── index.html           → Calendrier principal
 ├── admin.html           → Back-office administration
 ├── compte.html          → Tableau de bord + compte (intervenantes, hors admin)
-├── superadmin.html      → Super Administration (login / orgs / comptes / paramètres / sécurité)
+├── superadmin.html      → Super Administration (login, orgs, sécurité ; comptes/paramètres masqués au menu depuis v4.6.2)
 ├── storage-cors.example.json → Exemple CORS bucket Storage (optionnel, si uploads / SDK bloqués en local)
 ├── sync-ical.js         → Sync iCal → Firebase par organisation (cron)
 ├── notify-departs.js    → Notifications Telegram départs du jour (cron)
@@ -423,9 +423,7 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 5. **Application mobile native** — notifications push  
 6. ~~**URLs iCal Airbnb** — stockage hors `sync-ical.js`~~ — **fait en v4.6.x** (`/orgs/{orgId}/icalFeeds` + Super Admin + **`init-ical-feeds.js`**)  
 7. ~~**Phase 2 — Studios dynamiques**~~ — **fait en v4.6.1** (N studios, iCal par studio, suppression d’org, calendrier N + palette, admin N champs)  
-8. **Phase 3** — **« Visible sur calendrier »** par studio (filtrage affichage) ; **gestion `sharedWith`** (UI + règles) ; **hub multi-plannings** (enfants, crèche, etc., réutilisation du socle multi-org)
-9. Vues Comptes et Paramètres du menu Super Admin masquées (code conservé) — à supprimer proprement une fois la vue Organisations validée en production
-10. `defaultOrgId` dans adminConfig : paramètre prévu mais sans effet réel dans l'implémentation actuelle — à revoir en Phase 3 (paramètre global à la racine Firebase)
+8. **Phase 3** — supprimer proprement les vues **Comptes** et **Paramètres** masquées du menu Super Admin (code aujourd’hui conservé) ; implémenter **`defaultOrgId` global** à la racine Firebase (remplace un champ par org sans effet réel homogène dans l’app) ; **« Visible sur calendrier »** par studio (filtrage affichage) ; **gestion `sharedWith`** (UI + règles) ; **hub multi-plannings** (enfants, crèche, etc., réutilisation du socle multi-org)
 
 ---
 
@@ -433,7 +431,7 @@ Gérées dans **admin.html** → vue **Comptes** de **chaque organisation**. Str
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 4.6.1
+Version : 4.6.2
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
@@ -446,6 +444,11 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ---
 
 ## Historique des versions
+
+### v4.6.2 — Avril 2026
+- **`superadmin.html`** — refonte vue **Organisations** : **accordéon** à deux volets (**comptes** / **studios**) avec état **`studiosOpen` / `accountsOpen`** ; ligne d’org : toggles **🔐** / **💬** (`adminConfig`), badge **👤** + panneau comptes inline, **badge étapes** (cache procédures) ; suppression de l’ancien bouton **« X comptes associés »** ; entrées menu **Comptes** et **Paramètres** **masquées** (`display:none`) ; vue par défaut **Organisations** ; **`APP_VERSION` : 4.6.2**.
+- **`admin.html`** — retrait de l’UI **authentification**, **Telegram** et **organisation par défaut** sur la vue Comptes (réglages côté Super Admin / RTDB) ; **`APP_VERSION` : 4.6.2**.
+- **`index.html`**, **`compte.html`** — **`APP_VERSION` : 4.6.2**.
 
 ### v4.6.1 — Avril 2026
 - **Phase 2 complète** : **`superadmin.html`** — suppression d’**organisation** (cascade RTDB partielle : hors réservations / assignations / comptes rendus ; **Storage** sous **`orgs/{orgId}/`**) ; **N studios** (liste dynamique, ajout / renommage / suppression avec procédures + Storage par index) ; **URLs iCal** par studio (modale + re-auth **SHA-256**), cache **`icalCache`** ; création d’org avec **`studioNames: []`**.
