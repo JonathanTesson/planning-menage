@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Administration — Planning Ménage</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f5f5f0;color:#1a1a1a;padding:0 0 2rem}
+.topbar{background:#fff;border-bottom:1px solid #e0e0d8;padding:0.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar-left{display:flex;align-items:center;gap:0;min-width:0}
+.admin-burger{display:none;align-items:center;justify-content:center;width:40px;height:40px;margin-right:10px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;flex-shrink:0;padding:0;-webkit-tap-highlight-color:transparent}
+.admin-burger:hover{background:#f5f5f0}
+.admin-burger:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
+body.sa-nav-ready .admin-burger{display:flex}
+.admin-burger-icon{display:block;width:18px;height:2px;background:#1a1a1a;border-radius:1px;box-shadow:0 -6px 0 #1a1a1a,0 6px 0 #1a1a1a}
+.admin-nav-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.22);z-index:150;opacity:0;visibility:hidden;transition:opacity .2s ease,visibility .2s ease}
+.admin-nav-overlay:not(.is-open){pointer-events:none}
+.admin-nav-overlay.is-open{opacity:1;visibility:visible}
+.admin-nav-panel{position:fixed;top:0;left:0;bottom:0;width:max-content;max-width:min(92vw,300px);z-index:151;background:#fafaf8;border-right:1px solid #e0e0d8;box-shadow:4px 0 20px rgba(0,0,0,0.07);transform:translateX(-100%);transition:transform .25s ease;overflow-y:auto;-webkit-overflow-scrolling:touch;box-sizing:border-box}
+.admin-nav-panel:not(.is-open){pointer-events:none}
+.admin-nav-panel.is-open{transform:translateX(0);pointer-events:auto}
+.admin-nav-panel-inner{padding:0.5rem 1rem 1.25rem 0.875rem;width:max-content;max-width:100%;box-sizing:border-box}
+.admin-nav-link{display:block;padding:12px 10px;margin:4px 0;border-radius:8px;font-size:14px;font-weight:600;color:#333;text-decoration:none;line-height:1.35;white-space:nowrap;border:none;background:transparent;font:inherit;cursor:pointer;text-align:left;width:100%}
+.admin-nav-link:hover{background:#eeece6;color:#111}
+.topbar-title{font-size:16px;font-weight:600}
+.topbar-sub{font-size:12px;color:#888;margin-top:1px}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;margin-right:5px}
+.sync-dot.ok{background:#1D9E75}
+.container{max-width:700px;margin:0 auto;padding:1.25rem 1rem}
+.btn-primary{background:#1a1a1a;color:#fff;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500}
+.btn-primary:hover{background:#333}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed}
+.btn-secondary{background:#fff;color:#555;border:1px solid #ddd;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px}
+.btn-secondary:hover{background:#f5f5f0}
+.btn-danger{background:none;color:#E24B4A;border:none;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;line-height:1}
+.btn-danger:hover{background:#fde8e8}
+.btn-sm{padding:5px 10px;font-size:12px;border-radius:7px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#555}
+.btn-sm:hover{background:#f5f5f0}
+.section{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
+.section h3{font-size:14px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+.field-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.field-row label{font-size:12px;color:#888;width:140px;flex-shrink:0}
+.field-row input[type=text],.field-row input[type=password],.field-row select{flex:1;min-width:160px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
+.field-row input:focus,.field-row select:focus{outline:none;border-color:#378ADD}
+.login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:1rem;padding:2rem}
+.login-icon{font-size:48px}
+.login-title{font-size:18px;font-weight:600}
+.login-sub{font-size:13px;color:#888;text-align:center;max-width:320px}
+.login-select{width:100%;max-width:260px;padding:10px 14px;border:1px solid #ddd;border-radius:10px;font-size:14px;color:#1a1a1a;background:#fff}
+.login-input{width:100%;max-width:260px;padding:10px 14px;border:1px solid #ddd;border-radius:10px;font-size:15px;background:#fff;color:#1a1a1a}
+.login-input--user{text-align:left;letter-spacing:normal}
+.login-input--pwd{text-align:center;letter-spacing:2px}
+.login-input:focus,.login-select:focus{outline:none;border-color:#378ADD}
+.login-error{color:#E24B4A;font-size:12px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;z-index:200;padding:1rem}
+.modal-overlay.is-open{display:flex}
+.modal{background:#fff;border-radius:16px;padding:1.5rem;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,0.12);max-height:90vh;overflow-y:auto}
+.modal h3{font-size:16px;font-weight:600;margin-bottom:1rem}
+.modal-field{margin-bottom:0.875rem}
+.modal-field label{font-size:12px;color:#888;display:block;margin-bottom:4px;font-weight:500}
+.modal-field input[type=text],.modal-field input[type=password],.modal-field select{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
+.modal-field input:focus,.modal-field select:focus{outline:none;border-color:#378ADD}
+.modal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:1rem;justify-content:flex-end}
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;max-width:92vw;text-align:center;line-height:1.35}
+.toast.show{opacity:1}
+.account-row{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid #f5f5f0;flex-wrap:wrap}
+.account-row:last-child{border-bottom:none}
+.account-name{font-size:13px;font-weight:500;min-width:80px}
+.account-pwd{flex:1;min-width:100px;max-width:140px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:#fff;color:#1a1a1a}
+.account-role{display:flex;align-items:center;gap:3px;font-size:16px;cursor:pointer;padding:4px 6px;border-radius:6px;border:1px solid transparent;user-select:none}
+.account-role:hover{background:#f5f5f0}
+.account-role.active{border-color:#ddd;background:#f0f0eb}
+.org-list-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0eb;gap:8px;flex-wrap:wrap}
+.org-list-row:last-child{border-bottom:none}
+.org-list-id{font-family:ui-monospace,monospace;font-size:12px;color:#555}
+.org-list-label{font-size:13px;font-weight:500}
+.empty-hint{font-size:12px;color:#aaa;padding:8px 0}
+.toggle{position:relative;width:44px;height:24px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:#ddd;border-radius:24px;cursor:pointer;transition:0.2s}
+.toggle-slider:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:0.2s}
+.toggle input:checked+.toggle-slider{background:#1D9E75}
+.toggle input:checked+.toggle-slider:before{transform:translateX(20px)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0eb}
+.toggle-row:last-child{border-bottom:none}
+.toggle-label{font-size:13px;color:#333}
+</style>
+</head>
+<body>
+
+<div id="sa-nav-overlay" class="admin-nav-overlay" aria-hidden="true"></div>
+<nav id="sa-nav-panel" class="admin-nav-panel" aria-label="Super administration" aria-hidden="true">
+  <div class="admin-nav-panel-inner">
+    <button type="button" class="admin-nav-link" data-sa-view="comptes">Comptes</button>
+    <button type="button" class="admin-nav-link" data-sa-view="organisations">Organisations</button>
+    <button type="button" class="admin-nav-link" data-sa-view="parametres">Paramètres</button>
+    <button type="button" class="admin-nav-link" data-sa-view="securite">Sécurité</button>
+  </div>
+</nav>
+
+<div id="sa-login">
+  <div class="login-screen">
+    <div class="login-icon">🔐</div>
+    <div class="login-title">Super Administration</div>
+    <div class="login-sub">Identifiez-vous pour gérer les organisations et les comptes.</div>
+    <label class="login-sub" for="sa-login-user" style="align-self:stretch;max-width:260px;margin:0 auto;text-align:left">Nom d’utilisateur</label>
+    <input type="text" class="login-input login-input--user" id="sa-login-user" autocomplete="username" aria-label="Nom d'utilisateur">
+    <label class="login-sub" for="sa-login-pwd" style="align-self:stretch;max-width:260px;margin:0 auto;text-align:left">Mot de passe</label>
+    <input type="password" class="login-input login-input--pwd" id="sa-login-pwd" autocomplete="current-password" aria-label="Mot de passe" onkeydown="if(event.key==='Enter')window._saDoLogin()">
+    <div class="login-error" id="sa-login-error" style="display:none">Identifiants incorrects</div>
+    <button type="button" class="btn-primary" onclick="window._saDoLogin()">Connexion</button>
+    <a href="index.html" style="font-size:12px;color:#aaa;text-decoration:none;margin-top:4px">← Retour au planning</a>
+  </div>
+</div>
+
+<div id="sa-app" style="display:none">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button type="button" class="admin-burger" id="sa-burger" aria-label="Menu" aria-expanded="false" aria-controls="sa-nav-panel">
+        <span class="admin-burger-icon" aria-hidden="true"></span>
+      </button>
+      <div style="min-width:0">
+        <div class="topbar-title">Super Administration</div>
+        <div class="topbar-sub">Planning Ménage</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#aaa;white-space:nowrap">
+        <span class="sync-dot ok" id="sa-sync-dot"></span>
+        <span id="sa-sync-label">Connecté</span>
+      </div>
+      <button type="button" class="btn-secondary" id="sa-logout-btn">Se déconnecter</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div id="sa-view-comptes" class="sa-view">
+      <div class="section">
+        <h3>Comptes</h3>
+        <div class="field-row">
+          <label for="sa-comptes-org">Organisation</label>
+          <select class="login-select" id="sa-comptes-org" style="max-width:none;width:100%"></select>
+        </div>
+        <div id="sa-accounts-list"></div>
+        <button type="button" class="btn-primary" style="margin-top:12px" id="sa-add-account-btn">+ Ajouter un compte</button>
+      </div>
+    </div>
+
+    <div id="sa-view-organisations" class="sa-view" style="display:none">
+      <div class="section">
+        <h3>Organisations</h3>
+        <div id="sa-org-list"></div>
+        <button type="button" class="btn-primary" style="margin-top:12px" id="sa-create-org-btn">+ Créer une organisation</button>
+      </div>
+    </div>
+
+    <div id="sa-view-parametres" class="sa-view" style="display:none">
+      <div class="section">
+        <h3>Paramètres</h3>
+        <div class="field-row">
+          <label for="sa-params-org">Organisation</label>
+          <select class="login-select" id="sa-params-org" style="max-width:none;width:100%"></select>
+        </div>
+        <div id="sa-params-body">
+          <p class="empty-hint">Sélectionnez une organisation.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="sa-view-securite" class="sa-view" style="display:none">
+      <div class="section">
+        <h3>Sécurité</h3>
+        <p class="empty-hint" style="margin-bottom:12px">Modifier les identifiants Super Admin (SHA-256). Les comptes des organisations restent avec l’ancien hash (hashSimple).</p>
+        <div class="field-row">
+          <label for="sa-sec-user">Nouveau nom d’utilisateur</label>
+          <input type="text" id="sa-sec-user" autocomplete="username">
+        </div>
+        <div class="field-row">
+          <label for="sa-sec-pwd">Nouveau mot de passe</label>
+          <input type="password" id="sa-sec-pwd" autocomplete="new-password">
+        </div>
+        <div class="field-row">
+          <label for="sa-sec-pwd2">Confirmer le mot de passe</label>
+          <input type="password" id="sa-sec-pwd2" autocomplete="new-password">
+        </div>
+        <button type="button" class="btn-primary" id="sa-sec-save">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="sa-modal-add-account" role="dialog" aria-modal="true" aria-labelledby="sa-modal-add-title">
+  <div class="modal">
+    <h3 id="sa-modal-add-title">Ajouter un compte</h3>
+    <div class="modal-field">
+      <label for="sa-modal-add-name">Prénom / nom</label>
+      <input type="text" id="sa-modal-add-name" autocomplete="off">
+    </div>
+    <div class="modal-field">
+      <label for="sa-modal-add-pwd">Mot de passe</label>
+      <input type="password" id="sa-modal-add-pwd" autocomplete="new-password">
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="sa-modal-add-cancel">Annuler</button>
+      <button type="button" class="btn-primary" id="sa-modal-add-ok">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="sa-modal-del-account" role="dialog" aria-modal="true" aria-labelledby="sa-modal-del-acc-title">
+  <div class="modal">
+    <h3 id="sa-modal-del-acc-title">Supprimer le compte</h3>
+    <p class="empty-hint" id="sa-modal-del-acc-text" style="color:#555"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="sa-modal-del-acc-cancel">Annuler</button>
+      <button type="button" class="btn-danger" id="sa-modal-del-acc-ok" style="border:1px solid #f0c0c0;padding:8px 16px">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="sa-modal-create-org" role="dialog" aria-modal="true" aria-labelledby="sa-modal-org-title">
+  <div class="modal">
+    <h3 id="sa-modal-org-title">Créer une organisation</h3>
+    <div class="modal-field">
+      <label for="sa-modal-org-id">Identifiant (slug)</label>
+      <input type="text" id="sa-modal-org-id" placeholder="ex: dupont" autocomplete="off">
+    </div>
+    <div class="modal-field">
+      <label for="sa-modal-org-label">Libellé</label>
+      <input type="text" id="sa-modal-org-label-inp" placeholder="ex: Studio Dupont" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="sa-modal-org-cancel">Annuler</button>
+      <button type="button" class="btn-primary" id="sa-modal-org-ok">Créer</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="sa-toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, get, set, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
+  authDomain: "planning-menage-18b09.firebaseapp.com",
+  databaseURL: "https://planning-menage-18b09-default-rtdb.firebaseio.com",
+  projectId: "planning-menage-18b09",
+  storageBucket: "planning-menage-18b09.firebasestorage.app",
+  messagingSenderId: "685094108459",
+  appId: "1:685094108459:web:b90ec9f136de34d699996e"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const SA_SESSION_KEY = 'sa_session';
+
+function hashSimple(str){
+  let h=0;
+  for(let i=0;i<str.length;i++) h=((h<<5)-h)+str.charCodeAt(i),h|=0;
+  return h.toString(36);
+}
+
+async function sha256Hex(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function el(id){ return document.getElementById(id); }
+
+function showToast(msg){
+  const t=el('sa-toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+function normalizeAccounts(raw){
+  if(!raw) return [];
+  if(Array.isArray(raw)) return raw.filter(Boolean);
+  return Object.keys(raw).sort().map(k=>raw[k]).filter(x=>x&&typeof x==='object');
+}
+
+function escHtml(s){
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let orgEntries = [];
+let saNavOnce = false;
+
+async function fetchOrganizations(){
+  try{
+    const snap = await get(ref(db, 'organizations'));
+    const data = snap.val() || {};
+    orgEntries = Object.entries(data).map(([id, v]) => ({
+      id,
+      label: (v && v.label) || id
+    })).sort((a,b)=>a.label.localeCompare(b.label));
+  }catch(e){
+    console.warn(e);
+    orgEntries = [];
+  }
+  return orgEntries;
+}
+
+function fillOrgSelects(){
+  const opts = orgEntries.map(o=>`<option value="${escHtml(o.id)}">${escHtml(o.label)}</option>`).join('');
+  const c = el('sa-comptes-org');
+  const p = el('sa-params-org');
+  if(c){
+    c.innerHTML = orgEntries.length ? opts : '<option value="">— Aucune organisation —</option>';
+  }
+  if(p){
+    p.innerHTML = orgEntries.length ? opts : '<option value="">— Aucune organisation —</option>';
+  }
+}
+
+let currentSaView = 'comptes';
+
+function setSaView(view){
+  const v = ['comptes','organisations','parametres','securite'].includes(view) ? view : 'comptes';
+  currentSaView = v;
+  document.querySelectorAll('.sa-view').forEach(node=>{
+    node.style.display = node.id === 'sa-view-'+v ? '' : 'none';
+  });
+  try{
+    const base = location.pathname + location.search;
+    history.replaceState(null, '', v==='comptes' ? base : (base + '#'+v));
+  }catch(_){}
+  if(v==='organisations') renderOrgList();
+  if(v==='parametres') renderParamsForSelectedOrg();
+}
+
+function setupNav(){
+  if(saNavOnce) return;
+  const o = el('sa-nav-overlay');
+  const p = el('sa-nav-panel');
+  const b = el('sa-burger');
+  if(!o||!p||!b) return;
+  saNavOnce = true;
+  function openNav(on){
+    o.classList.toggle('is-open', on);
+    p.classList.toggle('is-open', on);
+    o.setAttribute('aria-hidden', on ? 'false' : 'true');
+    p.setAttribute('aria-hidden', on ? 'false' : 'true');
+    b.setAttribute('aria-expanded', on ? 'true' : 'false');
+    document.body.classList.toggle('sa-nav-open', on);
+  }
+  b.addEventListener('click',()=>openNav(!p.classList.contains('is-open')));
+  o.addEventListener('click',()=>openNav(false));
+  p.querySelectorAll('.admin-nav-link').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const v = btn.getAttribute('data-sa-view');
+      openNav(false);
+      if(b&&p.contains(document.activeElement)) b.focus();
+      setSaView(v);
+    });
+  });
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape' && p.classList.contains('is-open')) openNav(false);
+  });
+}
+
+function showAppShell(){
+  el('sa-login').style.display = 'none';
+  el('sa-app').style.display = '';
+  document.body.classList.add('sa-nav-ready');
+}
+
+function showLoginScreen(){
+  el('sa-app').style.display = 'none';
+  el('sa-login').style.display = '';
+  document.body.classList.remove('sa-nav-ready');
+  try{ sessionStorage.removeItem(SA_SESSION_KEY); }catch(_){}
+  el('sa-login-error').style.display = 'none';
+  el('sa-login-pwd').value = '';
+}
+
+async function doLogin(){
+  const user = String(el('sa-login-user').value||'').trim();
+  const pwd = el('sa-login-pwd').value||'';
+  el('sa-login-error').style.display = 'none';
+  try{
+    const snap = await get(ref(db, 'superAdmin/credentials'));
+    const c = snap.val();
+    if(!c || typeof c!=='object'){
+      el('sa-login-error').style.display = '';
+      return;
+    }
+    const u = c.username!=null ? String(c.username).trim() : '';
+    const h = c.pwdHash!=null ? String(c.pwdHash).trim() : '';
+    const pwdHash = await sha256Hex(pwd);
+    if(!user || !u || user !== u || pwdHash !== h){
+      el('sa-login-error').style.display = '';
+      return;
+    }
+    try{ sessionStorage.setItem(SA_SESSION_KEY, '1'); }catch(_){}
+    showAppShell();
+    await fetchOrganizations();
+    fillOrgSelects();
+    renderAccountsForSelectedOrg();
+    renderOrgList();
+    renderParamsForSelectedOrg();
+    setupNav();
+    setSaView('comptes');
+  }catch(e){
+    console.warn(e);
+    el('sa-login-error').style.display = '';
+  }
+}
+window._saDoLogin = doLogin;
+
+function logout(){
+  try{ sessionStorage.removeItem(SA_SESSION_KEY); }catch(_){}
+  window.location.replace('index.html');
+}
+el('sa-logout-btn').addEventListener('click', logout);
+
+function openModal(id){ el(id).classList.add('is-open'); }
+function closeModal(id){ el(id).classList.remove('is-open'); }
+
+let pendingDeleteAccountIndex = -1;
+
+async function getAccountsForOrg(orgId){
+  if(!orgId) return [];
+  const snap = await get(ref(db, `orgs/${orgId}/adminConfig`));
+  const d = snap.val() || {};
+  return normalizeAccounts(d.accounts);
+}
+
+async function saveAccountsArray(orgId, accounts){
+  await set(ref(db, `orgs/${orgId}/adminConfig/accounts`), accounts);
+}
+
+function selectedComptesOrgId(){
+  const s = el('sa-comptes-org');
+  return s && s.value ? s.value : '';
+}
+
+async function renderAccountsForSelectedOrg(){
+  const host = el('sa-accounts-list');
+  const oid = selectedComptesOrgId();
+  if(!host) return;
+  if(!oid){
+    host.innerHTML = '<p class="empty-hint">Choisissez une organisation.</p>';
+    return;
+  }
+  try{
+    const accounts = await getAccountsForOrg(oid);
+    if(!accounts.length){
+      host.innerHTML = '<p class="empty-hint">Aucun compte — ajoutez le premier ci-dessous.</p>';
+      return;
+    }
+    host.innerHTML = accounts.map((acc,i)=>{
+      const nm = escHtml(acc.name||'');
+      return `<div class="account-row" data-acc-i="${i}">
+        <span class="account-name">${nm}</span>
+        <span class="account-role ${acc.menage?'active':''}" data-role="menage" title="Ménage">🧹</span>
+        <span class="account-role ${acc.admin?'active':''}" data-role="admin" title="Admin">👑</span>
+        <input type="password" class="account-pwd" placeholder="Nouveau MDP" data-pwd-i="${i}" aria-label="Nouveau mot de passe pour ${nm}">
+        <button type="button" class="btn-sm" data-save-pwd="${i}">Enregistrer MDP</button>
+        <button type="button" class="btn-danger" data-del-acc="${i}">Supprimer</button>
+      </div>`;
+    }).join('');
+
+    host.querySelectorAll('.account-role').forEach(span=>{
+      span.addEventListener('click', async ()=>{
+        const row = span.closest('.account-row');
+        const i = Number(row.getAttribute('data-acc-i'));
+        const role = span.getAttribute('data-role');
+        const list = await getAccountsForOrg(oid);
+        if(!list[i]) return;
+        list[i] = { ...list[i], [role]: !list[i][role] };
+        await saveAccountsArray(oid, list);
+        showToast('Rôle mis à jour');
+        renderAccountsForSelectedOrg();
+      });
+    });
+    host.querySelectorAll('[data-save-pwd]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const i = Number(btn.getAttribute('data-save-pwd'));
+        const inp = host.querySelector(`[data-pwd-i="${i}"]`);
+        const val = inp && inp.value ? String(inp.value) : '';
+        if(val.length<4){ showToast('Mot de passe : au moins 4 caractères'); return; }
+        const list = await getAccountsForOrg(oid);
+        if(!list[i]) return;
+        list[i] = { ...list[i], pwdHash: hashSimple(val) };
+        await saveAccountsArray(oid, list);
+        if(inp) inp.value = '';
+        showToast('Mot de passe enregistré');
+      });
+    });
+    host.querySelectorAll('[data-del-acc]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const i = Number(btn.getAttribute('data-del-acc'));
+        pendingDeleteAccountIndex = i;
+        openModal('sa-modal-del-account');
+        const list = accounts;
+        const name = list[i] && list[i].name ? list[i].name : '';
+        el('sa-modal-del-acc-text').textContent = `Supprimer le compte « ${name} » ? Cette action est immédiate.`;
+      });
+    });
+  }catch(e){
+    console.warn(e);
+    host.innerHTML = '<p class="empty-hint">Erreur de chargement.</p>';
+  }
+}
+
+el('sa-comptes-org').addEventListener('change', ()=>renderAccountsForSelectedOrg());
+
+el('sa-add-account-btn').addEventListener('click', ()=>{
+  if(!selectedComptesOrgId()){ showToast('Choisissez une organisation'); return; }
+  el('sa-modal-add-name').value = '';
+  el('sa-modal-add-pwd').value = '';
+  openModal('sa-modal-add-account');
+});
+el('sa-modal-add-cancel').addEventListener('click', ()=>closeModal('sa-modal-add-account'));
+el('sa-modal-add-ok').addEventListener('click', async ()=>{
+  const oid = selectedComptesOrgId();
+  if(!oid){ showToast('Choisissez une organisation'); return; }
+  const name = String(el('sa-modal-add-name').value||'').trim();
+  const pwd = el('sa-modal-add-pwd').value||'';
+  if(!name){ showToast('Indiquez un nom'); return; }
+  if(pwd.length<4){ showToast('Mot de passe : au moins 4 caractères'); return; }
+  try{
+    let list = await getAccountsForOrg(oid);
+    if(list.find(a=>a.name===name)){ showToast('Ce prénom existe déjà'); return; }
+    list = [...list, { name, pwdHash: hashSimple(pwd), menage:true, admin:false, sharedWith:[] }];
+    await saveAccountsArray(oid, list);
+    closeModal('sa-modal-add-account');
+    showToast('Compte ajouté');
+    renderAccountsForSelectedOrg();
+  }catch(e){
+    console.warn(e);
+    showToast('Erreur d’enregistrement');
+  }
+});
+
+el('sa-modal-del-acc-cancel').addEventListener('click', ()=>{
+  pendingDeleteAccountIndex = -1;
+  closeModal('sa-modal-del-account');
+});
+el('sa-modal-del-acc-ok').addEventListener('click', async ()=>{
+  const oid = selectedComptesOrgId();
+  const i = pendingDeleteAccountIndex;
+  closeModal('sa-modal-del-account');
+  pendingDeleteAccountIndex = -1;
+  if(!oid || i<0) return;
+  try{
+    let list = await getAccountsForOrg(oid);
+    if(!list[i]) return;
+    list = list.filter((_,j)=>j!==i);
+    await saveAccountsArray(oid, list);
+    showToast('Compte supprimé');
+    renderAccountsForSelectedOrg();
+  }catch(e){
+    console.warn(e);
+    showToast('Erreur');
+  }
+});
+
+function renderOrgList(){
+  const host = el('sa-org-list');
+  if(!host) return;
+  if(!orgEntries.length){
+    host.innerHTML = '<p class="empty-hint">Aucune organisation. Créez-en une.</p>';
+    return;
+  }
+  host.innerHTML = orgEntries.map(o=>`<div class="org-list-row"><div><div class="org-list-label">${escHtml(o.label)}</div><div class="org-list-id">${escHtml(o.id)}</div></div></div>`).join('');
+}
+
+el('sa-create-org-btn').addEventListener('click', ()=>{
+  el('sa-modal-org-id').value = '';
+  el('sa-modal-org-label-inp').value = '';
+  openModal('sa-modal-create-org');
+});
+el('sa-modal-org-cancel').addEventListener('click', ()=>closeModal('sa-modal-create-org'));
+el('sa-modal-org-ok').addEventListener('click', async ()=>{
+  let slug = String(el('sa-modal-org-id').value||'').trim().toLowerCase();
+  const label = String(el('sa-modal-org-label-inp').value||'').trim();
+  if(!/^[a-z0-9-]+$/.test(slug)){
+    showToast('Identifiant : minuscules, chiffres et tirets uniquement');
+    return;
+  }
+  if(!label){ showToast('Indiquez un libellé'); return; }
+  try{
+    const ex = await get(ref(db, `organizations/${slug}`));
+    if(ex.val()!=null){ showToast('Cet identifiant existe déjà'); return; }
+    await set(ref(db, `organizations/${slug}`), { label });
+    await set(ref(db, `orgs/${slug}/config`), { studioNames: ['Studio 1', 'Studio 2'] });
+    await set(ref(db, `orgs/${slug}/adminConfig`), { authEnabled: false, telegramEnabled: true, accounts: [] });
+    closeModal('sa-modal-create-org');
+    showToast('Organisation créée. Pense à ajouter les URLs iCal dans sync-ical.js.');
+    await fetchOrganizations();
+    fillOrgSelects();
+    renderOrgList();
+  }catch(e){
+    console.warn(e);
+    showToast('Erreur à la création');
+  }
+});
+
+function selectedParamsOrgId(){
+  const s = el('sa-params-org');
+  return s && s.value ? s.value : '';
+}
+
+async function renderParamsForSelectedOrg(){
+  const body = el('sa-params-body');
+  const oid = selectedParamsOrgId();
+  if(!body) return;
+  if(!oid){
+    body.innerHTML = '<p class="empty-hint">Sélectionnez une organisation.</p>';
+    return;
+  }
+  try{
+    const snap = await get(ref(db, `orgs/${oid}/adminConfig`));
+    const d = snap.val() || {};
+    const authEnabled = !!d.authEnabled;
+    const telegramEnabled = d.telegramEnabled !== false;
+    const defaultOrgId = d.defaultOrgId || oid;
+    const defaultOpts = orgEntries.map(o=>`<option value="${escHtml(o.id)}"${o.id===defaultOrgId?' selected':''}>${escHtml(o.label)}</option>`).join('');
+    body.innerHTML = `
+      <div class="toggle-row">
+        <div><div class="toggle-label">Authentification activée</div></div>
+        <label class="toggle"><input type="checkbox" id="sa-p-auth" ${authEnabled?'checked':''}><span class="toggle-slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="toggle-label">Notifications Telegram</div></div>
+        <label class="toggle"><input type="checkbox" id="sa-p-tg" ${telegramEnabled?'checked':''}><span class="toggle-slider"></span></label>
+      </div>
+      <div class="field-row" style="margin-top:12px">
+        <label for="sa-p-deforg">Organisation par défaut</label>
+        <select id="sa-p-deforg">${defaultOpts}</select>
+      </div>`;
+    const savePartial = async (patch)=>{
+      await update(ref(db, `orgs/${oid}/adminConfig`), patch);
+    };
+    el('sa-p-auth').addEventListener('change', async e=>{
+      try{
+        await savePartial({ authEnabled: e.target.checked });
+        showToast('Enregistré');
+      }catch(err){ console.warn(err); showToast('Erreur'); }
+    });
+    el('sa-p-tg').addEventListener('change', async e=>{
+      try{
+        await savePartial({ telegramEnabled: e.target.checked });
+        showToast('Enregistré');
+      }catch(err){ console.warn(err); showToast('Erreur'); }
+    });
+    el('sa-p-deforg').addEventListener('change', async e=>{
+      try{
+        await savePartial({ defaultOrgId: e.target.value });
+        showToast('Enregistré');
+      }catch(err){ console.warn(err); showToast('Erreur'); }
+    });
+  }catch(e){
+    console.warn(e);
+    body.innerHTML = '<p class="empty-hint">Erreur de chargement.</p>';
+  }
+}
+
+el('sa-params-org').addEventListener('change', ()=>renderParamsForSelectedOrg());
+
+el('sa-sec-save').addEventListener('click', async ()=>{
+  const nu = String(el('sa-sec-user').value||'').trim();
+  const p1 = el('sa-sec-pwd').value||'';
+  const p2 = el('sa-sec-pwd2').value||'';
+  if(!nu){ showToast('Indiquez un nom d’utilisateur'); return; }
+  if(!p1 || p1.length<4){ showToast('Mot de passe : au moins 4 caractères'); return; }
+  if(p1 !== p2){ showToast('Les mots de passe ne correspondent pas'); return; }
+  try{
+    const hex = await sha256Hex(p1);
+    await set(ref(db, 'superAdmin/credentials'), { username: nu, pwdHash: hex });
+    el('sa-sec-pwd').value = '';
+    el('sa-sec-pwd2').value = '';
+    showToast('Identifiants Super Admin enregistrés');
+  }catch(e){
+    console.warn(e);
+    showToast('Erreur d’enregistrement');
+  }
+});
+
+(function boot(){
+  try{
+    if(sessionStorage.getItem(SA_SESSION_KEY)==='1'){
+      showAppShell();
+      fetchOrganizations().then(()=>{
+        fillOrgSelects();
+        renderAccountsForSelectedOrg();
+        renderOrgList();
+        renderParamsForSelectedOrg();
+        setupNav();
+        const h = location.hash.slice(1);
+        if(['comptes','organisations','parametres','securite'].includes(h)) setSaView(h);
+        else setSaView('comptes');
+      });
+    }
+  }catch(_){}
+})();
+</script>
+</body>
+</html>
