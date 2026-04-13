@@ -113,6 +113,8 @@ body.sa-nav-ready .admin-burger{display:flex}
 .sa-org-acc-accounts{border:none;background:transparent;padding:2px 6px;font-size:14px;line-height:1.2;cursor:pointer;color:#555;border-radius:6px;flex-shrink:0;-webkit-tap-highlight-color:transparent}
 .sa-org-acc-accounts:hover{background:#f0f0eb}
 .sa-org-acc-accounts:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
+.sa-org-rename-btn{background:transparent;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;margin:0;opacity:0.5;-webkit-tap-highlight-color:transparent}
+.sa-org-rename-btn:hover{opacity:1}
 </style>
 </head>
 <body>
@@ -150,8 +152,7 @@ body.sa-nav-ready .admin-burger{display:flex}
       </button>
       <div style="min-width:0">
         <div class="topbar-title">Super Administration</div>
-        <div class="topbar-sub">Planning Ménage</div>
-        <div class="topbar-sub" id="sa-app-version"></div>
+        <div class="topbar-sub"></div>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
@@ -252,7 +253,7 @@ body.sa-nav-ready .admin-burger{display:flex}
   <div class="modal">
     <h3 id="sa-modal-org-title">Créer une organisation</h3>
     <div class="modal-field">
-      <label for="sa-modal-org-id">Identifiant (slug)</label>
+      <label for="sa-modal-org-id">ID base de données (slug)</label>
       <input type="text" id="sa-modal-org-id" placeholder="ex: dupont" autocomplete="off">
     </div>
     <div class="modal-field">
@@ -262,6 +263,21 @@ body.sa-nav-ready .admin-burger{display:flex}
     <div class="modal-actions">
       <button type="button" class="btn-secondary" id="sa-modal-org-cancel">Annuler</button>
       <button type="button" class="btn-primary" id="sa-modal-org-ok">Créer</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="sa-modal-rename-org" role="dialog" aria-modal="true" aria-labelledby="sa-modal-rename-org-title">
+  <div class="modal">
+    <h3 id="sa-modal-rename-org-title">Renommer l’organisation</h3>
+    <p style="font-size:12px;color:#888;font-family:ui-monospace,monospace;margin:0 0 0.875rem;line-height:1.4">ID base de données : <span id="sa-modal-rename-org-id"></span></p>
+    <div class="modal-field">
+      <label for="sa-modal-rename-org-inp">Libellé</label>
+      <input type="text" id="sa-modal-rename-org-inp" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="sa-modal-rename-org-cancel">Annuler</button>
+      <button type="button" class="btn-primary" id="sa-modal-rename-org-ok">Enregistrer</button>
     </div>
   </div>
 </div>
@@ -565,8 +581,8 @@ function showAppShell(){
   el('sa-login').style.display = 'none';
   el('sa-app').style.display = '';
   document.body.classList.add('sa-nav-ready');
-  const vEl = el('sa-app-version');
-  if(vEl) vEl.textContent = 'Planning Ménage · v '+APP_VERSION;
+  const subEl = el('sa-app').querySelector('.topbar-sub');
+  if(subEl) subEl.textContent = 'Planning Ménage · v '+APP_VERSION;
 }
 
 async function doLogin(){
@@ -614,6 +630,7 @@ function closeModal(id){ el(id).classList.remove('is-open'); }
 
 let pendingDeleteOrgId = '';
 let pendingDeleteOrgLabel = '';
+let pendingRenameOrgId = '';
 
 async function deleteStorageTree(rootRef){
   const page = await listAll(rootRef);
@@ -1097,8 +1114,10 @@ function renderOrgList(){
       <div class="sa-org-acc-left">
         <span class="sa-org-acc-arrow" aria-hidden="true">▶</span>
         <div class="sa-org-acc-titles">
-          <div class="org-list-label">${escHtml(o.label)}</div>
-          <div class="org-list-id">${escHtml(o.id)}</div>
+          <div class="org-list-label" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+            <span>${escHtml(o.label)}</span>
+            <button type="button" class="sa-org-rename-btn" data-sa-rename-org="${escHtml(o.id)}" title="Renommer le libellé" aria-label="Renommer le libellé">✏️</button>
+          </div>
         </div>
       </div>
       <div class="sa-org-acc-toggles">
@@ -1133,6 +1152,7 @@ function renderOrgList(){
     host.addEventListener('click', (e)=>{
       if(e.target.closest('.sa-org-acc-toggles')) e.stopPropagation();
       if(e.target.closest('.sa-org-acc-accounts')) e.stopPropagation();
+      if(e.target.closest('.sa-org-rename-btn')) e.stopPropagation();
     });
     host.addEventListener('change', async (e)=>{
       const t = e.target;
@@ -1180,6 +1200,7 @@ function renderOrgList(){
       if(e.target.closest('[data-del-org]')) return;
       if(e.target.closest('.sa-org-acc-toggles')) return;
       if(e.target.closest('[data-sa-org-accounts-btn]')) return;
+      if(e.target.closest('[data-sa-rename-org]')) return;
       const acc = head.closest('.sa-org-acc');
       const orgId = acc.getAttribute('data-org-id');
       if(studiosOpen[orgId]){
@@ -1213,6 +1234,19 @@ function renderOrgList(){
       if(!oid) return;
       accountsOpen[oid] = !accountsOpen[oid];
       await applyOrgPanelState(oid);
+    });
+  });
+
+  host.querySelectorAll('[data-sa-rename-org]').forEach(btn=>{
+    btn.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      const id = btn.getAttribute('data-sa-rename-org');
+      const o = orgEntries.find(x=>x.id===id);
+      if(!o) return;
+      pendingRenameOrgId = id;
+      el('sa-modal-rename-org-inp').value = o.label;
+      el('sa-modal-rename-org-id').textContent = id;
+      openModal('sa-modal-rename-org');
     });
   });
 }
@@ -1253,6 +1287,37 @@ el('sa-modal-org-ok').addEventListener('click', async ()=>{
   }catch(e){
     console.warn(e);
     showToast('Erreur à la création');
+  }
+});
+
+el('sa-modal-rename-org-cancel').addEventListener('click', ()=>{
+  pendingRenameOrgId = '';
+  closeModal('sa-modal-rename-org');
+});
+el('sa-modal-rename-org-ok').addEventListener('click', async ()=>{
+  const oid = pendingRenameOrgId;
+  if(!oid){
+    showToast('Erreur');
+    return;
+  }
+  const label = String(el('sa-modal-rename-org-inp').value||'').trim();
+  if(!label){
+    showToast('Indiquez un libellé');
+    return;
+  }
+  try{
+    await set(ref(db, `organizations/${oid}`), { label });
+    const e = orgEntries.find(x=>x.id===oid);
+    if(e) e.label = label;
+    orgEntries.sort((a,b)=>a.label.localeCompare(b.label));
+    pendingRenameOrgId = '';
+    closeModal('sa-modal-rename-org');
+    fillOrgSelects();
+    renderOrgList();
+    showToast('Libellé enregistré');
+  }catch(err){
+    console.warn(err);
+    showToast('Erreur d’enregistrement');
   }
 });
 
