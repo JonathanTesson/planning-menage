@@ -272,6 +272,7 @@ html[data-menage-org-gate="1"] #main-app{display:none!important}
     <div style="display:flex;align-items:center;gap:4px">
       <div class="topbar-title" id="topbar-title-text">Planning Ménage</div>
       <span id="pending-deletion-pip" style="display:none;width:7px;height:7px;border-radius:50%;background:#F59E0B;animation:depart-note-pulse 1.5s ease-in-out infinite;flex-shrink:0"></span>
+      <span id="pending-suggestions-pip" style="display:none;width:7px;height:7px;border-radius:50%;background:#F59E0B;animation:depart-note-pulse 1.5s ease-in-out infinite;flex-shrink:0"></span>
     </div>
     <div class="topbar-sub" id="topbar-sub">Studios</div>
   </div>
@@ -382,6 +383,19 @@ function paintPendingDeletionPipFromVal(on){
   pip.style.display = on ? 'inline-block' : 'none';
 }
 
+function paintSuggestionsPip(){
+  const pip=document.getElementById('pending-suggestions-pip');
+  if(!pip) return;
+  const main=document.getElementById('main-app');
+  if(!main||main.style.display==='none'){
+    pip.style.display='none';
+    return;
+  }
+  const adminLike=S.currentUser?.admin||S.currentUser?.noAuth;
+  const has=Object.keys(S.procedureSuggestions||{}).length>0;
+  pip.style.display=adminLike&&has?'inline-block':'none';
+}
+
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 onValue(ref(db, 'pendingDeletionRequests'), snap=>{
@@ -477,7 +491,8 @@ let S = {
   cleaningReports: {},
   procedures: {},
   /** @type {Record<string, Record<string, { by: string|null }>>} prénom → date locale → { by } (cf. normalizeUnavailability) */
-  unavailability: {}
+  unavailability: {},
+  procedureSuggestions: {}
 };
 
 /** Feedback coches procédure pour la modale ménage (mis à jour par onValue sur stepFeedback). */
@@ -791,6 +806,7 @@ function showApp(){
   if(topTitle) topTitle.textContent='Planning Ménage';
   paintPendingDeletionPipFromVal(false);
   render();
+  paintSuggestionsPip();
 }
 
 function fillOrgSelect(selectEl){
@@ -818,6 +834,8 @@ function showLogin(){
   const topTitleLogin=document.querySelector('.topbar-title');
   if(topTitleLogin) topTitleLogin.textContent='Accueil';
   document.getElementById('topbar-sub').textContent='';
+  const sugPipLogin=document.getElementById('pending-suggestions-pip');
+  if(sugPipLogin) sugPipLogin.style.display='none';
   void get(ref(db, 'pendingDeletionRequests')).then(s=>paintPendingDeletionPipFromVal(!!s.val())).catch(()=>paintPendingDeletionPipFromVal(false));
 }
 
@@ -944,6 +962,8 @@ function showOrgUnconfigured(){
   const topTitleUn=document.querySelector('.topbar-title');
   if(topTitleUn) topTitleUn.textContent='Accueil';
   document.getElementById('topbar-sub').textContent='';
+  const sugPipUn=document.getElementById('pending-suggestions-pip');
+  if(sugPipUn) sugPipUn.style.display='none';
   void get(ref(db, 'pendingDeletionRequests')).then(s=>paintPendingDeletionPipFromVal(!!s.val())).catch(()=>paintPendingDeletionPipFromVal(false));
 }
 
@@ -1053,6 +1073,11 @@ function initFirebaseAndApp(){
     S.unavailability=normalizeUnavailability(snap.val());
     if(fbReady&&S.currentUser) render();
   });
+
+  onValue(ref(db,ob('procedureSuggestions')), snap=>{
+    S.procedureSuggestions=snap.val()||{};
+    paintSuggestionsPip();
+  });
 }
 
 function showOrgFirst(){
@@ -1068,6 +1093,8 @@ function showOrgFirst(){
   const topTitleFirst=document.querySelector('.topbar-title');
   if(topTitleFirst) topTitleFirst.textContent='Accueil';
   document.getElementById('topbar-sub').textContent='';
+  const sugPipFirst=document.getElementById('pending-suggestions-pip');
+  if(sugPipFirst) sugPipFirst.style.display='none';
   void get(ref(db, 'pendingDeletionRequests')).then(s=>paintPendingDeletionPipFromVal(!!s.val())).catch(()=>paintPendingDeletionPipFromVal(false));
 }
 

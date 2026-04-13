@@ -24,6 +24,14 @@ body.admin-nav-ready .admin-burger{display:flex}
 .admin-nav-panel-inner{padding:0.5rem 1rem 1.25rem 0.875rem;width:max-content;max-width:100%;box-sizing:border-box}
 .admin-nav-link{display:block;padding:12px 10px;margin:4px 0;border-radius:8px;font-size:14px;font-weight:600;color:#333;text-decoration:none;line-height:1.35;white-space:nowrap}
 .admin-nav-link:hover{background:#eeece6;color:#111}
+@keyframes nav-pending-pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,0.5);}
+  50%{box-shadow:0 0 0 5px rgba(245,158,11,0);}
+}
+.admin-nav-link.has-pending-suggestions{
+  animation:nav-pending-pulse 1.8s ease-in-out infinite;
+  border-radius:8px;
+}
 #admin-content .section[id]{scroll-margin-top:72px}
 .topbar-title{font-size:16px;font-weight:600}
 .topbar-sub{font-size:12px;color:#888;margin-top:1px}
@@ -50,6 +58,18 @@ body.admin-nav-ready .admin-burger{display:flex}
 .btn-danger:hover{background:#fde8e8}
 .btn-sm{padding:5px 10px;font-size:12px;border-radius:7px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#555}
 .btn-sm:hover{background:#f5f5f0}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;z-index:200;padding:1rem}
+.modal-overlay.is-open{display:flex}
+.modal{background:#fff;border-radius:16px;padding:1.5rem;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.12);max-height:90vh;overflow-y:auto}
+.modal h3{font-size:16px;font-weight:600;margin-bottom:0.75rem}
+.modal-shared-hint{font-size:13px;color:#666;margin-bottom:12px;line-height:1.45}
+.modal-field{margin-bottom:0.875rem}
+.modal-field label{font-size:12px;color:#888;display:block;margin-bottom:4px;font-weight:500}
+.modal-field input[type=text]{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;box-sizing:border-box}
+.modal-field input[type=text]:focus{outline:none;border-color:#378ADD}
+.modal-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:1rem;justify-content:flex-end}
+.btn-cancel{background:#fff;color:#555;border:1px solid #ddd;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px}
+.btn-cancel:hover{background:#f5f5f0}
 .section{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
 .section h3{font-size:14px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
 .toggle{position:relative;width:44px;height:24px;flex-shrink:0}
@@ -357,6 +377,20 @@ body.admin-nav-ready .admin-burger{display:flex}
   </div>
 </div>
 
+<div class="modal-overlay" id="sa-modal-ical-admin" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3>URL iCal</h3>
+    <p class="modal-shared-hint" id="sa-modal-ical-admin-info"></p>
+    <div class="modal-field">
+      <label for="sa-modal-ical-admin-url">URL iCal</label>
+      <input type="text" id="sa-modal-ical-admin-url" autocomplete="off" placeholder="https://www.airbnb.fr/calendar/ical/...">
+    </div>
+    <div class="modal-btns">
+      <button type="button" class="btn-cancel" id="sa-modal-ical-admin-cancel">Retour</button>
+      <button type="button" class="btn-primary" id="sa-modal-ical-admin-ok">Enregistrer</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script type="module">
@@ -420,6 +454,10 @@ const procedureUploading = new Set();
 let procLastRenderedStudioIdx=null;
 /** Signature JSON des suggestions du studio courant : évite de refaire innerHTML du bloc orange si seules les étapes officielles changent. */
 let procSuggestionsRenderSig=null;
+/** Dernier état iCal par index studio (vue Organisation), pour la modale admin. */
+let adminIcalByStudioCache={};
+let adminIcalSaveStudioIndex=-1;
+let adminIcalModalBound=false;
 
 function procAttrEsc(s){
   return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
@@ -810,6 +848,7 @@ async function loadOrganizations(){
 
   onValue(ref(db,ob('procedureSuggestions')), snap=>{
     A.procedureSuggestions=snap.val()||{};
+    paintProcedureSuggestionsNav();
     if(A.unlocked) renderProcedures();
   });
 
@@ -927,6 +966,13 @@ function setupAdminNavOnce(){
 }
 setupAdminNavOnce();
 
+function paintProcedureSuggestionsNav(){
+  const link=document.querySelector('.admin-nav-link[data-admin-view="procedures"]');
+  if(!link) return;
+  const has=Object.keys(A.procedureSuggestions||{}).length>0;
+  link.classList.toggle('has-pending-suggestions',has);
+}
+
 // ─── Render ───────────────────────────────────────────────────────────────────
 
 function renderAdminContent(){
@@ -953,6 +999,7 @@ function renderAdminContent(){
     if(h==='general') h='dashboard';
     if(ADMIN_VIEW_IDS.includes(h)&&h!=='dashboard') window.setAdminUiView(h,{noScroll:true});
   }
+  paintProcedureSuggestionsNav();
 }
 
 const ACTIVITY_TYPE_LABEL={ login:'Connexion', logout:'Déconnexion', assign:'Assignation', assign_admin:'Assignation (admin)', admin:'Admin', admin_config:'Comptes', event:'Événement' };
@@ -983,6 +1030,25 @@ async function recomputePendingDeletionRequestsGlobally(){
     }catch(_){/* org inaccessible */}
   }
   return false;
+}
+
+function readRawIcalEntry(raw,i){
+  if(raw==null) return null;
+  if(Array.isArray(raw)) return i<raw.length?raw[i]:null;
+  if(typeof raw==='object'&&Object.prototype.hasOwnProperty.call(raw,String(i))) return raw[i];
+  return null;
+}
+
+function maxIcalIndexFromRaw(raw){
+  if(raw==null) return -1;
+  if(Array.isArray(raw)) return raw.length-1;
+  let m=-1;
+  if(typeof raw==='object'){
+    for(const k of Object.keys(raw)){
+      if(/^\d+$/.test(k)) m=Math.max(m,Number(k));
+    }
+  }
+  return m;
 }
 
 async function studioFieldsClickHandler(e){
@@ -1040,13 +1106,82 @@ async function studioFieldsClickHandler(e){
   }
 }
 
+async function saveAdminIcalUrlForStudio(studioIndex,newUrl){
+  const snap=await get(ref(db,ob('icalFeeds')));
+  const raw=snap.val();
+  const maxI=Math.max(maxIcalIndexFromRaw(raw),A.studioNames.length-1,studioIndex);
+  const arr=[];
+  for(let i=0;i<=maxI;i++){
+    const prev=readRawIcalEntry(raw,i);
+    if(i===studioIndex){
+      const slot={ url:String(newUrl||'').trim(),studio:i };
+      if(prev&&typeof prev==='object'&&prev.locked===true) slot.locked=true;
+      arr[i]=slot;
+    }else if(prev&&typeof prev==='object'){
+      const slot={ url:String(prev.url||'').trim(),studio:i };
+      if(prev.locked===true) slot.locked=true;
+      arr[i]=slot;
+    }else{
+      arr[i]={ url:'',studio:i };
+    }
+  }
+  await set(ref(db,ob('icalFeeds')),arr);
+}
+
+function openSaModalIcalAdmin(i){
+  adminIcalSaveStudioIndex=i;
+  const overlay=document.getElementById('sa-modal-ical-admin');
+  const info=document.getElementById('sa-modal-ical-admin-info');
+  const urlIn=document.getElementById('sa-modal-ical-admin-url');
+  const name=A.studioNames[i]||`Studio ${i+1}`;
+  if(info) info.textContent=`Studio « ${name} » (studio ${i+1}).`;
+  if(urlIn) urlIn.value=String(adminIcalByStudioCache[i]?.url||'');
+  if(overlay) overlay.classList.add('is-open');
+}
+
+function closeSaModalIcalAdmin(){
+  const overlay=document.getElementById('sa-modal-ical-admin');
+  if(overlay) overlay.classList.remove('is-open');
+  adminIcalSaveStudioIndex=-1;
+}
+
+function bindSaModalIcalAdminOnce(){
+  if(adminIcalModalBound) return;
+  adminIcalModalBound=true;
+  document.getElementById('sa-modal-ical-admin-cancel')?.addEventListener('click',()=>closeSaModalIcalAdmin());
+  document.getElementById('sa-modal-ical-admin-ok')?.addEventListener('click',async()=>{
+    const idx=adminIcalSaveStudioIndex;
+    if(!Number.isFinite(idx)||idx<0) return;
+    const urlIn=document.getElementById('sa-modal-ical-admin-url');
+    const v=urlIn?String(urlIn.value||'').trim():'';
+    try{
+      await saveAdminIcalUrlForStudio(idx,v);
+      showToast('URL enregistrée');
+      closeSaModalIcalAdmin();
+      await renderStudioFields();
+    }catch(err){
+      console.warn(err);
+      showToast('Erreur réseau');
+    }
+  });
+}
+
 let studioFieldsClickBound=false;
 function bindStudioFieldsDelegationOnce(){
   if(studioFieldsClickBound) return;
   const host=document.getElementById('studios-fields');
   if(!host) return;
   studioFieldsClickBound=true;
+  bindSaModalIcalAdminOnce();
   host.addEventListener('click', e=>{ void studioFieldsClickHandler(e); });
+  host.addEventListener('click', e=>{
+    const b=e.target.closest('[data-ical-admin-studio]');
+    if(!b||b.disabled) return;
+    e.preventDefault();
+    const i=Number(b.getAttribute('data-ical-admin-studio'));
+    if(!Number.isFinite(i)) return;
+    openSaModalIcalAdmin(i);
+  });
 }
 
 async function renderStudioFields(){
@@ -1065,15 +1200,34 @@ async function renderStudioFields(){
     }
   }catch(err){ console.warn(err); }
 
+  adminIcalByStudioCache={};
+  let icalRaw=null;
+  try{
+    const icalSnap=await get(ref(db,ob('icalFeeds')));
+    icalRaw=icalSnap.val();
+  }catch(err){ console.warn(err); }
+  for(let i=0;i<A.studioNames.length;i++){
+    const ent=readRawIcalEntry(icalRaw,i);
+    adminIcalByStudioCache[i]={
+      url:ent&&typeof ent==='object'?String(ent.url||'').trim():'',
+      locked:!!(ent&&typeof ent==='object'&&ent.locked===true)
+    };
+  }
+
   host.innerHTML=A.studioNames.map((name,i)=>{
     const hasReq=!!pendingByIndex[i];
     const btn=hasReq
       ? `<button type="button" class="btn-danger" data-cancel-del-req-studio="${i}" style="font-size:12px;padding:6px 10px;border:1px solid #f0c0c0;border-radius:8px;background:#fff;white-space:nowrap">Annuler la demande</button>`
       : `<button type="button" class="btn-secondary" data-del-req-studio="${i}" style="white-space:nowrap">Demande de suppression</button>`;
+    const ic=adminIcalByStudioCache[i]||{ locked:false, url:'' };
+    const icalBtn=ic.locked
+      ? `<button type="button" class="btn-secondary" disabled style="opacity:0.45;cursor:not-allowed" title="URL verrouillée par le Super Admin" data-ical-admin-studio="${i}">🔗 URL iCal</button>`
+      : `<button type="button" class="btn-secondary" data-ical-admin-studio="${i}">🔗 URL iCal</button>`;
     return `<div class="field-row" style="align-items:center">
       <label>Studio ${i+1}</label>
       <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;flex-wrap:wrap">
         <input type="text" id="name-s${i}" value="${escHtml(name)}" style="flex:1;min-width:140px">
+        ${icalBtn}
         ${btn}
       </div>
     </div>`;
