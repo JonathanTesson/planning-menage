@@ -961,15 +961,124 @@ function escHtml(s){
   return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function renderStudioFields(){
+function normalizeConfigStudioNames(raw){
+  if(raw==null) return [];
+  if(Array.isArray(raw)) return raw.map(x=>String(x==null?'':x).trim());
+  if(typeof raw==='object'){
+    return Object.keys(raw)
+      .filter(k=>/^\d+$/.test(k))
+      .sort((a,b)=>Number(a)-Number(b))
+      .map(k=>String(raw[k]==null?'':raw[k]).trim());
+  }
+  return [];
+}
+
+async function recomputePendingDeletionRequestsGlobally(){
+  for(const o of ORGANIZATIONS){
+    if(!o||!o.id) continue;
+    try{
+      const snap=await get(ref(db, `orgs/${o.id}/deletionRequests/studios`));
+      const v=snap.val();
+      if(v&&typeof v==='object'&&Object.keys(v).length) return true;
+    }catch(_){/* org inaccessible */}
+  }
+  return false;
+}
+
+async function studioFieldsClickHandler(e){
+  const addEl=e.target.closest('#admin-add-studio-btn');
+  if(addEl){
+    e.preventDefault();
+    try{
+      const snap=await get(ref(db, ob('config/studioNames')));
+      const arr=normalizeConfigStudioNames(snap.val());
+      const n=arr.length+1;
+      arr.push(`Studio ${n}`);
+      A.studioNames=arr;
+      await syncCleanersToConfig();
+      showToast('Studio ajouté');
+      await renderStudioFields();
+    }catch(err){
+      console.warn(err);
+      showToast('Erreur réseau');
+    }
+    return;
+  }
+  const delEl=e.target.closest('[data-del-req-studio]');
+  if(delEl){
+    e.preventDefault();
+    const i=Number(delEl.getAttribute('data-del-req-studio'));
+    if(A.studioNames.length<=1){
+      showToast('Impossible de demander la suppression du dernier studio.');
+      return;
+    }
+    try{
+      await set(ref(db, ob(`deletionRequests/studios/${i}`)), { demandedBy: adminActor(), demandedAt: Date.now() });
+      await set(ref(db, 'pendingDeletionRequests'), true);
+      showToast('Demande envoyée');
+      await renderStudioFields();
+    }catch(err){
+      console.warn(err);
+      showToast('Erreur réseau');
+    }
+    return;
+  }
+  const canEl=e.target.closest('[data-cancel-del-req-studio]');
+  if(canEl){
+    e.preventDefault();
+    const i=Number(canEl.getAttribute('data-cancel-del-req-studio'));
+    try{
+      await remove(ref(db, ob(`deletionRequests/studios/${i}`)));
+      const anyLeft=await recomputePendingDeletionRequestsGlobally();
+      await set(ref(db, 'pendingDeletionRequests'), anyLeft);
+      showToast('Demande annulée');
+      await renderStudioFields();
+    }catch(err){
+      console.warn(err);
+      showToast('Erreur réseau');
+    }
+  }
+}
+
+let studioFieldsClickBound=false;
+function bindStudioFieldsDelegationOnce(){
+  if(studioFieldsClickBound) return;
   const host=document.getElementById('studios-fields');
   if(!host) return;
-  host.innerHTML=A.studioNames.map((name,i)=>
-    `<div class="field-row">
+  studioFieldsClickBound=true;
+  host.addEventListener('click', e=>{ void studioFieldsClickHandler(e); });
+}
+
+async function renderStudioFields(){
+  bindStudioFieldsDelegationOnce();
+  const host=document.getElementById('studios-fields');
+  if(!host) return;
+  const pendingByIndex={};
+  try{
+    const snap=await get(ref(db, ob('deletionRequests/studios')));
+    const v=snap.val();
+    if(v&&typeof v==='object'){
+      for(const k of Object.keys(v)){
+        const idx=Number(k);
+        if(Number.isFinite(idx)) pendingByIndex[idx]=true;
+      }
+    }
+  }catch(err){ console.warn(err); }
+
+  host.innerHTML=A.studioNames.map((name,i)=>{
+    const hasReq=!!pendingByIndex[i];
+    const btn=hasReq
+      ? `<button type="button" class="btn-danger" data-cancel-del-req-studio="${i}" style="font-size:12px;padding:6px 10px;border:1px solid #f0c0c0;border-radius:8px;background:#fff;white-space:nowrap">Annuler la demande</button>`
+      : `<button type="button" class="btn-secondary" data-del-req-studio="${i}" style="white-space:nowrap">Demande de suppression</button>`;
+    return `<div class="field-row" style="align-items:center">
       <label>Studio ${i+1}</label>
-      <input type="text" id="name-s${i}" value="${escHtml(name)}">
-    </div>`
-  ).join('');
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;flex-wrap:wrap">
+        <input type="text" id="name-s${i}" value="${escHtml(name)}" style="flex:1;min-width:140px">
+        ${btn}
+      </div>
+    </div>`;
+  }).join('')+
+    '<div style="margin-top:10px"><button type="button" class="btn-secondary" id="admin-add-studio-btn">+ Ajouter un studio</button></div>';
 }
 
 /** Résumé global des indispos futures (toutes les ménagères), sous le calendrier admin. */
