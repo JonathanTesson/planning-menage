@@ -73,7 +73,6 @@ body.sa-nav-ready .admin-burger{display:flex}
 .account-role.active{border-color:#ddd;background:#f0f0eb}
 .org-list-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0eb;gap:8px;flex-wrap:wrap}
 .org-list-row:last-child{border-bottom:none}
-.org-list-id{font-family:ui-monospace,monospace;font-size:12px;color:#555}
 .org-list-label{font-size:13px;font-weight:500}
 .empty-hint{font-size:12px;color:#aaa;padding:8px 0}
 .toggle{position:relative;width:44px;height:24px;flex-shrink:0}
@@ -140,6 +139,7 @@ body.sa-nav-ready .admin-burger{display:flex}
     <input type="password" class="login-input login-input--pwd" id="sa-login-pwd" autocomplete="current-password" aria-label="Mot de passe" onkeydown="if(event.key==='Enter')window._saDoLogin()">
     <div class="login-error" id="sa-login-error" style="display:none">Identifiants incorrects</div>
     <button type="button" class="btn-primary" onclick="window._saDoLogin()">Connexion</button>
+    <p style="font-size:11px;color:#bbb;text-align:center;margin-top:4px">L'interface Super Administration n'est pas prévue pour un smartphone</p>
     <a href="index.html" style="font-size:12px;color:#aaa;text-decoration:none;margin-top:4px">← Retour au planning</a>
   </div>
 </div>
@@ -360,7 +360,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const storage = getStorage(app);
 
-const APP_VERSION = '4.6.2';
+const APP_VERSION = '4.6.3';
 const SA_SESSION_KEY = 'sa_session';
 
 function hashSimple(str){

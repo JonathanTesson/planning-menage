@@ -274,8 +274,7 @@ html[data-menage-org-gate="1"] #main-app{display:none!important}
   </div>
   <div style="display:flex;align-items:center;gap:6px">
     <span class="sync-dot loading" id="sync-dot"></span>
-    <span id="sync-label" style="font-size:11px;color:#aaa">Connexion...</span>
-    <a id="superadmin-lock-btn" href="superadmin.html" title="Super Administration" style="display:none;margin-left:4px;opacity:0.3;font-size:16px;text-decoration:none;line-height:1" aria-label="Super Administration">🔒</a>
+    <a href="superadmin.html" style="text-decoration:none;color:inherit;cursor:pointer"><span id="sync-label" style="font-size:11px;color:#aaa">Connexion...</span></a>
   </div>
 </div>
 
@@ -405,7 +404,7 @@ const ORG_STORAGE_KEY = 'menage_org_v1';
 const ORG_CHANGE_GATE_KEY = 'menage_org_change_gate';
 let ORGANIZATIONS = [];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.6.2';
+const APP_VERSION = '4.6.3';
 
 const STUDIO_COLORS = [
   { bg: '#daeafe', text: '#1047a0' },
@@ -734,8 +733,6 @@ function showApp(){
   if(el('org-first-screen')) el('org-first-screen').style.display='none';
   if(el('login-screen')) el('login-screen').style.display='none';
   if(el('main-app')) el('main-app').style.display='';
-  const lockBtn = document.getElementById('superadmin-lock-btn');
-  if(lockBtn) lockBtn.style.display='none';
   const noAuth=S.currentUser?.noAuth;
   if(el('logout-btn')) el('logout-btn').style.display=noAuth?'none':'';
   const homeBtn=el('home-btn');
@@ -773,6 +770,8 @@ function showApp(){
       }
     }
   }
+  const topTitle=document.querySelector('.topbar-title');
+  if(topTitle) topTitle.textContent='Planning Ménage';
   render();
 }
 
@@ -781,8 +780,6 @@ function fillOrgSelect(selectEl){
   selectEl.innerHTML=ORGANIZATIONS.map(o=>`<option value="${o.id}">${o.label}</option>`).join('');
 }
 function showLogin(){
-  const lockBtnLogin = document.getElementById('superadmin-lock-btn');
-  if(lockBtnLogin) lockBtnLogin.style.display='inline';
   hideOrgChangeGate();
   setVersionFootVisible(true);
   if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='none';
@@ -800,6 +797,9 @@ function showLogin(){
   const sel=el('login-name');
   if(sel) sel.innerHTML='<option value="">-</option>'+
     accounts.map(a=>`<option value="${a.name}">${a.name}</option>`).join('');
+  const topTitleLogin=document.querySelector('.topbar-title');
+  if(topTitleLogin) topTitleLogin.textContent='Accueil';
+  document.getElementById('topbar-sub').textContent='';
 }
 
 /** Le planning Firebase est lié à menage_org_v1 : changer l’org sur l’écran login recharge avec les bonnes données. */
@@ -915,8 +915,6 @@ function hideOrgUnconfiguredScreen(){
 }
 
 function showOrgUnconfigured(){
-  const lockBtnUn = document.getElementById('superadmin-lock-btn');
-  if(lockBtnUn) lockBtnUn.style.display='inline';
   hideOrgChangeGate();
   setVersionFootVisible(true);
   if(el('org-first-screen')) el('org-first-screen').style.display='none';
@@ -924,6 +922,9 @@ function showOrgUnconfigured(){
   if(el('main-app')) el('main-app').style.display='none';
   if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='';
   S.currentUser=null;
+  const topTitleUn=document.querySelector('.topbar-title');
+  if(topTitleUn) topTitleUn.textContent='Accueil';
+  document.getElementById('topbar-sub').textContent='';
 }
 
 function routeAfterFirebaseReady(){
@@ -1035,8 +1036,6 @@ function initFirebaseAndApp(){
 }
 
 function showOrgFirst(){
-  const lockBtnFirst = document.getElementById('superadmin-lock-btn');
-  if(lockBtnFirst) lockBtnFirst.style.display='inline';
   hideOrgChangeGate();
   setVersionFootVisible(true);
   el('org-first-screen').style.display='';
@@ -1046,6 +1045,9 @@ function showOrgFirst(){
   const s=el('org-first-select');
   fillOrgSelect(s);
   if(s) s.value=ORGANIZATIONS[0]?.id || 'tesson';
+  const topTitleFirst=document.querySelector('.topbar-title');
+  if(topTitleFirst) topTitleFirst.textContent='Accueil';
+  document.getElementById('topbar-sub').textContent='';
 }
 
 window.confirmOrgFirst=function(){
