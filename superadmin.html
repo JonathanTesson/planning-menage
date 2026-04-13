@@ -1550,6 +1550,15 @@ el('sa-modal-del-studio-ok').addEventListener('click', async ()=>{
     arr.splice(i, 1);
     await set(ref(db, `orgs/${orgId}/config/studioNames`), arr);
     delete studioCache[orgId];
+    try{ await remove(ref(db, `orgs/${orgId}/deletionRequests/studios/${i}`)); }catch(_){}
+    await recomputePendingDeletionRequestsRootSa();
+    try{
+      const snapDr = await get(ref(db, `orgs/${orgId}/deletionRequests/studios`));
+      const vDr = snapDr.val();
+      if(orgParamsCache[orgId]) orgParamsCache[orgId].deletionRequests = deletionRequestsHasEntries(vDr) ? vDr : null;
+      const listHost = el('sa-org-list');
+      if(listHost && orgParamsCache[orgId]) paintOrgRow(listHost, orgId, orgParamsCache[orgId]);
+    }catch(_){}
     pendingDeleteStudioOrgId = '';
     pendingDeleteStudioIndex = -1;
     closeModal('sa-modal-del-studio');
@@ -1684,6 +1693,7 @@ el('sa-modal-del-org-ok').addEventListener('click', async ()=>{
     el('sa-modal-del-org-pwd').value = '';
     showToast('Organisation supprimée (hors réservations / assignations / comptes rendus).');
     await fetchOrganizations();
+    await recomputePendingDeletionRequestsRootSa();
     renderAccountsForSelectedOrg();
     renderParamsForSelectedOrg();
   }catch(e){
