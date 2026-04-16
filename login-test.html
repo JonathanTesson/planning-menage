@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test connexion comptes globaux — Planning Ménage</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f5f5f0;color:#1a1a1a;padding:0 0 2rem}
+.topbar{background:#fff;border-bottom:1px solid #e0e0d8;padding:0.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar-title{font-size:16px;font-weight:600}
+.topbar-sub{font-size:12px;color:#888;margin-top:1px}
+.container{max-width:700px;margin:0 auto;padding:1.25rem 1rem}
+.section{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
+.section h3{font-size:14px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+.field-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.field-row label{font-size:12px;color:#888;width:140px;flex-shrink:0}
+.field-row input[type=text],.field-row input[type=password]{flex:1;min-width:160px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
+.field-row input:focus{outline:none;border-color:#378ADD}
+.btn-primary{background:#1a1a1a;color:#fff;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500}
+.btn-primary:hover{background:#333}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed}
+.btn-secondary{background:#fff;color:#555;border:1px solid #ddd;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px}
+.btn-secondary:hover{background:#f5f5f0}
+.login-error{color:#E24B4A;font-size:13px;margin-top:10px;line-height:1.4}
+.login-hint{font-size:12px;color:#888;margin-top:8px;line-height:1.4}
+.empty-hint{font-size:12px;color:#aaa;padding:4px 0}
+.result-block{margin-top:4px}
+.result-line{font-size:13px;margin-bottom:6px;line-height:1.45}
+.result-line strong{color:#333;font-weight:600}
+.org-card{border:1px solid #e8e8e2;border-radius:10px;padding:10px 12px;margin-top:8px;background:#fafaf8}
+.org-card-title{font-size:13px;font-weight:600;margin-bottom:4px}
+.org-card-roles{font-size:16px;letter-spacing:4px;line-height:1.4}
+.tools-out{font-family:ui-monospace,Consolas,monospace;font-size:12px;word-break:break-all;background:#f0f0eb;border:1px solid #e0e0d8;border-radius:8px;padding:10px 12px;margin-top:10px;color:#1a1a1a;min-height:2.5em}
+.tools-muted{font-size:11px;color:#aaa;margin-top:6px}
+a.back-link{font-size:12px;color:#aaa;text-decoration:none;display:inline-block;margin-top:12px}
+a.back-link:hover{color:#666}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="topbar-title">Test connexion — comptes globaux</div>
+    <div class="topbar-sub">Firebase · /accounts · SHA-256</div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="section">
+    <h3>Connexion (pseudo + mot de passe)</h3>
+    <p class="empty-hint" style="margin-bottom:12px">Aucune organisation à choisir : le compte est résolu dans <code style="font-size:11px;background:#f0f0eb;padding:2px 6px;border-radius:4px">/accounts</code> par scan côté client.</p>
+    <div class="field-row">
+      <label for="lt-pseudo">Pseudo</label>
+      <input type="text" id="lt-pseudo" autocomplete="username" spellcheck="false" aria-label="Pseudo">
+    </div>
+    <div class="field-row">
+      <label for="lt-pwd">Mot de passe</label>
+      <input type="password" id="lt-pwd" autocomplete="current-password" aria-label="Mot de passe">
+    </div>
+    <button type="button" class="btn-primary" id="lt-connect">Connexion</button>
+    <div class="login-error" id="lt-error" style="display:none" role="alert"></div>
+    <p class="login-hint">En cas d’échec, vérifiez le pseudo, le mot de passe et que l’entrée existe bien sous <strong>/accounts</strong> avec un <strong>pwdHash</strong> SHA-256 hex (outil ci-dessous).</p>
+  </div>
+
+  <div class="section" id="lt-result-wrap" style="display:none">
+    <h3>Compte trouvé</h3>
+    <div class="result-block" id="lt-result-body"></div>
+  </div>
+
+  <div class="section">
+    <h3>Outils de test</h3>
+    <p class="empty-hint" style="margin-bottom:10px">Génère le hash SHA-256 (hex) d’un mot de passe pour renseigner <strong>pwdHash</strong> dans Firebase.</p>
+    <div class="field-row">
+      <label for="lt-tool-pwd">Mot de passe</label>
+      <input type="text" id="lt-tool-pwd" autocomplete="off" spellcheck="false" aria-label="Mot de passe pour hash">
+    </div>
+    <button type="button" class="btn-secondary" id="lt-tool-btn">Générer SHA-256 hex</button>
+    <div class="tools-out" id="lt-tool-out" aria-live="polite"></div>
+    <p class="tools-muted">Même algorithme que la page Super Administration (UTF-8 → SHA-256 → hex minuscule).</p>
+  </div>
+
+  <a class="back-link" href="index.html">← Retour au planning</a>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
+  authDomain: "planning-menage-18b09.firebaseapp.com",
+  databaseURL: "https://planning-menage-18b09-default-rtdb.firebaseio.com",
+  projectId: "planning-menage-18b09",
+  storageBucket: "planning-menage-18b09.firebasestorage.app",
+  messagingSenderId: "685094108459",
+  appId: "1:685094108459:web:b90ec9f136de34d699996e"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+async function sha256Hex(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function el(id){ return document.getElementById(id); }
+
+function normalizePseudo(s){
+  return (s == null ? '' : String(s)).trim();
+}
+
+function rolesLine(roles){
+  const r = Array.isArray(roles) ? roles.map(x => String(x).toLowerCase()) : [];
+  let s = '';
+  if(r.includes('menage')) s += '🧹';
+  if(r.includes('admin')) s += '👑';
+  if(!s) return '<span class="empty-hint">(aucun rôle reconnu — attendu : menage, admin)</span>';
+  return s;
+}
+
+function showError(msg){
+  const e = el('lt-error');
+  e.textContent = msg;
+  e.style.display = 'block';
+  el('lt-result-wrap').style.display = 'none';
+}
+
+function hideError(){
+  el('lt-error').style.display = 'none';
+  el('lt-error').textContent = '';
+}
+
+async function tryLogin(){
+  hideError();
+  const pseudo = normalizePseudo(el('lt-pseudo').value);
+  const pwd = el('lt-pwd').value;
+  const btn = el('lt-connect');
+  if(!pseudo){
+    showError('Indiquez un pseudo.');
+    return;
+  }
+  btn.disabled = true;
+  try{
+    const snap = await get(ref(db, 'accounts'));
+    if(!snap.exists()){
+      showError('Aucune donnée à la racine « accounts ». Créez au moins un enregistrement /accounts/{id} dans Firebase.');
+      return;
+    }
+    const val = snap.val();
+    const entries = Object.entries(val).filter(([, acc]) => acc && typeof acc === 'object');
+    const match = entries.find(([, acc]) => normalizePseudo(acc.pseudo) === pseudo);
+    if(!match){
+      showError('Aucun compte trouvé avec ce pseudo.');
+      return;
+    }
+    const [, account] = match;
+    if(account.pwdHash == null || account.pwdHash === ''){
+      showError('Compte trouvé mais pwdHash manquant ou vide.');
+      return;
+    }
+    const hash = await sha256Hex(pwd);
+    const storedHash = String(account.pwdHash).trim().toLowerCase();
+    if(hash !== storedHash){
+      showError('Mot de passe incorrect.');
+      return;
+    }
+    const nom = account.nom != null ? String(account.nom) : '—';
+    const prenom = account.prenom != null ? String(account.prenom) : '—';
+    const pseudoDisp = account.pseudo != null ? String(account.pseudo) : '—';
+    const defaultOrg = account.defaultOrg != null && account.defaultOrg !== '' ? String(account.defaultOrg) : '—';
+    const orgs = account.orgs && typeof account.orgs === 'object' ? account.orgs : {};
+    const orgKeys = Object.keys(orgs);
+
+    let orgHtml = '';
+    if(orgKeys.length === 0){
+      orgHtml = '<p class="empty-hint">Aucune organisation dans « orgs ».</p>';
+    }else{
+      orgHtml = orgKeys.sort().map(key => {
+        const o = orgs[key];
+        const roles = o && o.roles != null ? o.roles : [];
+        return `<div class="org-card"><div class="org-card-title">${escapeHtml(key)}</div><div class="org-card-roles">${rolesLine(roles)}</div></div>`;
+      }).join('');
+    }
+
+    el('lt-result-body').innerHTML = `
+      <div class="result-line"><strong>Nom</strong> : ${escapeHtml(nom)}</div>
+      <div class="result-line"><strong>Prénom</strong> : ${escapeHtml(prenom)}</div>
+      <div class="result-line"><strong>Pseudo</strong> : ${escapeHtml(pseudoDisp)}</div>
+      <div class="result-line" style="margin-top:10px"><strong>Organisation par défaut</strong> : ${escapeHtml(defaultOrg)}</div>
+      <div class="result-line" style="margin-top:10px"><strong>Organisations</strong></div>
+      ${orgHtml}
+    `;
+    el('lt-result-wrap').style.display = 'block';
+  }catch(err){
+    console.error(err);
+    showError('Erreur de lecture Firebase : ' + (err && err.message ? err.message : String(err)));
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function escapeHtml(s){
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+el('lt-connect').addEventListener('click', tryLogin);
+el('lt-pwd').addEventListener('keydown', e => { if(e.key === 'Enter') tryLogin(); });
+el('lt-pseudo').addEventListener('keydown', e => { if(e.key === 'Enter') tryLogin(); });
+
+el('lt-tool-btn').addEventListener('click', async () => {
+  const raw = el('lt-tool-pwd').value;
+  const out = el('lt-tool-out');
+  out.textContent = '';
+  try{
+    out.textContent = await sha256Hex(raw);
+  }catch(e){
+    out.textContent = 'Erreur : ' + (e && e.message ? e.message : String(e));
+  }
+});
+</script>
+</body>
+</html>
