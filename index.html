@@ -309,8 +309,6 @@ html[data-menage-org-gate="1"] #main-app{display:none!important}
     <div class="login-icon">🔑</div>
     <div class="login-title">Planning Ménage</div>
     <div class="login-sub">Identifiez-vous pour accéder<br>au planning</div>
-    <label for="login-org" style="font-size:11px;color:#aaa;max-width:260px;width:100%">Organisation</label>
-    <select class="login-select" id="login-org" aria-label="Organisation" onchange="onLoginOrgChange()"></select>
     <label for="login-name" style="font-size:11px;color:#aaa;max-width:260px;width:100%">Nom</label>
     <select class="login-select" id="login-name" aria-label="Nom">
       <option value="">-</option>
@@ -686,6 +684,11 @@ function hashSimple(str){
   return h.toString(36);
 }
 
+async function sha256Hex(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
 /** Clé jour **locale** (alignée sur le calendrier), format YYYY-MM-DD. */
 function localDateKey(d){
   const y=d.getFullYear();
@@ -975,17 +978,28 @@ function showLogin(){
   if(el('org-first-screen')) el('org-first-screen').style.display='none';
   if(el('login-screen')) el('login-screen').style.display='';
   if(el('main-app')) el('main-app').style.display='none';
-  const stored=getStoredOrgId();
-  const defOrg=stored||(S.adminConfig.defaultOrgId&&ORGANIZATIONS.some(o=>o.id===S.adminConfig.defaultOrgId)
-    ? S.adminConfig.defaultOrgId
-    : ORGANIZATIONS[0]?.id || 'tesson');
-  const orgEl=el('login-org');
-  fillOrgSelect(orgEl);
-  if(orgEl) orgEl.value=defOrg;
-  const accounts=S.adminConfig.accounts||[];
   const sel=el('login-name');
-  if(sel) sel.innerHTML='<option value="">-</option>'+
-    accounts.map(a=>`<option value="${a.name}">${a.name}</option>`).join('');
+  if(sel){
+    sel.innerHTML='<option value="">-</option>';
+    void get(ref(db,'accounts')).then(snap=>{
+      const val=snap.val();
+      const set=new Set();
+      if(val&&typeof val==='object'){
+        for(const row of Object.values(val)){
+          if(!row||typeof row!=='object') continue;
+          const disp=String(row.name??'').trim()||String(row.prenom??'').trim();
+          if(disp) set.add(disp);
+        }
+      }
+      const sorted=[...set].sort((a,b)=>a.localeCompare(b,'fr'));
+      for(const n of sorted){
+        const o=document.createElement('option');
+        o.value=n;
+        o.textContent=n;
+        sel.appendChild(o);
+      }
+    }).catch(()=>{});
+  }
   const topTitleLogin=document.querySelector('.topbar-title');
   if(topTitleLogin) topTitleLogin.textContent='Accueil';
   closeOrgSwitchMenu();
@@ -1009,24 +1023,83 @@ window.clearOrgChoiceAndReload=function(){
   location.reload();
 };
 
-window.doLogin = function(){
-  const orgSel=document.getElementById('login-org');
-  const orgId=orgSel&&orgSel.value;
-  if(!orgId){ document.getElementById('login-error').style.display=''; document.getElementById('login-error').textContent='Choisissez une organisation'; return; }
+function rolesToMenageAdmin(roles){
+  const r=Array.isArray(roles)?roles.map(x=>String(x).toLowerCase()):[];
+  return{ menage:r.includes('menage'), admin:r.includes('admin') };
+}
+
+window.doLogin = async function(){
   const name=document.getElementById('login-name').value;
   const pwd=document.getElementById('login-pwd').value;
-  if(!name){ document.getElementById('login-error').style.display=''; document.getElementById('login-error').textContent='Choisissez votre nom'; return; }
+  const errEl=document.getElementById('login-error');
+  if(!name){ errEl.style.display=''; errEl.textContent='Choisissez votre nom'; return; }
+  let accountGlobal=null;
+  try{
+    const snap=await get(ref(db,'accounts'));
+    const val=snap.val();
+    const candidates=[];
+    if(val&&typeof val==='object'){
+      for(const row of Object.values(val)){
+        if(!row||typeof row!=='object') continue;
+        const nm=String(row.name??'').trim();
+        const pr=String(row.prenom??'').trim();
+        if(nm===name||pr===name) candidates.push(row);
+      }
+    }
+    if(candidates.length){
+      const h=await sha256Hex(pwd);
+      for(const row of candidates){
+        const stored=String(row.pwdHash??'').trim().toLowerCase();
+        if(h===stored){
+          accountGlobal=row;
+          break;
+        }
+      }
+      if(!accountGlobal){
+        errEl.style.display='';
+        errEl.textContent='Mot de passe incorrect';
+        document.getElementById('login-pwd').value='';
+        return;
+      }
+    }
+  }catch(_){
+    accountGlobal=null;
+  }
+  if(accountGlobal){
+    const defOrg=String(accountGlobal.defaultOrg||'').trim()||getStoredOrgId();
+    const roles=(accountGlobal.orgs&&accountGlobal.orgs[defOrg]&&accountGlobal.orgs[defOrg].roles)||[];
+    const {menage,admin}=rolesToMenageAdmin(roles);
+    const sessionName=String(accountGlobal.name??'').trim()||String(accountGlobal.prenom??'').trim()||name;
+    errEl.style.display='none';
+    if(window.__menageFbInit&&window.__menageActiveOrg&&window.__menageActiveOrg!==defOrg){
+      saveSession({ name:sessionName });
+      setStoredOrgId(defOrg);
+      try{ sessionStorage.setItem(ORG_CHANGE_GATE_KEY,'1'); }catch(e){}
+      location.reload();
+      return;
+    }
+    setStoredOrgId(defOrg);
+    S.currentUser={ name:sessionName, menage, admin };
+    saveSession({ name:sessionName });
+    S.globalAccountLoaded=false;
+    S.globalAccount=null;
+    void ensureGlobalAccountCache(sessionName).then(()=>{
+      logActivity({ type:'login', actor:sessionName, text:sessionName+' s\'est connectée au planning' });
+      showApp();
+    });
+    return;
+  }
   const acc=(S.adminConfig.accounts||[]).find(a=>a.name===name);
-  if(!acc){ document.getElementById('login-error').style.display=''; document.getElementById('login-error').textContent='Compte introuvable'; return; }
-  if(acc.pwdHash && hashSimple(pwd)!==acc.pwdHash){
-    document.getElementById('login-error').style.display='';
-    document.getElementById('login-error').textContent='Mot de passe incorrect';
+  if(!acc){ errEl.style.display=''; errEl.textContent='Compte introuvable'; return; }
+  if(acc.pwdHash&&hashSimple(pwd)!==acc.pwdHash){
+    errEl.style.display='';
+    errEl.textContent='Mot de passe incorrect';
     document.getElementById('login-pwd').value='';
     return;
   }
-  document.getElementById('login-error').style.display='none';
-  setStoredOrgId(orgId);
-  if(window.__menageFbInit && window.__menageActiveOrg && window.__menageActiveOrg!==orgId){
+  errEl.style.display='none';
+  const orgId=getStoredOrgId();
+  if(window.__menageFbInit&&window.__menageActiveOrg&&orgId&&window.__menageActiveOrg!==orgId){
     try{ sessionStorage.setItem(ORG_CHANGE_GATE_KEY,'1'); }catch(e){}
     location.reload();
     return;
