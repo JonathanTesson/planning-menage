@@ -203,6 +203,12 @@ body.admin-nav-ready .admin-burger{display:flex}
 .acc-modal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;justify-content:flex-end}
 .acc-add-btn{min-width:40px;padding:8px 14px;font-size:18px;line-height:1;font-weight:600}
 #accounts-list .account-row .account-name{flex:1;min-width:0}
+#acc-edit-modal{z-index:425}
+.acc-modal-field input.acc-modal-input-ro,.acc-modal-field input:read-only{background:#f5f5f0;color:#888;cursor:default}
+.acc-edit-actions-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;justify-content:space-between;align-items:center}
+.acc-edit-actions-row .acc-edit-actions-right{display:flex;gap:8px;flex-wrap:wrap}
+.acc-edit-del-btn{font-size:13px;padding:8px 14px;border-radius:8px;border:1px solid #f0c0c0;background:#fff}
+.acc-edit-del-btn:hover{background:#fde8e8}
 </style>
 </head>
 <body>
@@ -331,6 +337,31 @@ body.admin-nav-ready .admin-burger{display:flex}
           <div class="acc-modal-actions">
             <button type="button" class="btn-secondary" onclick="closeAddAccountModal()">Annuler</button>
             <button type="button" class="btn-primary" id="acc-modal-submit" onclick="submitAddAccountModal()">Créer</button>
+          </div>
+        </div>
+      </div>
+      <div id="acc-edit-modal" class="acc-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="acc-edit-modal-title" aria-hidden="true" onclick="closeEditAccountModal()">
+        <div class="acc-modal-panel" onclick="event.stopPropagation()">
+          <div class="acc-modal-title" id="acc-edit-modal-title">Modifier le compte</div>
+          <div class="acc-modal-field"><label for="acc-edit-prenom">Prénom</label><input type="text" id="acc-edit-prenom" class="acc-modal-input-ro" readonly autocomplete="off"></div>
+          <div class="acc-modal-field"><label for="acc-edit-nom">Nom</label><input type="text" id="acc-edit-nom" autocomplete="off"></div>
+          <div class="acc-modal-field"><label for="acc-edit-email">Email</label><input type="email" id="acc-edit-email" autocomplete="email"></div>
+          <div class="acc-modal-field"><label for="acc-edit-pseudo">Pseudo<span class="acc-modal-req">*</span></label><input type="text" id="acc-edit-pseudo" autocomplete="username"></div>
+          <div class="acc-modal-field"><label for="acc-edit-tel">Téléphone (optionnel)</label><input type="text" id="acc-edit-tel" autocomplete="tel"></div>
+          <div class="acc-modal-field"><label for="acc-edit-pwd">Nouveau mot de passe</label><input type="password" id="acc-edit-pwd" autocomplete="new-password" placeholder="Laisser vide pour ne pas changer"></div>
+          <div class="acc-modal-field">
+            <span style="font-size:12px;color:#888;font-weight:500">Rôles</span>
+            <div class="acc-modal-roles">
+              <button type="button" class="account-role" id="acc-edit-menage-btn" onclick="accEditToggleRole('menage')" title="Peut faire le ménage">🧹</button>
+              <button type="button" class="account-role" id="acc-edit-admin-btn" onclick="accEditToggleRole('admin')" title="Administrateur">👑</button>
+            </div>
+          </div>
+          <div class="acc-edit-actions-row">
+            <button type="button" class="btn-danger acc-edit-del-btn" onclick="submitDeleteAccountModal()">Supprimer</button>
+            <div class="acc-edit-actions-right">
+              <button type="button" class="btn-secondary" onclick="closeEditAccountModal()">Annuler</button>
+              <button type="button" class="btn-primary" id="acc-edit-save" onclick="submitEditAccountModal()">Enregistrer</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1386,7 +1417,7 @@ function renderAccounts(){
       <div class="account-name">${acc.nom ? acc.name + ' ' + acc.nom : acc.name}</div>
       <div class="account-role${acc.menage?' active':''}" onclick="toggleRole(${i},'menage')" title="Peut faire le ménage">🧹</div>
       <div class="account-role${acc.admin?' active':''}" onclick="toggleRole(${i},'admin')" title="Administrateur">👑</div>
-      <button type="button" class="btn-sm" onclick="accEditComingSoon()" title="Modifier">✏️</button>
+      <button type="button" class="btn-sm" onclick="openEditAccountModal(${i})" title="Modifier">✏️</button>
     </div>`;
   }).join('');
 }
@@ -1485,6 +1516,28 @@ function accFindPseudoOwner(entries,pseudo){
   return null;
 }
 
+function accFindPseudoOwnerExcluding(entries,pseudo,excludeId){
+  const ps=String(pseudo||'').trim();
+  if(!ps) return null;
+  for(const row of entries){
+    if(excludeId&&row.id===excludeId) continue;
+    if(String(row.pseudo??'').trim()===ps) return row;
+  }
+  return null;
+}
+
+function accEditFindGlobal(entries,legacyAcc){
+  const p=String(legacyAcc.name??'').trim();
+  const n=String(legacyAcc.nom??'').trim();
+  let candidates=entries.filter(row=>String(row.prenom??'').trim()===p);
+  if(n!=='') candidates=candidates.filter(row=>String(row.nom??'').trim()===n);
+  if(legacyAcc.email!=null&&String(legacyAcc.email).trim()!==''){
+    const em=accNormalizeEmail(legacyAcc.email);
+    return candidates.find(row=>accNormalizeEmail(row.email)===em)||null;
+  }
+  return candidates[0]||null;
+}
+
 function accRolesFromCheckboxes(){
   const menage=document.getElementById('acc-modal-menage-btn').classList.contains('active');
   const admin=document.getElementById('acc-modal-admin-btn').classList.contains('active');
@@ -1574,7 +1627,7 @@ window.submitAddAccountModal=async function(){
       btn.disabled=false;
       return;
     }
-    accounts.push({name:prenom,nom,pwdHash:hashSimple(pwd),menage,admin,sharedWith:[]});
+    accounts.push({name:prenom,nom,email:accNormalizeEmail(email),pseudo,tel:tel||'',pwdHash:hashSimple(pwd),menage,admin,sharedWith:[]});
     A.adminConfig.accounts=accounts;
     saveAdminConfig();
     closeAddAccountModal();
@@ -1614,7 +1667,7 @@ window.submitAddAccountModal=async function(){
     btn.disabled=false;
     return;
   }
-  accounts.push({name:prenom,nom,pwdHash:hashSimple(pwd),menage,admin,sharedWith:[]});
+  accounts.push({name:prenom,nom,email:accNormalizeEmail(email),pseudo,tel:tel||'',pwdHash:hashSimple(pwd),menage,admin,sharedWith:[]});
   A.adminConfig.accounts=accounts;
   saveAdminConfig();
   closeAddAccountModal();
@@ -1625,7 +1678,197 @@ window.submitAddAccountModal=async function(){
   btn.disabled=false;
 };
 
-window.accEditComingSoon=function(){showToast('Modification à venir');};
+window.closeEditAccountModal=function(){
+  const m=document.getElementById('acc-edit-modal');
+  m.classList.remove('is-open');
+  m.setAttribute('aria-hidden','true');
+  window._accEditIndex=-1;
+  window._accEditGlobalId=null;
+};
+
+window.accEditToggleRole=function(role){
+  const id=role==='menage'?'acc-edit-menage-btn':'acc-edit-admin-btn';
+  document.getElementById(id).classList.toggle('active');
+};
+
+window.openEditAccountModal=async function(i){
+  const accounts=A.adminConfig.accounts||[];
+  const acc=accounts[i];
+  if(!acc) return;
+  window._accEditIndex=i;
+  document.getElementById('acc-edit-prenom').value=acc.name||'';
+  document.getElementById('acc-edit-pwd').value='';
+  let entries=[];
+  let global=null;
+  try{
+    const snap=await get(ref(db,'accounts'));
+    entries=accEntriesFromSnapshotVal(snap.val());
+    global=accEditFindGlobal(entries,acc);
+    setSyncStatus('ok');
+  }catch(_){
+    showToast('Erreur lecture comptes globaux');
+    return;
+  }
+  window._accEditGlobalId=global?global.id:null;
+  const nomInp=document.getElementById('acc-edit-nom');
+  const hadLegacyNom=acc.nom!=null&&String(acc.nom).trim()!=='';
+  if(hadLegacyNom){
+    nomInp.value=String(acc.nom).trim();
+    nomInp.readOnly=true;
+    nomInp.classList.add('acc-modal-input-ro');
+  }else{
+    nomInp.value=global&&global.nom!=null?String(global.nom).trim():'';
+    nomInp.readOnly=false;
+    nomInp.classList.remove('acc-modal-input-ro');
+  }
+  const emailInp=document.getElementById('acc-edit-email');
+  const hadLegacyEmail=acc.email!=null&&String(acc.email).trim()!=='';
+  if(hadLegacyEmail){
+    emailInp.value=String(acc.email).trim();
+    emailInp.readOnly=true;
+    emailInp.classList.add('acc-modal-input-ro');
+  }else{
+    emailInp.value=global&&global.email!=null?String(global.email).trim():'';
+    emailInp.readOnly=false;
+    emailInp.classList.remove('acc-modal-input-ro');
+  }
+  document.getElementById('acc-edit-pseudo').value=acc.pseudo!=null&&String(acc.pseudo).trim()!==''?String(acc.pseudo).trim():(global&&global.pseudo?String(global.pseudo).trim():'');
+  document.getElementById('acc-edit-tel').value=acc.tel!=null&&String(acc.tel).trim()!==''?String(acc.tel):(global&&global.tel!=null?String(global.tel):'');
+  document.getElementById('acc-edit-menage-btn').classList.toggle('active',!!acc.menage);
+  document.getElementById('acc-edit-admin-btn').classList.toggle('active',!!acc.admin);
+  const m=document.getElementById('acc-edit-modal');
+  m.classList.add('is-open');
+  m.setAttribute('aria-hidden','false');
+};
+
+window.submitEditAccountModal=async function(){
+  const i=window._accEditIndex;
+  if(i==null||i<0) return;
+  const accounts=A.adminConfig.accounts||[];
+  const acc=accounts[i];
+  if(!acc){ closeEditAccountModal(); return; }
+  const hadLegacyEmail=acc.email!=null&&String(acc.email).trim()!=='';
+  const hadLegacyNom=acc.nom!=null&&String(acc.nom).trim()!=='';
+  const pseudo=document.getElementById('acc-edit-pseudo').value.trim();
+  const tel=document.getElementById('acc-edit-tel').value.trim();
+  const pwd=document.getElementById('acc-edit-pwd').value;
+  const nomInpVal=document.getElementById('acc-edit-nom').value.trim();
+  const emailInpVal=document.getElementById('acc-edit-email').value.trim();
+  const email=hadLegacyEmail?String(acc.email).trim():emailInpVal;
+  if(!pseudo){ showToast('Pseudo obligatoire'); return; }
+  if(!hadLegacyNom&&!nomInpVal){ showToast('Nom obligatoire'); return; }
+  if(!hadLegacyEmail){
+    if(!emailInpVal||emailInpVal.indexOf('@')<0){ showToast('Email obligatoire'); return; }
+  }
+  const menage=document.getElementById('acc-edit-menage-btn').classList.contains('active');
+  const admin=document.getElementById('acc-edit-admin-btn').classList.contains('active');
+  if(!menage&&!admin){ showToast('Choisissez au moins un rôle'); return; }
+  const roles=[];
+  if(menage) roles.push('menage');
+  if(admin) roles.push('admin');
+  const btn=document.getElementById('acc-edit-save');
+  btn.disabled=true;
+  let entries=[];
+  try{
+    const snap=await get(ref(db,'accounts'));
+    entries=accEntriesFromSnapshotVal(snap.val());
+  }catch(_){
+    showToast('Erreur lecture comptes globaux');
+    btn.disabled=false;
+    return;
+  }
+  const gid=window._accEditGlobalId;
+  if(accFindPseudoOwnerExcluding(entries,pseudo,gid)){
+    showToast('Ce pseudo est déjà utilisé');
+    btn.disabled=false;
+    return;
+  }
+  const emailNorm=hadLegacyEmail?accNormalizeEmail(acc.email):accNormalizeEmail(emailInpVal);
+  const nomFinal=hadLegacyNom?String(acc.nom).trim():nomInpVal;
+  const leg={...acc};
+  leg.nom=nomFinal;
+  leg.pseudo=pseudo;
+  leg.tel=tel;
+  leg.menage=menage;
+  leg.admin=admin;
+  if(!hadLegacyEmail) leg.email=emailNorm;
+  if(pwd) leg.pwdHash=hashSimple(pwd);
+  const updates={};
+  if(gid){
+    updates[`accounts/${gid}/pseudo`]=pseudo;
+    updates[`accounts/${gid}/tel`]=tel;
+    updates[`accounts/${gid}/orgs/${orgId}/roles`]=roles;
+    if(pwd){
+      let h;
+      try{ h=await sha256Hex(pwd); }catch(_){ showToast('Erreur hash mot de passe'); btn.disabled=false; return; }
+      updates[`accounts/${gid}/pwdHash`]=h;
+    }
+    if(!hadLegacyEmail) updates[`accounts/${gid}/email`]=emailNorm;
+    if(!hadLegacyNom) updates[`accounts/${gid}/nom`]=nomFinal;
+  }
+  try{
+    if(Object.keys(updates).length) await update(ref(db),updates);
+    setSyncStatus('ok');
+  }catch(_){
+    showToast('Erreur synchronisation — réessayez');
+    setSyncStatus('err');
+    btn.disabled=false;
+    return;
+  }
+  accounts[i]=leg;
+  A.adminConfig.accounts=accounts;
+  saveAdminConfig();
+  renderAccounts();
+  syncCleanersToConfig();
+  pushActivity({type:'admin_config',text:`Compte mis à jour : ${acc.name}`});
+  showToast('Modifications enregistrées ✓');
+  closeEditAccountModal();
+  btn.disabled=false;
+};
+
+window.submitDeleteAccountModal=async function(){
+  const i=window._accEditIndex;
+  if(i==null||i<0) return;
+  const accounts=A.adminConfig.accounts||[];
+  const acc=accounts[i];
+  if(!acc) return;
+  const prenom=acc.name;
+  if(!confirm(`Supprimer ${prenom} ? Cette action est irréversible.`)) return;
+  const btnDel=document.querySelector('#acc-edit-modal .acc-edit-del-btn');
+  const btnSave=document.getElementById('acc-edit-save');
+  if(btnDel) btnDel.disabled=true;
+  if(btnSave) btnSave.disabled=true;
+  try{
+    const snap=await get(ref(db,'accounts'));
+    const entries=accEntriesFromSnapshotVal(snap.val());
+    const global=accEditFindGlobal(entries,acc);
+    if(global){
+      const orgs=global.orgs&&typeof global.orgs==='object'?global.orgs:{};
+      const nOrg=Object.keys(orgs).length;
+      if(nOrg>1){
+        await update(ref(db),{[`accounts/${global.id}/orgs/${orgId}`]:null});
+      }else{
+        await remove(ref(db,`accounts/${global.id}`));
+      }
+    }
+    await remove(ref(db,ob(`unavailability/${prenom}`)));
+    accounts.splice(i,1);
+    A.adminConfig.accounts=accounts;
+    saveAdminConfig();
+    renderAccounts();
+    syncCleanersToConfig();
+    pushActivity({type:'admin_config',text:`Compte supprimé : ${prenom}`});
+    showToast('Compte supprimé ✓');
+    closeEditAccountModal();
+    setSyncStatus('ok');
+  }catch(_){
+    showToast('Erreur suppression — réessayez');
+    setSyncStatus('err');
+  }finally{
+    if(btnDel) btnDel.disabled=false;
+    if(btnSave) btnSave.disabled=false;
+  }
+};
 
 window.removeAccount = function(i){
   const accounts=A.adminConfig.accounts||[];
