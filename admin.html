@@ -188,6 +188,21 @@ body.admin-nav-ready .admin-burger{display:flex}
 .proc-avg-star{color:#e5e5e0;display:inline-block;width:1em;text-align:center}
 .proc-avg-star.full,.proc-avg-star.half{position:relative;color:#e5e5e0}
 .proc-avg-star.half::after{content:'★';position:absolute;left:0;top:0;width:50%;overflow:hidden;color:#F59E0B}
+/* Modale création compte (vue Comptes) */
+.acc-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:420;display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+.acc-modal-backdrop.is-open{display:flex}
+.acc-modal-panel{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:1.1rem 1.25rem;max-width:400px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.12)}
+.acc-modal-title{font-size:15px;font-weight:600;margin-bottom:12px;color:#1a1a1a}
+.acc-modal-field{margin-bottom:10px}
+.acc-modal-field label{font-size:12px;color:#888;display:block;margin-bottom:4px;font-weight:500}
+.acc-modal-field input[type=text],.acc-modal-field input[type=password],.acc-modal-field input[type=email]{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;box-sizing:border-box}
+.acc-modal-field input:focus{outline:none;border-color:#378ADD}
+.acc-modal-req{color:#E24B4A;font-weight:600;margin-left:2px}
+.acc-modal-roles{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;align-items:center}
+.acc-modal-roles .account-role{margin:0;font:inherit;color:inherit;-webkit-appearance:none;appearance:none}
+.acc-modal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;justify-content:flex-end}
+.acc-add-btn{min-width:40px;padding:8px 14px;font-size:18px;line-height:1;font-weight:600}
+#accounts-list .account-row .account-name{flex:1;min-width:0}
 </style>
 </head>
 <body>
@@ -295,9 +310,29 @@ body.admin-nav-ready .admin-burger{display:flex}
       <h3 style="margin-bottom:1rem"><span>👥</span> Comptes</h3>
       <div id="accounts-list"></div>
       <div class="add-account-row">
-        <input type="text" id="new-name" placeholder="Prénom..." style="width:110px">
-        <input type="password" id="new-pwd-acc" placeholder="Mot de passe..." style="flex:1;min-width:100px">
-        <button class="btn-primary" onclick="addAccount()">Ajouter</button>
+        <button type="button" class="btn-primary acc-add-btn" onclick="openAddAccountModal()" title="Nouveau compte">+</button>
+      </div>
+      <div id="acc-create-modal" class="acc-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="acc-modal-title" aria-hidden="true" onclick="closeAddAccountModal()">
+        <div class="acc-modal-panel" onclick="event.stopPropagation()">
+          <div class="acc-modal-title" id="acc-modal-title">Nouveau compte</div>
+          <div class="acc-modal-field"><label for="acc-modal-prenom">Prénom<span class="acc-modal-req">*</span></label><input type="text" id="acc-modal-prenom" autocomplete="given-name" oninput="accModalOnPrenomInput()"></div>
+          <div class="acc-modal-field"><label for="acc-modal-nom">Nom<span class="acc-modal-req">*</span></label><input type="text" id="acc-modal-nom" autocomplete="family-name"></div>
+          <div class="acc-modal-field"><label for="acc-modal-pseudo">Pseudo de connexion<span class="acc-modal-req">*</span></label><input type="text" id="acc-modal-pseudo" autocomplete="username" oninput="accModalOnPseudoInput()"></div>
+          <div class="acc-modal-field"><label for="acc-modal-email">Email<span class="acc-modal-req">*</span></label><input type="email" id="acc-modal-email" autocomplete="email"></div>
+          <div class="acc-modal-field"><label for="acc-modal-tel">Téléphone (optionnel)</label><input type="text" id="acc-modal-tel" autocomplete="tel"></div>
+          <div class="acc-modal-field"><label for="acc-modal-pwd">Mot de passe<span class="acc-modal-req">*</span></label><input type="password" id="acc-modal-pwd" autocomplete="new-password"></div>
+          <div class="acc-modal-field">
+            <span style="font-size:12px;color:#888;font-weight:500">Rôles</span>
+            <div class="acc-modal-roles">
+              <button type="button" class="account-role active" id="acc-modal-menage-btn" onclick="accModalToggleRole('menage')" title="Peut faire le ménage">🧹</button>
+              <button type="button" class="account-role" id="acc-modal-admin-btn" onclick="accModalToggleRole('admin')" title="Administrateur">👑</button>
+            </div>
+          </div>
+          <div class="acc-modal-actions">
+            <button type="button" class="btn-secondary" onclick="closeAddAccountModal()">Annuler</button>
+            <button type="button" class="btn-primary" id="acc-modal-submit" onclick="submitAddAccountModal()">Créer</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -498,6 +533,11 @@ function hashSimple(str){
   let h=0;
   for(let i=0;i<str.length;i++) h=((h<<5)-h)+str.charCodeAt(i),h|=0;
   return h.toString(36);
+}
+
+async function sha256Hex(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
 function setSyncStatus(s){
@@ -1343,12 +1383,10 @@ function renderAccounts(){
     const col=CLEANER_COLORS[i%CLEANER_COLORS.length];
     return `<div class="account-row">
       <div class="account-dot" style="background:${col}"></div>
-      <div class="account-name">${acc.name}</div>
-      <input type="password" class="account-pwd" placeholder="Nouveau mdp" id="pwd-acc-${i}" title="Laisser vide pour ne pas changer">
+      <div class="account-name">${acc.nom ? acc.name + ' ' + acc.nom : acc.name}</div>
       <div class="account-role${acc.menage?' active':''}" onclick="toggleRole(${i},'menage')" title="Peut faire le ménage">🧹</div>
       <div class="account-role${acc.admin?' active':''}" onclick="toggleRole(${i},'admin')" title="Administrateur">👑</div>
-      <button class="btn-sm" onclick="saveAccountPwd(${i})">💾</button>
-      <button class="btn-danger" onclick="removeAccount(${i})">✕</button>
+      <button type="button" class="btn-sm" onclick="accEditComingSoon()" title="Modifier">✏️</button>
     </div>`;
   }).join('');
 }
@@ -1420,23 +1458,174 @@ function renderHisto(){
 
 // ─── Accounts ────────────────────────────────────────────────────────────────
 
-window.addAccount = function(){
-  const name=document.getElementById('new-name').value.trim();
-  const pwd=document.getElementById('new-pwd-acc').value;
-  if(!name) return;
+function accNormalizeEmail(e){
+  return String(e||'').trim().toLowerCase();
+}
+
+function accEntriesFromSnapshotVal(val){
+  if(!val||typeof val!=='object') return [];
+  return Object.entries(val).filter(([,v])=>v&&typeof v==='object').map(([id,v])=>({id,...v}));
+}
+
+function accFindIdentityMatch(entries,prenom,nom,email){
+  const p=prenom.trim(),n=nom.trim(),em=accNormalizeEmail(email);
+  if(!p||!n||!em) return null;
+  for(const row of entries){
+    if(String(row.prenom??'').trim()===p&&String(row.nom??'').trim()===n&&accNormalizeEmail(row.email)===em) return row;
+  }
+  return null;
+}
+
+function accFindPseudoOwner(entries,pseudo){
+  const ps=String(pseudo||'').trim();
+  if(!ps) return null;
+  for(const row of entries){
+    if(String(row.pseudo??'').trim()===ps) return row;
+  }
+  return null;
+}
+
+function accRolesFromCheckboxes(){
+  const menage=document.getElementById('acc-modal-menage-btn').classList.contains('active');
+  const admin=document.getElementById('acc-modal-admin-btn').classList.contains('active');
+  const r=[];
+  if(menage) r.push('menage');
+  if(admin) r.push('admin');
+  return {menage,admin,roles:r};
+}
+
+window.accModalToggleRole=function(role){
+  const id=role==='menage'?'acc-modal-menage-btn':'acc-modal-admin-btn';
+  document.getElementById(id).classList.toggle('active');
+};
+
+window.openAddAccountModal=function(){
+  window._accModalPseudoDirty=false;
+  document.getElementById('acc-modal-prenom').value='';
+  document.getElementById('acc-modal-nom').value='';
+  document.getElementById('acc-modal-pseudo').value='';
+  document.getElementById('acc-modal-email').value='';
+  document.getElementById('acc-modal-tel').value='';
+  document.getElementById('acc-modal-pwd').value='';
+  document.getElementById('acc-modal-menage-btn').classList.add('active');
+  document.getElementById('acc-modal-admin-btn').classList.remove('active');
+  const m=document.getElementById('acc-create-modal');
+  m.classList.add('is-open');
+  m.setAttribute('aria-hidden','false');
+};
+
+window.closeAddAccountModal=function(){
+  const m=document.getElementById('acc-create-modal');
+  m.classList.remove('is-open');
+  m.setAttribute('aria-hidden','true');
+};
+
+window.accModalOnPrenomInput=function(){
+  if(window._accModalPseudoDirty) return;
+  document.getElementById('acc-modal-pseudo').value=document.getElementById('acc-modal-prenom').value;
+};
+
+window.accModalOnPseudoInput=function(){
+  window._accModalPseudoDirty=true;
+};
+
+window.submitAddAccountModal=async function(){
+  const prenom=document.getElementById('acc-modal-prenom').value.trim();
+  const nom=document.getElementById('acc-modal-nom').value.trim();
+  const pseudo=document.getElementById('acc-modal-pseudo').value.trim();
+  const email=document.getElementById('acc-modal-email').value.trim();
+  const tel=document.getElementById('acc-modal-tel').value.trim();
+  const pwd=document.getElementById('acc-modal-pwd').value;
+  const {menage,admin,roles}=accRolesFromCheckboxes();
+  if(!prenom){ showToast('Prénom obligatoire'); return; }
+  if(!nom){ showToast('Nom obligatoire'); return; }
+  if(!pseudo){ showToast('Pseudo obligatoire'); return; }
+  if(!email){ showToast('Email obligatoire'); return; }
+  if(!pwd){ showToast('Mot de passe obligatoire'); return; }
+  if(!menage&&!admin){ showToast('Choisissez au moins un rôle'); return; }
   const accounts=A.adminConfig.accounts||[];
-  if(accounts.find(a=>a.name===name)){ showToast('Ce prénom existe déjà'); return; }
-  accounts.push({ name, pwdHash: pwd?hashSimple(pwd):'', menage:true, admin:false, sharedWith: [] });
+  if(accounts.find(a=>a.name===prenom)){ showToast('Ce prénom existe déjà dans cette organisation'); return; }
+  const btn=document.getElementById('acc-modal-submit');
+  btn.disabled=true;
+  let snap;
+  try{
+    snap=await get(ref(db,'accounts'));
+    setSyncStatus('ok');
+  }catch(_){
+    showToast('Erreur lecture comptes globaux');
+    setSyncStatus('err');
+    btn.disabled=false;
+    return;
+  }
+  const entries=accEntriesFromSnapshotVal(snap.val());
+  const identity=accFindIdentityMatch(entries,prenom,nom,email);
+  if(identity){
+    const ps=identity.pseudo!=null&&String(identity.pseudo).trim()!==''?String(identity.pseudo).trim():'(aucun)';
+    if(!confirm(`Ce compte existe déjà (pseudo: ${ps}). Voulez-vous l'associer à cette organisation ?`)){
+      btn.disabled=false;
+      return;
+    }
+    try{
+      await update(ref(db),{[`accounts/${identity.id}/orgs/${orgId}`]:{roles}});
+      setSyncStatus('ok');
+    }catch(_){
+      showToast('Erreur synchronisation — réessayez');
+      setSyncStatus('err');
+      btn.disabled=false;
+      return;
+    }
+    accounts.push({name:prenom,nom,pwdHash:hashSimple(pwd),menage,admin,sharedWith:[]});
+    A.adminConfig.accounts=accounts;
+    saveAdminConfig();
+    closeAddAccountModal();
+    renderAccounts();
+    syncCleanersToConfig();
+    pushActivity({type:'admin_config',text:`Compte existant associé : ${prenom} (${orgId})`});
+    showToast('Compte associé ✓');
+    btn.disabled=false;
+    return;
+  }
+  if(accFindPseudoOwner(entries,pseudo)){
+    showToast('Ce pseudo est déjà utilisé');
+    btn.disabled=false;
+    return;
+  }
+  let pwdHash256;
+  try{
+    pwdHash256=await sha256Hex(pwd);
+  }catch(_){
+    showToast('Erreur hash mot de passe');
+    btn.disabled=false;
+    return;
+  }
+  const newRef=push(ref(db,'accounts'));
+  const payload={
+    nom,prenom,pseudo,email,tel:tel||'',
+    pwdHash:pwdHash256,
+    orgs:{[orgId]:{roles}},
+    defaultOrg:orgId
+  };
+  try{
+    await set(newRef,payload);
+    setSyncStatus('ok');
+  }catch(_){
+    showToast('Erreur création compte global — réessayez');
+    setSyncStatus('err');
+    btn.disabled=false;
+    return;
+  }
+  accounts.push({name:prenom,nom,pwdHash:hashSimple(pwd),menage,admin,sharedWith:[]});
   A.adminConfig.accounts=accounts;
   saveAdminConfig();
-  document.getElementById('new-name').value='';
-  document.getElementById('new-pwd-acc').value='';
+  closeAddAccountModal();
   renderAccounts();
-  // Sync cleaners dans /config
   syncCleanersToConfig();
-  pushActivity({ type:'admin_config', text:`Nouveau compte : ${name}` });
-  showToast(name+' ajouté ✓');
+  pushActivity({type:'admin_config',text:`Nouveau compte : ${prenom}`});
+  showToast(prenom+' ajouté ✓');
+  btn.disabled=false;
 };
+
+window.accEditComingSoon=function(){showToast('Modification à venir');};
 
 window.removeAccount = function(i){
   const accounts=A.adminConfig.accounts||[];
