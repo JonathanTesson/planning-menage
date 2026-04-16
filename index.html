@@ -10,6 +10,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .topbar{background:#fff;border-bottom:1px solid #e0e0d8;padding:0.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 .topbar-title{font-size:16px;font-weight:600}
 .topbar-sub{font-size:12px;color:#888;margin-top:1px}
+.topbar-sub-wrap{position:relative;display:inline-block;max-width:100%}
+.topbar-sub.org-switch-trigger{cursor:pointer;user-select:none}
+.org-switch-caret{margin-left:3px;font-size:10px}
+.org-switch-dropdown{display:none;position:absolute;left:0;top:100%;margin-top:4px;min-width:180px;background:#fff;border:1px solid #e8e8e2;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.08);z-index:100;padding:4px 0}
+.org-switch-item{padding:8px 12px;font-size:12px;color:#333;cursor:pointer;line-height:1.3}
+.org-switch-item:hover{background:#f5f5f0}
+.org-switch-item--current{color:#888;cursor:default;font-weight:500}
+.org-switch-item--current:hover{background:transparent}
 .sync-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;margin-right:5px;transition:background 0.3s}
 .sync-dot.ok{background:#1D9E75}
 .sync-dot.err{background:#E24B4A}
@@ -274,7 +282,9 @@ html[data-menage-org-gate="1"] #main-app{display:none!important}
       <span id="pending-deletion-pip" style="display:none;width:7px;height:7px;border-radius:50%;background:#F59E0B;animation:depart-note-pulse 1.5s ease-in-out infinite;flex-shrink:0"></span>
       <span id="pending-suggestions-pip" style="display:none;width:7px;height:7px;border-radius:50%;background:#F59E0B;animation:depart-note-pulse 1.5s ease-in-out infinite;flex-shrink:0"></span>
     </div>
-    <div class="topbar-sub" id="topbar-sub">Studios</div>
+    <div class="topbar-sub-wrap" id="topbar-sub-wrap">
+      <div class="topbar-sub" id="topbar-sub">Studios</div>
+    </div>
   </div>
   <div style="display:flex;align-items:center;gap:6px">
     <span class="sync-dot loading" id="sync-dot"></span>
@@ -492,7 +502,10 @@ let S = {
   procedures: {},
   /** @type {Record<string, Record<string, { by: string|null }>>} prénom → date locale → { by } (cf. normalizeUnavailability) */
   unavailability: {},
-  procedureSuggestions: {}
+  procedureSuggestions: {},
+  /** Après un scan réussi de /accounts : null = pas de ligne globale, sinon { id, ...champs }. */
+  globalAccount: null,
+  globalAccountLoaded: false
 };
 
 /** Feedback coches procédure pour la modale ménage (mis à jour par onValue sur stepFeedback). */
@@ -718,7 +731,7 @@ function normalizeUnavailability(raw){
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-function checkAuth(){
+async function checkAuth(){
   const authEnabled = S.adminConfig?.authEnabled || false;
   if(!authEnabled){
     if(!S.currentUser){
@@ -732,10 +745,13 @@ function checkAuth(){
     const acc = (S.adminConfig.accounts||[]).find(a=>a.name===session.name);
     if(acc){
       S.currentUser = { name:acc.name, menage:acc.menage, admin:acc.admin };
+      await ensureGlobalAccountCache(session.name);
       showApp();
       return;
     }
   }
+  S.globalAccountLoaded=false;
+  S.globalAccount=null;
   S.currentUser = null;
   showLogin();
 }
@@ -749,6 +765,145 @@ function setVersionFootVisible(show){
 function syncAppVersionFootText(){
   const f=el('app-version-foot');
   if(f) f.textContent='Planning Ménage · v '+APP_VERSION;
+}
+
+let _globalAccountEnsurePromise=null;
+async function ensureGlobalAccountCache(sessionName){
+  if(S.globalAccountLoaded) return;
+  if(_globalAccountEnsurePromise) return _globalAccountEnsurePromise;
+  const sn=String(sessionName||'').trim();
+  _globalAccountEnsurePromise=(async()=>{
+    try{
+      const snap=await get(ref(db,'accounts'));
+      const val=snap.val();
+      if(!val||typeof val!=='object'){
+        S.globalAccount=null;
+        return;
+      }
+      for(const [id,row] of Object.entries(val)){
+        if(!row||typeof row!=='object') continue;
+        const nm=String(row.name??'').trim();
+        const pr=String(row.prenom??'').trim();
+        if(nm===sn||pr===sn){
+          S.globalAccount={id,...row};
+          return;
+        }
+      }
+      S.globalAccount=null;
+    }catch(_){
+      S.globalAccount=null;
+    }finally{
+      S.globalAccountLoaded=true;
+      _globalAccountEnsurePromise=null;
+    }
+  })();
+  return _globalAccountEnsurePromise;
+}
+
+let orgSwitchDocListenerBound=false;
+function onOrgSwitchDocMousedown(e){
+  const w=el('topbar-sub-wrap');
+  if(w&&w.contains(e.target)) return;
+  closeOrgSwitchMenu();
+}
+function closeOrgSwitchMenu(){
+  const m=el('org-switch-menu');
+  if(m) m.style.display='none';
+  if(orgSwitchDocListenerBound){
+    document.removeEventListener('mousedown',onOrgSwitchDocMousedown,true);
+    orgSwitchDocListenerBound=false;
+  }
+}
+function openOrgSwitchMenu(){
+  const m=el('org-switch-menu');
+  if(!m) return;
+  m.style.display='block';
+  if(!orgSwitchDocListenerBound){
+    orgSwitchDocListenerBound=true;
+    setTimeout(()=>document.addEventListener('mousedown',onOrgSwitchDocMousedown,true),0);
+  }
+}
+function toggleOrgSwitchMenu(){
+  const m=el('org-switch-menu');
+  if(!m) return;
+  if(m.style.display==='block') closeOrgSwitchMenu();
+  else openOrgSwitchMenu();
+}
+
+function getOrCreateOrgSwitchMenu(){
+  let m=el('org-switch-menu');
+  if(m) return m;
+  const wrap=el('topbar-sub-wrap');
+  if(!wrap) return null;
+  m=document.createElement('div');
+  m.id='org-switch-menu';
+  m.className='org-switch-dropdown';
+  m.style.display='none';
+  wrap.appendChild(m);
+  return m;
+}
+
+window.applyOrgSwitchFromTopbar=function(newOrgId){
+  if(!newOrgId||newOrgId===getStoredOrgId()){ closeOrgSwitchMenu(); return; }
+  setStoredOrgId(newOrgId);
+  location.reload();
+};
+
+function updateOrgSwitcher(){
+  const sub=el('topbar-sub');
+  if(!sub||!S.currentUser) return;
+  closeOrgSwitchMenu();
+  sub.onclick=null;
+  sub.replaceChildren();
+  sub.classList.remove('org-switch-trigger');
+  const authEnabled=S.adminConfig?.authEnabled||false;
+  const noAuth=S.currentUser?.noAuth;
+  const cur=getStoredOrgId();
+  const label=orgLabel(cur)||cur||'';
+  if(!authEnabled||noAuth){
+    sub.textContent=label;
+    return;
+  }
+  if(!S.globalAccountLoaded){
+    void ensureGlobalAccountCache(S.currentUser.name).then(()=>{ if(S.currentUser) render(); });
+    sub.textContent=label;
+    return;
+  }
+  const ga=S.globalAccount;
+  if(!ga||!ga.orgs||typeof ga.orgs!=='object'){
+    sub.textContent=label;
+    return;
+  }
+  const orgKeys=Object.keys(ga.orgs).filter(k=>ga.orgs[k]&&typeof ga.orgs[k]==='object');
+  if(orgKeys.length<=1){
+    sub.textContent=label;
+    return;
+  }
+  sub.classList.add('org-switch-trigger');
+  const lab=document.createElement('span');
+  lab.className='org-switch-label';
+  lab.textContent=label;
+  const caret=document.createElement('span');
+  caret.className='org-switch-caret';
+  caret.textContent='▾';
+  sub.appendChild(lab);
+  sub.appendChild(caret);
+  sub.onclick=function(e){ e.stopPropagation(); toggleOrgSwitchMenu(); };
+  const menu=getOrCreateOrgSwitchMenu();
+  if(!menu) return;
+  menu.replaceChildren();
+  const others=orgKeys.filter(k=>k!==cur);
+  for(const oid of others){
+    const div=document.createElement('div');
+    div.className='org-switch-item';
+    div.textContent=orgLabel(oid)||oid;
+    div.onclick=function(e){
+      e.stopPropagation();
+      closeOrgSwitchMenu();
+      applyOrgSwitchFromTopbar(oid);
+    };
+    menu.appendChild(div);
+  }
 }
 
 function hideOrgChangeGate(){
@@ -833,6 +988,7 @@ function showLogin(){
     accounts.map(a=>`<option value="${a.name}">${a.name}</option>`).join('');
   const topTitleLogin=document.querySelector('.topbar-title');
   if(topTitleLogin) topTitleLogin.textContent='Accueil';
+  closeOrgSwitchMenu();
   document.getElementById('topbar-sub').textContent='';
   const sugPipLogin=document.getElementById('pending-suggestions-pip');
   if(sugPipLogin) sugPipLogin.style.display='none';
@@ -877,8 +1033,12 @@ window.doLogin = function(){
   }
   S.currentUser={ name:acc.name, menage:acc.menage, admin:acc.admin };
   saveSession({ name:acc.name });
-  logActivity({ type:'login', actor:acc.name, text:acc.name+' s\'est connectée au planning' });
-  showApp();
+  S.globalAccountLoaded=false;
+  S.globalAccount=null;
+  void ensureGlobalAccountCache(acc.name).then(()=>{
+    logActivity({ type:'login', actor:acc.name, text:acc.name+' s\'est connectée au planning' });
+    showApp();
+  });
 };
 
 window.doLogout = function(){
@@ -887,6 +1047,9 @@ window.doLogout = function(){
   }
   clearSession();
   S.currentUser=null;
+  S.globalAccountLoaded=false;
+  S.globalAccount=null;
+  closeOrgSwitchMenu();
   const pe=el('login-pwd'); if(pe) pe.value='';
   if(!essentialDataLoaded()) return;
   if(!orgHasConfiguredAccounts()) showOrgUnconfigured();
@@ -961,6 +1124,7 @@ function showOrgUnconfigured(){
   S.currentUser=null;
   const topTitleUn=document.querySelector('.topbar-title');
   if(topTitleUn) topTitleUn.textContent='Accueil';
+  closeOrgSwitchMenu();
   document.getElementById('topbar-sub').textContent='';
   const sugPipUn=document.getElementById('pending-suggestions-pip');
   if(sugPipUn) sugPipUn.style.display='none';
@@ -1092,6 +1256,7 @@ function showOrgFirst(){
   if(s) s.value=ORGANIZATIONS[0]?.id || 'tesson';
   const topTitleFirst=document.querySelector('.topbar-title');
   if(topTitleFirst) topTitleFirst.textContent='Accueil';
+  closeOrgSwitchMenu();
   document.getElementById('topbar-sub').textContent='';
   const sugPipFirst=document.getElementById('pending-suggestions-pip');
   if(sugPipFirst) sugPipFirst.style.display='none';
@@ -1421,7 +1586,7 @@ function render(){
   if(!S.currentUser) return;
   const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   document.getElementById('month-title').textContent=MO[S.currentMonth]+' '+S.currentYear;
-  document.getElementById('topbar-sub').textContent=S.studioNames.join(' · ');
+  updateOrgSwitcher();
   renderKpi();
   renderControls();
   renderCalendar();
