@@ -1850,6 +1850,19 @@ window.submitDeleteAccountModal=async function(){
       }else{
         await remove(ref(db,`accounts/${global.id}`));
       }
+    }else{
+      const pn=String(acc.name??'').trim();
+      if(pn){
+        for(const row of entries){
+          if(String(row.name??'').trim()===pn){
+            const orgs2=row.orgs&&typeof row.orgs==='object'?row.orgs:{};
+            if(Object.keys(orgs2).length<=1){
+              await remove(ref(db,`accounts/${row.id}`));
+            }
+            break;
+          }
+        }
+      }
     }
     await remove(ref(db,ob(`unavailability/${prenom}`)));
     accounts.splice(i,1);
