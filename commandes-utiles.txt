@@ -47,3 +47,5 @@ Voir l’historique des commits
 localStorage.clear()
 $env:FIREBASE_SERVICE_ACCOUNT = Get-Content ".\Firebase\planning-menage-18b09-firebase.json" -Raw; node init-superadmin.js
 
+Verifier compte :  $env:FIREBASE_SERVICE_ACCOUNT = Get-Content ".\Firebase\planning-menage-18b09-firebase.json" -Raw; node check-accounts.js
+  
