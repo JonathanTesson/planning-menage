@@ -526,8 +526,12 @@ function accFindPseudoOwnerExcluding(entries,pseudo,excludeId){
 function accEditFindGlobal(entries,legacyAcc){
   const p=String(legacyAcc.name??'').trim();
   const n=String(legacyAcc.nom??'').trim();
+  const slim=r=>({prenom:r.prenom,name:r.name,nom:r.nom,email:r.email});
+  const entriesLite=entries.map(slim);
   let candidates=entries.filter(row=>String(row.prenom??'').trim()===p||String(row.name??'').trim()===p);
+  const candidatesAfterPrenom=candidates.map(slim);
   if(n!=='') candidates=candidates.filter(row=>String(row.nom??'').trim()===n);
+  console.log('[accEditFindGlobal]',{p,entriesLite,candidatesAfterPrenom,candidates:candidates.map(slim)});
   if(legacyAcc.email!=null&&String(legacyAcc.email).trim()!==''){
     const em=accNormalizeEmail(legacyAcc.email);
     return candidates.find(row=>accNormalizeEmail(row.email)===em)||null;
@@ -1342,8 +1346,11 @@ el('sa-acc-edit-save').addEventListener('click', async ()=>{
   const gid = globalNow != null && globalNow.id != null ? globalNow.id : window._saAccEditGlobalId;
   const excludeKey = gid != null && gid !== '' ? String(gid) : '';
   const ps = String(pseudo || '').trim();
+  console.log('[sa-acc-edit-save] gid=', gid, 'globalNow.id=', globalNow && globalNow.id, '_saAccEditGlobalId=', window._saAccEditGlobalId, 'excludeKey=', excludeKey, 'pseudo=', ps);
   let pseudoTaken = false;
   for(const row of entries){
+    const excluded = !!(excludeKey && String(row.id) === excludeKey);
+    console.log('[sa-acc-edit-save] /accounts row', { id: row.id, pseudo: row.pseudo, excluded });
     if(excludeKey && String(row.id) === excludeKey) continue;
     if(String(row.pseudo ?? '').trim() === ps){
       pseudoTaken = true;
