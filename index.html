@@ -752,6 +752,17 @@ async function checkAuth(){
       showApp();
       return;
     }
+    if(!S.globalAccountLoaded){
+      await ensureGlobalAccountCache(session.name);
+    }
+    const ga = S.globalAccount;
+    const sn = String(session.name || '').trim();
+    if(ga && (String(ga.name ?? '').trim() === sn || String(ga.prenom ?? '').trim() === sn)){
+      const roles = ga.orgs?.[getStoredOrgId()]?.roles || [];
+      S.currentUser = { name: sn, menage: roles.includes('menage'), admin: roles.includes('admin') };
+      showApp();
+      return;
+    }
   }
   S.globalAccountLoaded=false;
   S.globalAccount=null;
@@ -1346,10 +1357,7 @@ window.confirmOrgFirst=function(){
 
 async function bootstrap(){
   await loadOrganizations();
-  if(!getStoredOrgId()){
-    showOrgFirst();
-    return;
-  }
+  if(!getStoredOrgId()) setStoredOrgId(ORGANIZATIONS[0]?.id || 'tesson');
   initFirebaseAndApp();
 }
 bootstrap();
