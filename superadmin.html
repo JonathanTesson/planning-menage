@@ -68,7 +68,7 @@ body.sa-nav-ready .admin-burger{display:flex}
 #sa-modal-del-studio .sa-modal-del-studio-req-sub{font-size:10px;color:#aaa;text-align:center;margin-top:4px;line-height:1.3;max-width:140px}
 .toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;max-width:92vw;text-align:center;line-height:1.35}
 .toast.show{opacity:1}
-.account-row{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid #f5f5f0;flex-wrap:wrap}
+.account-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #f5f5f0;flex-wrap:wrap}
 .account-row:last-child{border-bottom:none}
 .account-name{font-size:13px;font-weight:500;min-width:80px}
 .account-pwd{flex:1;min-width:100px;max-width:140px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:#fff;color:#1a1a1a}
@@ -94,13 +94,16 @@ body.sa-nav-ready .admin-burger{display:flex}
 .toggle-label{font-size:13px;color:#333}
 .sa-org-acc{border-bottom:1px solid #f0f0eb}
 .sa-org-acc:last-child{border-bottom:none}
-.sa-org-acc-head{display:grid;grid-template-columns:1fr 160px auto auto;align-items:center;column-gap:10px;padding:10px 0;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+.sa-org-acc-head{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto auto;align-items:center;column-gap:10px;padding:10px 0;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
 .sa-org-acc-head:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
 .sa-org-acc-arrow{flex-shrink:0;width:1.25rem;text-align:center;transition:transform .2s ease;display:inline-block;font-size:11px;line-height:1;color:#555}
 .sa-org-acc.is-open .sa-org-acc-arrow{transform:rotate(90deg)}
 .sa-org-acc-left{display:flex;align-items:center;gap:10px;min-width:0}
 .sa-org-acc-titles{flex:0 1 auto;min-width:0}
-.sa-org-acc-toggles{display:flex;align-items:center;justify-content:center;gap:14px}
+.sa-org-acc-toggles{display:flex;align-items:center;justify-content:center;gap:0}
+.sa-org-tog-emoji{background:transparent;border:none;cursor:pointer;font-size:16px;line-height:1;padding:4px 6px;border-radius:6px;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.sa-org-tog-emoji:hover{background:#f0f0eb}
+.sa-org-tog-emoji:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
 .sa-org-toggle-item{display:flex;align-items:center;gap:6px}
 .sa-org-toggle-emoji{font-size:14px;line-height:1;user-select:none;flex-shrink:0}
 .sa-org-del.btn-danger{color:#fff;background:#E24B4A;border:1px solid #c0392b;border-radius:6px;padding:4px 8px}
@@ -113,9 +116,10 @@ body.sa-nav-ready .admin-burger{display:flex}
 .sa-steps-badge{display:inline-block;font-size:12px;padding:3px 8px;border-radius:12px;background:#f0f0eb;color:#555;user-select:none;pointer-events:none;white-space:nowrap;flex-shrink:0}
 .sa-studio-line-main{display:flex;gap:8px;align-items:center;flex:1;min-width:0;flex-wrap:wrap}
 .sa-org-panel-sep{border:none;border-top:1px solid #e8e8e2;margin:8px 0}
-.sa-org-acc-accounts{border:none;background:transparent;padding:2px 6px;font-size:14px;line-height:1.2;cursor:pointer;color:#555;border-radius:6px;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.sa-org-acc-accounts{border:none;background:transparent;padding:2px 4px;font-size:14px;line-height:1.2;cursor:pointer;color:#555;border-radius:6px;flex-shrink:0;-webkit-tap-highlight-color:transparent}
 .sa-org-acc-accounts:hover{background:#f0f0eb}
 .sa-org-acc-accounts:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
+.sa-org-acc-count-badge{display:inline-block;font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;background:#e8ecf4;color:#333;white-space:nowrap;pointer-events:none}
 @keyframes sa-pending-pulse{
   0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,0.5)}
   50%{box-shadow:0 0 0 5px rgba(245,158,11,0)}
@@ -130,6 +134,22 @@ body.sa-nav-ready .admin-burger{display:flex}
 }
 .sa-org-rename-btn{background:transparent;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;margin:0;opacity:0.5;-webkit-tap-highlight-color:transparent}
 .sa-org-rename-btn:hover{opacity:1}
+.sa-acc-row-main{display:flex;align-items:center;flex-wrap:wrap;gap:8px;flex:1;min-width:0}
+.sa-acc-avatar{width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:-0.02em;flex-shrink:0;line-height:1}
+.sa-acc-name{font-size:13px;font-weight:600;color:#222;flex-shrink:0}
+.sa-acc-org-badges{display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-width:0}
+.sa-acc-org-badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.sa-acc-edit-btn{background:transparent;border:none;cursor:pointer;font-size:15px;line-height:1;padding:4px 6px;border-radius:6px;color:#666;margin-left:auto;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.sa-acc-edit-btn:hover{background:#f0f0eb;color:#111}
+.sa-acc-edit-btn:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
+.sa-input-ro{background:#f5f5f0!important;color:#666!important;cursor:not-allowed}
+.sa-acc-modal-roles{display:flex;gap:8px;margin-top:4px}
+.sa-acc-modal-roles .account-role{font-size:18px;padding:6px 10px}
+#sa-modal-edit-account .modal{max-width:400px}
+.sa-org-cb-hid{display:none!important}
+.account-row .sa-acc-name{cursor:pointer;border-radius:6px;padding:2px 6px;margin:0 -2px;transition:background-color .15s ease,box-shadow .15s ease,color .15s ease,text-decoration .15s ease}
+.account-row .sa-acc-name:hover{background:#ecece6;box-shadow:inset 0 -1px 0 rgba(0,0,0,0.08);text-decoration:underline;text-decoration-color:#888;text-underline-offset:3px;color:#111}
+.account-row .sa-acc-name:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
 </style>
 </head>
 <body>
@@ -360,6 +380,50 @@ body.sa-nav-ready .admin-burger{display:flex}
   </div>
 </div>
 
+<div class="modal-overlay" id="sa-modal-edit-account" role="dialog" aria-modal="true" aria-labelledby="sa-modal-edit-acc-title">
+  <div class="modal">
+    <h3 id="sa-modal-edit-acc-title">Modifier le compte</h3>
+    <div class="modal-field">
+      <label for="sa-acc-edit-prenom">Prénom</label>
+      <input type="text" id="sa-acc-edit-prenom" class="sa-input-ro" readonly autocomplete="off">
+    </div>
+    <div class="modal-field">
+      <label for="sa-acc-edit-nom">Nom</label>
+      <input type="text" id="sa-acc-edit-nom" autocomplete="family-name">
+    </div>
+    <div class="modal-field">
+      <label for="sa-acc-edit-email">Email</label>
+      <input type="text" id="sa-acc-edit-email" autocomplete="email">
+    </div>
+    <div class="modal-field">
+      <label for="sa-acc-edit-pseudo">Pseudo<span style="color:#E24B4A"> *</span></label>
+      <input type="text" id="sa-acc-edit-pseudo" autocomplete="username">
+    </div>
+    <div class="modal-field">
+      <label for="sa-acc-edit-tel">Téléphone (optionnel)</label>
+      <input type="text" id="sa-acc-edit-tel" autocomplete="tel">
+    </div>
+    <div class="modal-field">
+      <label for="sa-acc-edit-pwd">Nouveau mot de passe</label>
+      <input type="password" id="sa-acc-edit-pwd" autocomplete="new-password" placeholder="Laisser vide pour ne pas changer">
+    </div>
+    <div class="modal-field">
+      <span style="font-size:12px;color:#888;font-weight:500">Rôles</span>
+      <div class="sa-acc-modal-roles">
+        <span class="account-role" id="sa-acc-edit-menage" data-sa-acc-role="menage" title="Ménage" role="button" tabindex="0">🧹</span>
+        <span class="account-role" id="sa-acc-edit-admin" data-sa-acc-role="admin" title="Admin" role="button" tabindex="0">👑</span>
+      </div>
+    </div>
+    <div class="modal-actions" style="flex-wrap:wrap;justify-content:space-between">
+      <button type="button" class="btn-danger" id="sa-acc-edit-del" style="border:1px solid #f0c0c0;padding:8px 16px">Supprimer</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn-secondary" id="sa-acc-edit-cancel">Annuler</button>
+        <button type="button" class="btn-primary" id="sa-acc-edit-save">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="sa-toast"></div>
 
 <script type="module">
@@ -415,6 +479,103 @@ function escHtml(s){
 }
 
 let orgEntries = [];
+
+const SA_AVATAR_PALETTE=[
+  {bg:'#5B8DEF',fg:'#fff'},
+  {bg:'#E24B8A',fg:'#fff'},
+  {bg:'#1D9E75',fg:'#fff'},
+  {bg:'#9B59B6',fg:'#fff'},
+  {bg:'#E67E22',fg:'#fff'},
+  {bg:'#34495e',fg:'#fff'},
+];
+const SA_ORG_BADGE_PALETTE=[
+  {bg:'#dce8fc',fg:'#1a3a6e'},
+  {bg:'#fde2ec',fg:'#6d1a3d'},
+  {bg:'#d4f5e8',fg:'#145234'},
+  {bg:'#ede4fc',fg:'#3d266d'},
+  {bg:'#fce8d4',fg:'#5c3a12'},
+  {bg:'#e8ecef',fg:'#2c3e50'},
+];
+
+function saStrHash(str){
+  const s=String(str||'');
+  let h=0;
+  for(let i=0;i<s.length;i++) h=((h<<5)-h)+s.charCodeAt(i),h|=0;
+  return Math.abs(h);
+}
+
+function accNormalizeEmail(e){
+  return String(e||'').trim().toLowerCase();
+}
+
+function accEntriesFromSnapshotVal(val){
+  if(!val||typeof val!=='object') return [];
+  return Object.entries(val).filter(([,v])=>v&&typeof v==='object').map(([id,v])=>({id,...v}));
+}
+
+function accFindPseudoOwnerExcluding(entries,pseudo,excludeId){
+  const ps=String(pseudo||'').trim();
+  if(!ps) return null;
+  for(const row of entries){
+    if(excludeId&&row.id===excludeId) continue;
+    if(String(row.pseudo??'').trim()===ps) return row;
+  }
+  return null;
+}
+
+function accEditFindGlobal(entries,legacyAcc){
+  const p=String(legacyAcc.name??'').trim();
+  const n=String(legacyAcc.nom??'').trim();
+  let candidates=entries.filter(row=>String(row.prenom??'').trim()===p);
+  if(n!=='') candidates=candidates.filter(row=>String(row.nom??'').trim()===n);
+  if(legacyAcc.email!=null&&String(legacyAcc.email).trim()!==''){
+    const em=accNormalizeEmail(legacyAcc.email);
+    return candidates.find(row=>accNormalizeEmail(row.email)===em)||null;
+  }
+  return candidates[0]||null;
+}
+
+function saOrgLabelById(orgId){
+  const o=orgEntries.find(x=>x.id===orgId);
+  return o?o.label:String(orgId||'');
+}
+
+function saOrgIdsUnionForPrenom(entries,prenom){
+  const p=String(prenom??'').trim();
+  if(!p) return [];
+  const set=new Set();
+  for(const row of entries){
+    if(String(row.prenom??'').trim()!==p) continue;
+    const orgs=row.orgs&&typeof row.orgs==='object'?row.orgs:{};
+    for(const k of Object.keys(orgs)) set.add(k);
+  }
+  return [...set].sort((a,b)=>String(saOrgLabelById(a)).localeCompare(String(saOrgLabelById(b))));
+}
+
+function saAccInitials(acc){
+  const prenom=String(acc.name||'').trim();
+  const nom=String(acc.nom||'').trim();
+  const a=prenom?prenom.charAt(0).toUpperCase():'?';
+  const b=nom?nom.charAt(0).toUpperCase():'';
+  return (a+b).slice(0,2);
+}
+
+function saAccDisplayLine(acc){
+  const prenom=String(acc.name||'').trim();
+  const nom=String(acc.nom||'').trim();
+  if(nom) return `${prenom} ${nom}`;
+  return prenom||'—';
+}
+
+function saRenderOrgBadgesHtml(orgIds){
+  if(!orgIds||!orgIds.length) return '';
+  return orgIds.map(oid=>{
+    const lab=saOrgLabelById(oid);
+    const pal=SA_ORG_BADGE_PALETTE[saStrHash(oid)%SA_ORG_BADGE_PALETTE.length];
+    return `<span class="sa-acc-org-badge" style="background:${pal.bg};color:${pal.fg}" title="${escHtml(lab)}">${escHtml(lab)}</span>`;
+  }).join('');
+}
+
 const studioCache = {};
 const icalCache = {};
 /** @type {Record<string, Record<number, number>>} */
@@ -447,8 +608,41 @@ function paintOrgRow(host, orgId, p){
   const tInp = acc.querySelector('input[data-sa-org-tg]');
   if(aInp) aInp.checked = !!p.authEnabled;
   if(tInp) tInp.checked = !!p.telegramEnabled;
+  const authBtn = acc.querySelector(`[data-sa-toggle-auth="${CSS.escape(orgId)}"]`);
+  if(authBtn){
+    const inner = authBtn.querySelector('.sa-org-tog-emoji-inner');
+    if(inner){
+      inner.textContent = p.authEnabled ? '🔐' : '🔓';
+      inner.setAttribute(
+        'style',
+        p.authEnabled
+          ? 'filter:none;box-shadow:0 0 6px 2px rgba(29,158,117,0.5);border-radius:6px'
+          : 'filter:grayscale(1) opacity(0.4);box-shadow:none',
+      );
+    }
+  }
+  const tgBtn = acc.querySelector(`[data-sa-toggle-tg="${CSS.escape(orgId)}"]`);
+  if(tgBtn){
+    const inner = tgBtn.querySelector('.sa-org-tog-emoji-inner');
+    if(inner){
+      inner.textContent = p.telegramEnabled ? '💬' : '🔕';
+      inner.setAttribute(
+        'style',
+        p.telegramEnabled
+          ? 'filter:none;box-shadow:0 0 6px 2px rgba(29,158,117,0.5);border-radius:6px'
+          : 'filter:grayscale(1) opacity(0.4);box-shadow:none',
+      );
+    }
+  }
   const accBtn = acc.querySelector('[data-sa-org-accounts-btn]');
-  if(accBtn) accBtn.textContent = '👤' + (Number(p.accountsCount) || 0);
+  if(accBtn){
+    const n = Number(p.accountsCount) || 0;
+    const accZero = 'background:#FEF3C7;color:#92400E';
+    accBtn.innerHTML =
+      n > 0
+        ? `<span class="sa-org-acc-count-badge">${n} compte${n === 1 ? '' : 's'}</span>`
+        : `<span class="sa-org-acc-count-badge" style="${accZero}" title="Aucun compte — ajoutez-en un">+ compte</span>`;
+  }
 }
 
 async function recomputePendingDeletionRequestsRootSa(){
@@ -848,6 +1042,67 @@ function selectedComptesOrgId(){
   return s && s.value ? s.value : '';
 }
 
+async function runLegacyPwdSaveFromRow(host, oid, i){
+  const inp = host.querySelector(`[data-pwd-i="${i}"]`);
+  const val = inp && inp.value ? String(inp.value) : '';
+  if(val.length<4){ showToast('Mot de passe : au moins 4 caractères'); return false; }
+  const list = await getAccountsForOrg(oid);
+  if(!list[i]) return false;
+  list[i] = { ...list[i], pwdHash: hashSimple(val) };
+  await saveAccountsArray(oid, list);
+  if(inp) inp.value = '';
+  showToast('Mot de passe enregistré');
+  await afterOrgAccountsChanged(oid);
+  return true;
+}
+
+async function openSaEditAccountModal(orgId, index){
+  const list = await getAccountsForOrg(orgId);
+  const acc = list[index];
+  if(!acc) return;
+  let entries = [];
+  try{
+    const snap = await get(ref(db, 'accounts'));
+    entries = accEntriesFromSnapshotVal(snap.val());
+  }catch(_){
+    showToast('Erreur lecture comptes globaux');
+    return;
+  }
+  const global = accEditFindGlobal(entries, acc);
+  window._saAccEditOrgId = orgId;
+  window._saAccEditIndex = index;
+  window._saAccEditGlobalId = global ? global.id : null;
+  el('sa-acc-edit-prenom').value = String(acc.name || '').trim();
+  el('sa-acc-edit-pwd').value = '';
+  const hadLegacyNom = acc.nom != null && String(acc.nom).trim() !== '';
+  const nomInp = el('sa-acc-edit-nom');
+  if(hadLegacyNom){
+    nomInp.value = String(acc.nom).trim();
+    nomInp.readOnly = true;
+    nomInp.classList.add('sa-input-ro');
+  }else{
+    nomInp.value = global && global.nom != null ? String(global.nom).trim() : '';
+    nomInp.readOnly = false;
+    nomInp.classList.remove('sa-input-ro');
+  }
+  const emailInp = el('sa-acc-edit-email');
+  const hadLegacyEmail = acc.email != null && String(acc.email).trim() !== '';
+  if(hadLegacyEmail){
+    emailInp.value = String(acc.email).trim();
+    emailInp.readOnly = true;
+    emailInp.classList.add('sa-input-ro');
+  }else{
+    emailInp.value = global && global.email != null ? String(global.email).trim() : '';
+    emailInp.readOnly = false;
+    emailInp.classList.remove('sa-input-ro');
+  }
+  el('sa-acc-edit-pseudo').value = acc.pseudo != null && String(acc.pseudo).trim() !== '' ? String(acc.pseudo).trim() : (global && global.pseudo ? String(global.pseudo).trim() : '');
+  el('sa-acc-edit-tel').value = acc.tel != null && String(acc.tel).trim() !== '' ? String(acc.tel) : (global && global.tel != null ? String(global.tel) : '');
+  el('sa-acc-edit-menage').classList.toggle('active', !!acc.menage);
+  el('sa-acc-edit-admin').classList.toggle('active', !!acc.admin);
+  openModal('sa-modal-edit-account');
+}
+
 async function renderAccountsForSelectedOrg(ctx){
   const host = ctx && ctx.host ? ctx.host : el('sa-accounts-list');
   const oid = ctx && ctx.orgId != null ? ctx.orgId : selectedComptesOrgId();
@@ -876,47 +1131,59 @@ async function renderAccountsForSelectedOrg(ctx){
       }
       return;
     }
-    host.innerHTML = accounts.map((acc,i)=>{
-      const nm = escHtml(acc.name||'');
+    let globalEntries = [];
+    try{
+      const snapG = await get(ref(db, 'accounts'));
+      globalEntries = accEntriesFromSnapshotVal(snapG.val());
+    }catch(_){
+      globalEntries = [];
+    }
+    host.innerHTML = accounts.map((acc, i)=>{
+      const prenom = String(acc.name || '').trim();
+      const nom = String(acc.nom || '').trim();
+      const displayRaw = nom ? `${prenom} ${nom}`.trim() : prenom;
+      const display = escHtml(displayRaw || '—');
+      const initials = escHtml(saAccInitials(acc));
+      const av = SA_AVATAR_PALETTE[saStrHash(acc.name) % SA_AVATAR_PALETTE.length];
+      const orgIds = saOrgIdsUnionForPrenom(globalEntries, acc.name);
+      const badges = saRenderOrgBadgesHtml(orgIds);
+      const roleIcons = acc.menage || acc.admin
+        ? `<span class="sa-acc-role-wrap" style="margin-left:auto;display:flex;gap:4px;align-items:center;flex-shrink:0;font-size:16px;line-height:1;user-select:none" aria-hidden="true">${acc.menage ? '<span title="Ménage">🧹</span>' : ''}${acc.admin ? '<span title="Administrateur">👑</span>' : ''}</span>`
+        : '';
       return `<div class="account-row" data-acc-i="${i}">
-        <span class="account-name">${nm}</span>
-        <span class="account-role ${acc.menage?'active':''}" data-role="menage" title="Ménage">🧹</span>
-        <span class="account-role ${acc.admin?'active':''}" data-role="admin" title="Admin">👑</span>
-        <input type="password" class="account-pwd" placeholder="Nouveau MDP" data-pwd-i="${i}" aria-label="Nouveau mot de passe pour ${nm}">
-        <button type="button" class="btn-sm" data-save-pwd="${i}">Enregistrer MDP</button>
-        <button type="button" class="btn-danger" data-del-acc="${i}">Supprimer</button>
+        <div class="sa-acc-row-main">
+          <span class="sa-acc-avatar" style="background:${av.bg};color:${av.fg}" aria-hidden="true">${initials}</span>
+          <span class="sa-acc-name" role="button" tabindex="0" title="Modifier le compte">${display}</span>
+          <span class="sa-acc-org-badges">${badges}</span>
+          ${roleIcons}
+        </div>
+        <input type="password" class="account-pwd" style="display:none" data-pwd-i="${i}" tabindex="-1" autocomplete="new-password" aria-hidden="true">
+        <button type="button" class="btn-sm" style="display:none" data-save-pwd="${i}" tabindex="-1">Enregistrer MDP</button>
+        <button type="button" class="btn-danger" style="display:none" data-del-acc="${i}" tabindex="-1">Supprimer</button>
       </div>`;
     }).join('');
     if(nextCtx){
       host.innerHTML += `<button type="button" class="btn-primary" style="margin-top:12px" data-inline-add-acc="${escHtml(oid)}">+ Ajouter un compte</button>`;
     }
 
-    host.querySelectorAll('.account-role').forEach(span=>{
-      span.addEventListener('click', async ()=>{
-        const row = span.closest('.account-row');
-        const i = Number(row.getAttribute('data-acc-i'));
-        const role = span.getAttribute('data-role');
-        const list = await getAccountsForOrg(oid);
-        if(!list[i]) return;
-        list[i] = { ...list[i], [role]: !list[i][role] };
-        await saveAccountsArray(oid, list);
-        showToast('Rôle mis à jour');
-        await afterOrgAccountsChanged(oid);
+    host.querySelectorAll('.account-row .sa-acc-name').forEach(nameEl=>{
+      const openEdit = ev=>{
+        ev.preventDefault();
+        const row = nameEl.closest('.account-row');
+        if(!row) return;
+        const idx = Number(row.getAttribute('data-acc-i'));
+        void openSaEditAccountModal(oid, idx);
+      };
+      nameEl.addEventListener('click', openEdit);
+      nameEl.addEventListener('keydown', e=>{
+        if(e.key !== 'Enter' && e.key !== ' ') return;
+        openEdit(e);
       });
     });
     host.querySelectorAll('[data-save-pwd]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const i = Number(btn.getAttribute('data-save-pwd'));
-        const inp = host.querySelector(`[data-pwd-i="${i}"]`);
-        const val = inp && inp.value ? String(inp.value) : '';
-        if(val.length<4){ showToast('Mot de passe : au moins 4 caractères'); return; }
-        const list = await getAccountsForOrg(oid);
-        if(!list[i]) return;
-        list[i] = { ...list[i], pwdHash: hashSimple(val) };
-        await saveAccountsArray(oid, list);
-        if(inp) inp.value = '';
-        showToast('Mot de passe enregistré');
-        await afterOrgAccountsChanged(oid);
+        await runLegacyPwdSaveFromRow(host, oid, i);
       });
     });
     host.querySelectorAll('[data-del-acc]').forEach(btn=>{
@@ -1002,6 +1269,143 @@ el('sa-modal-del-acc-ok').addEventListener('click', async ()=>{
     console.warn(e);
     showToast('Erreur');
   }
+});
+
+(function wireSaAccEditModal(){
+  const tog = (n)=>{
+    n.addEventListener('click', ()=>n.classList.toggle('active'));
+    n.addEventListener('keydown', e=>{
+      if(e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      n.classList.toggle('active');
+    });
+  };
+  tog(el('sa-acc-edit-menage'));
+  tog(el('sa-acc-edit-admin'));
+})();
+
+el('sa-acc-edit-cancel').addEventListener('click', ()=>closeModal('sa-modal-edit-account'));
+
+el('sa-acc-edit-del').addEventListener('click', ()=>{
+  const orgId = window._saAccEditOrgId;
+  const idx = window._saAccEditIndex;
+  if(!orgId || idx == null || idx < 0) return;
+  closeModal('sa-modal-edit-account');
+  const pane = document.getElementById('sa-accounts-panel-' + orgId) || el('sa-accounts-list');
+  requestAnimationFrame(()=>{
+    const row = pane && pane.querySelector(`.account-row[data-acc-i="${idx}"]`);
+    const delBtn = row && row.querySelector('[data-del-acc]');
+    if(delBtn) delBtn.click();
+  });
+});
+
+el('sa-acc-edit-save').addEventListener('click', async ()=>{
+  const orgId = window._saAccEditOrgId;
+  const i = window._saAccEditIndex;
+  if(!orgId || i == null || i < 0) return;
+  const listCur = await getAccountsForOrg(orgId);
+  const acc = listCur[i];
+  if(!acc){
+    closeModal('sa-modal-edit-account');
+    return;
+  }
+  const hadLegacyEmail = acc.email != null && String(acc.email).trim() !== '';
+  const hadLegacyNom = acc.nom != null && String(acc.nom).trim() !== '';
+  const pseudo = el('sa-acc-edit-pseudo').value.trim();
+  const tel = el('sa-acc-edit-tel').value.trim();
+  const pwd = el('sa-acc-edit-pwd').value;
+  const nomInpVal = el('sa-acc-edit-nom').value.trim();
+  const emailInpVal = el('sa-acc-edit-email').value.trim();
+  if(!pseudo){ showToast('Pseudo obligatoire'); return; }
+  if(!hadLegacyNom && !nomInpVal){ showToast('Nom obligatoire'); return; }
+  if(!hadLegacyEmail){
+    if(!emailInpVal || emailInpVal.indexOf('@') < 0){ showToast('Email obligatoire'); return; }
+  }
+  const menage = el('sa-acc-edit-menage').classList.contains('active');
+  const admin = el('sa-acc-edit-admin').classList.contains('active');
+  if(!menage && !admin){ showToast('Choisissez au moins un rôle'); return; }
+  const roles = [];
+  if(menage) roles.push('menage');
+  if(admin) roles.push('admin');
+  const btn = el('sa-acc-edit-save');
+  btn.disabled = true;
+  let entries = [];
+  try{
+    const snap = await get(ref(db, 'accounts'));
+    entries = accEntriesFromSnapshotVal(snap.val());
+  }catch(_){
+    showToast('Erreur lecture comptes globaux');
+    btn.disabled = false;
+    return;
+  }
+  const globalNow = accEditFindGlobal(entries, acc);
+  const gid = globalNow != null && globalNow.id != null ? globalNow.id : window._saAccEditGlobalId;
+  const excludeKey = gid != null && gid !== '' ? String(gid) : '';
+  const ps = String(pseudo || '').trim();
+  let pseudoTaken = false;
+  for(const row of entries){
+    if(excludeKey && String(row.id) === excludeKey) continue;
+    if(String(row.pseudo ?? '').trim() === ps){
+      pseudoTaken = true;
+      break;
+    }
+  }
+  if(pseudoTaken){
+    showToast('Ce pseudo est déjà utilisé');
+    btn.disabled = false;
+    return;
+  }
+  const emailNorm = hadLegacyEmail ? accNormalizeEmail(acc.email) : accNormalizeEmail(emailInpVal);
+  const nomFinal = hadLegacyNom ? String(acc.nom).trim() : nomInpVal;
+  const leg = { ...acc };
+  leg.nom = nomFinal;
+  leg.pseudo = pseudo;
+  leg.tel = tel;
+  leg.menage = menage;
+  leg.admin = admin;
+  if(!hadLegacyEmail) leg.email = emailNorm;
+  if(pwd){
+    if(pwd.length < 4){ showToast('Mot de passe : au moins 4 caractères'); btn.disabled = false; return; }
+    leg.pwdHash = hashSimple(pwd);
+  }
+  const updates = {};
+  if(gid){
+    updates[`accounts/${gid}/pseudo`] = pseudo;
+    updates[`accounts/${gid}/tel`] = tel;
+    updates[`accounts/${gid}/orgs/${orgId}/roles`] = roles;
+    if(pwd){
+      let h;
+      try{ h = await sha256Hex(pwd); }catch(_){ showToast('Erreur hash mot de passe'); btn.disabled = false; return; }
+      updates[`accounts/${gid}/pwdHash`] = h;
+    }
+    if(!hadLegacyEmail) updates[`accounts/${gid}/email`] = emailNorm;
+    if(!hadLegacyNom) updates[`accounts/${gid}/nom`] = nomFinal;
+  }
+  try{
+    if(Object.keys(updates).length) await update(ref(db), updates);
+  }catch(_){
+    showToast('Erreur synchronisation — réessayez');
+    btn.disabled = false;
+    return;
+  }
+  try{
+    const list = await getAccountsForOrg(orgId);
+    if(!list[i]){ btn.disabled = false; return; }
+    list[i] = leg;
+    await saveAccountsArray(orgId, list);
+  }catch(_){
+    showToast('Erreur d’enregistrement');
+    btn.disabled = false;
+    return;
+  }
+  const pane = document.getElementById('sa-accounts-panel-' + orgId) || el('sa-accounts-list');
+  const hidInp = pane && pane.querySelector(`[data-pwd-i="${i}"]`);
+  if(hidInp) hidInp.value = '';
+  el('sa-acc-edit-pwd').value = '';
+  showToast('Modifications enregistrées');
+  closeModal('sa-modal-edit-account');
+  btn.disabled = false;
+  await afterOrgAccountsChanged(orgId);
 });
 
 function normalizeStudioNames(raw){
@@ -1254,6 +1658,19 @@ function renderOrgList(){
     const authCh = p && p.authEnabled ? 'checked' : '';
     const tgCh = p && p.telegramEnabled ? 'checked' : '';
     const accN = p && p.accountsCount != null ? Number(p.accountsCount) || 0 : 0;
+    const accZero = 'background:#FEF3C7;color:#92400E';
+    const accBadgeHtml =
+      accN > 0
+        ? `<span class="sa-org-acc-count-badge">${accN} compte${accN === 1 ? '' : 's'}</span>`
+        : `<span class="sa-org-acc-count-badge" style="${accZero}" title="Aucun compte — ajoutez-en un">+ compte</span>`;
+    const authEmoji = p && p.authEnabled ? '🔐' : '🔓';
+    const authInnerStyle = p && p.authEnabled
+      ? 'filter:none;box-shadow:0 0 6px 2px rgba(29,158,117,0.5);border-radius:6px'
+      : 'filter:grayscale(1) opacity(0.4);box-shadow:none';
+    const tgEmoji = p && p.telegramEnabled ? '💬' : '🔕';
+    const tgInnerStyle = p && p.telegramEnabled
+      ? 'filter:none;box-shadow:0 0 6px 2px rgba(29,158,117,0.5);border-radius:6px'
+      : 'filter:grayscale(1) opacity(0.4);box-shadow:none';
     return `<div class="sa-org-acc" data-org-id="${escHtml(o.id)}">
     <div class="sa-org-acc-head" role="button" tabindex="0" aria-expanded="false">
       <div class="sa-org-acc-left">
@@ -1265,23 +1682,15 @@ function renderOrgList(){
           </div>
         </div>
       </div>
+      <button type="button" class="sa-org-acc-accounts" data-sa-org-accounts-btn="${escHtml(o.id)}" title="${escHtml(accPanelTitle)}" aria-label="${escHtml(accPanelTitle)}">${accBadgeHtml}</button>
       <div class="sa-org-acc-toggles">
-        <div class="sa-org-toggle-item">
-          <span class="sa-org-toggle-emoji" title="${escHtml(SA_ORG_TITLE_AUTH)}">🔐</span>
-          <label class="toggle toggle--mini" title="${escHtml(SA_ORG_TITLE_AUTH)}">
-            <input type="checkbox" data-sa-org-auth="${escHtml(o.id)}" title="${escHtml(SA_ORG_TITLE_AUTH)}" ${authCh}>
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="sa-org-toggle-item">
-          <span class="sa-org-toggle-emoji" title="${escHtml(SA_ORG_TITLE_TG)}">💬</span>
-          <label class="toggle toggle--mini" title="${escHtml(SA_ORG_TITLE_TG)}">
-            <input type="checkbox" data-sa-org-tg="${escHtml(o.id)}" title="${escHtml(SA_ORG_TITLE_TG)}" ${tgCh}>
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
+        <button type="button" class="sa-org-tog-emoji" data-sa-toggle-auth="${escHtml(o.id)}" title="${escHtml(SA_ORG_TITLE_AUTH)}" aria-label="${escHtml(SA_ORG_TITLE_AUTH)}"><span class="sa-org-tog-emoji-inner" style="${authInnerStyle}">${authEmoji}</span></button>
+        <label class="sa-org-cb-hid"><input type="checkbox" style="display:none" data-sa-org-auth="${escHtml(o.id)}" title="${escHtml(SA_ORG_TITLE_AUTH)}" ${authCh}></label>
       </div>
-      <button type="button" class="sa-org-acc-accounts" data-sa-org-accounts-btn="${escHtml(o.id)}" title="${escHtml(accPanelTitle)}" aria-label="${escHtml(accPanelTitle)}">👤${accN}</button>
+      <div class="sa-org-acc-toggles">
+        <button type="button" class="sa-org-tog-emoji" data-sa-toggle-tg="${escHtml(o.id)}" title="${escHtml(SA_ORG_TITLE_TG)}" aria-label="${escHtml(SA_ORG_TITLE_TG)}"><span class="sa-org-tog-emoji-inner" style="${tgInnerStyle}">${tgEmoji}</span></button>
+        <label class="sa-org-cb-hid"><input type="checkbox" style="display:none" data-sa-org-tg="${escHtml(o.id)}" title="${escHtml(SA_ORG_TITLE_TG)}" ${tgCh}></label>
+      </div>
       <button type="button" class="btn-danger sa-org-del" data-del-org="${escHtml(o.id)}" title="Supprimer l’organisation" aria-label="Supprimer ${escHtml(o.label)}">🗑️ ⚠️</button>
     </div>
     <div class="sa-org-acc-panel" style="display:none">
@@ -1298,6 +1707,23 @@ function renderOrgList(){
       if(e.target.closest('.sa-org-acc-toggles')) e.stopPropagation();
       if(e.target.closest('.sa-org-acc-accounts')) e.stopPropagation();
       if(e.target.closest('.sa-org-rename-btn')) e.stopPropagation();
+    });
+    host.addEventListener('click', (e)=>{
+      const ta = e.target.closest('[data-sa-toggle-auth]');
+      if(ta){
+        e.stopPropagation();
+        const oid = ta.getAttribute('data-sa-toggle-auth');
+        const inp = oid && host.querySelector(`input[data-sa-org-auth="${CSS.escape(oid)}"]`);
+        if(inp instanceof HTMLInputElement) inp.click();
+        return;
+      }
+      const tt = e.target.closest('[data-sa-toggle-tg]');
+      if(tt){
+        e.stopPropagation();
+        const oid = tt.getAttribute('data-sa-toggle-tg');
+        const inp = oid && host.querySelector(`input[data-sa-org-tg="${CSS.escape(oid)}"]`);
+        if(inp instanceof HTMLInputElement) inp.click();
+      }
     });
     host.addEventListener('change', async (e)=>{
       const t = e.target;
@@ -1317,6 +1743,8 @@ function renderOrgList(){
           return;
         }
         showToast('Enregistré');
+        const lhA = el('sa-org-list');
+        if(lhA && orgParamsCache[oidAuth]) paintOrgRow(lhA, oidAuth, orgParamsCache[oidAuth]);
         return;
       }
       const oidTg = t.getAttribute('data-sa-org-tg');
@@ -1334,6 +1762,8 @@ function renderOrgList(){
           return;
         }
         showToast('Enregistré');
+        const lhT = el('sa-org-list');
+        if(lhT && orgParamsCache[oidTg]) paintOrgRow(lhT, oidTg, orgParamsCache[oidTg]);
       }
     });
   }
@@ -1344,6 +1774,8 @@ function renderOrgList(){
     head.addEventListener('click', async (e)=>{
       if(e.target.closest('[data-del-org]')) return;
       if(e.target.closest('.sa-org-acc-toggles')) return;
+      if(e.target.closest('[data-sa-toggle-auth]')) return;
+      if(e.target.closest('[data-sa-toggle-tg]')) return;
       if(e.target.closest('[data-sa-org-accounts-btn]')) return;
       if(e.target.closest('[data-sa-rename-org]')) return;
       const acc = head.closest('.sa-org-acc');
