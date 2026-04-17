@@ -526,7 +526,7 @@ function accFindPseudoOwnerExcluding(entries,pseudo,excludeId){
 function accEditFindGlobal(entries,legacyAcc){
   const p=String(legacyAcc.name??'').trim();
   const n=String(legacyAcc.nom??'').trim();
-  let candidates=entries.filter(row=>String(row.prenom??'').trim()===p);
+  let candidates=entries.filter(row=>String(row.prenom??'').trim()===p||String(row.name??'').trim()===p);
   if(n!=='') candidates=candidates.filter(row=>String(row.nom??'').trim()===n);
   if(legacyAcc.email!=null&&String(legacyAcc.email).trim()!==''){
     const em=accNormalizeEmail(legacyAcc.email);
@@ -545,7 +545,7 @@ function saOrgIdsUnionForPrenom(entries,prenom){
   if(!p) return [];
   const set=new Set();
   for(const row of entries){
-    if(String(row.prenom??'').trim()!==p) continue;
+    if(String(row.prenom??'').trim()!==p&&String(row.name??'').trim()!==p) continue;
     const orgs=row.orgs&&typeof row.orgs==='object'?row.orgs:{};
     for(const k of Object.keys(orgs)) set.add(k);
   }
