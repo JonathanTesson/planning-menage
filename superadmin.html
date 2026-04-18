@@ -150,6 +150,7 @@ body.sa-nav-ready .admin-burger{display:flex}
 .account-row .sa-acc-name{cursor:pointer;border-radius:6px;padding:2px 6px;margin:0 -2px;transition:background-color .15s ease,box-shadow .15s ease,color .15s ease,text-decoration .15s ease}
 .account-row .sa-acc-name:hover{background:#ecece6;box-shadow:inset 0 -1px 0 rgba(0,0,0,0.08);text-decoration:underline;text-decoration-color:#888;text-underline-offset:3px;color:#111}
 .account-row .sa-acc-name:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
+#sa-modal-add-name,#sa-modal-add-nom,#sa-modal-add-email{border:1.5px solid #F59E0B}
 </style>
 </head>
 <body>
@@ -260,16 +261,50 @@ body.sa-nav-ready .admin-burger{display:flex}
   <div class="modal">
     <h3 id="sa-modal-add-title">Ajouter un compte</h3>
     <div class="modal-field">
-      <label for="sa-modal-add-name">Prénom / nom</label>
-      <input type="text" id="sa-modal-add-name" autocomplete="off">
+      <label for="sa-modal-add-name">Prénom<span style="color:#E24B4A"> *</span></label>
+      <input type="text" id="sa-modal-add-name" autocomplete="given-name">
     </div>
     <div class="modal-field">
-      <label for="sa-modal-add-pwd">Mot de passe</label>
+      <label for="sa-modal-add-nom">Nom<span style="color:#E24B4A"> *</span></label>
+      <input type="text" id="sa-modal-add-nom" autocomplete="family-name">
+    </div>
+    <div class="modal-field">
+      <label for="sa-modal-add-pseudo">Pseudo<span style="color:#E24B4A"> *</span></label>
+      <input type="text" id="sa-modal-add-pseudo" autocomplete="username">
+    </div>
+    <div class="modal-field">
+      <label for="sa-modal-add-email">Email<span style="color:#E24B4A"> *</span></label>
+      <input type="text" id="sa-modal-add-email" autocomplete="email">
+    </div>
+    <div class="modal-field">
+      <label for="sa-modal-add-tel">Téléphone (optionnel)</label>
+      <input type="text" id="sa-modal-add-tel" autocomplete="tel">
+    </div>
+    <div class="modal-field">
+      <label for="sa-modal-add-pwd">Mot de passe<span style="color:#E24B4A"> *</span></label>
       <input type="password" id="sa-modal-add-pwd" autocomplete="new-password">
+    </div>
+    <div class="modal-field">
+      <span style="font-size:12px;color:#888;font-weight:500">Rôles</span>
+      <div class="sa-acc-modal-roles">
+        <span class="account-role active" id="sa-modal-add-menage" data-sa-modal-add-role="menage" title="Ménage" role="button" tabindex="0">🧹</span>
+        <span class="account-role" id="sa-modal-add-admin" data-sa-modal-add-role="admin" title="Admin" role="button" tabindex="0">👑</span>
+      </div>
     </div>
     <div class="modal-actions">
       <button type="button" class="btn-secondary" id="sa-modal-add-cancel">Annuler</button>
       <button type="button" class="btn-primary" id="sa-modal-add-ok">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="sa-modal-confirm-assoc" role="dialog" aria-modal="true" aria-labelledby="sa-modal-confirm-assoc-title">
+  <div class="modal">
+    <h3 id="sa-modal-confirm-assoc-title">Compte existant</h3>
+    <p class="empty-hint" id="sa-modal-confirm-assoc-text" style="color:#555;line-height:1.45"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="sa-modal-confirm-assoc-cancel">Annuler</button>
+      <button type="button" class="btn-primary" id="sa-modal-confirm-assoc-ok">Associer</button>
     </div>
   </div>
 </div>
@@ -428,7 +463,7 @@ body.sa-nav-ready .admin-burger{display:flex}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, get, set, update, onValue, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, get, set, update, onValue, remove, push } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { getStorage, ref as sRef, deleteObject, listAll } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 const firebaseConfig = {
@@ -523,6 +558,20 @@ function accFindPseudoOwnerExcluding(entries,pseudo,excludeId){
   return null;
 }
 
+function accFindIdentityMatch(entries,prenom,nom,email){
+  const pl=prenom.trim().toLowerCase();
+  const nl=nom.trim().toLowerCase();
+  const em=accNormalizeEmail(email);
+  if(!pl||!nl||!em) return null;
+  for(const row of entries){
+    const rPr=String(row.prenom??'').trim().toLowerCase();
+    const rName=String(row.name??'').trim().toLowerCase();
+    const rNom=String(row.nom??'').trim().toLowerCase();
+    if((rPr===pl||rName===pl)&&rNom===nl&&accNormalizeEmail(row.email)===em) return row;
+  }
+  return null;
+}
+
 function accEditFindGlobal(entries,legacyAcc){
   const p=String(legacyAcc.name??'').trim();
   const n=String(legacyAcc.nom??'').trim();
@@ -535,17 +584,54 @@ function accEditFindGlobal(entries,legacyAcc){
   return candidates[0]||null;
 }
 
+function resetSaModalAddAccountForm(){
+  window._saModalAddPseudoDirty = false;
+  el('sa-modal-add-name').value = '';
+  el('sa-modal-add-nom').value = '';
+  el('sa-modal-add-pseudo').value = '';
+  el('sa-modal-add-email').value = '';
+  el('sa-modal-add-tel').value = '';
+  el('sa-modal-add-pwd').value = '';
+  el('sa-modal-add-menage').classList.add('active');
+  el('sa-modal-add-admin').classList.remove('active');
+}
+
+async function executeAssociation(identity, oid, pseudo, tel, pwd, menage, admin, emailNorm){
+  const roles=[];
+  if(menage) roles.push('menage');
+  if(admin) roles.push('admin');
+  try{
+    await update(ref(db), { [`accounts/${identity.id}/orgs/${oid}`]: { roles } });
+  }catch(_){
+    showToast('Erreur synchronisation — réessayez');
+    return false;
+  }
+  let list = await getAccountsForOrg(oid);
+  const legacyName = String(identity.name || identity.prenom || '').trim();
+  const legacyNom = String(identity.nom || '').trim();
+  list = [...list, { name: legacyName, nom: legacyNom, email: emailNorm, pseudo, tel: tel || '', pwdHash: hashSimple(pwd), menage, admin, sharedWith: [] }];
+  await saveAccountsArray(oid, list);
+  pendingAddAccountOrgId = '';
+  resetSaModalAddAccountForm();
+  closeModal('sa-modal-add-account');
+  showToast('Compte associé ✓');
+  await afterOrgAccountsChanged(oid);
+  return true;
+}
+
 function saOrgLabelById(orgId){
   const o=orgEntries.find(x=>x.id===orgId);
   return o?o.label:String(orgId||'');
 }
 
 function saOrgIdsUnionForPrenom(entries,prenom){
-  const p=String(prenom??'').trim();
+  const p=String(prenom??'').trim().toLowerCase();
   if(!p) return [];
   const set=new Set();
   for(const row of entries){
-    if(String(row.prenom??'').trim()!==p&&String(row.name??'').trim()!==p) continue;
+    const rPr=String(row.prenom??'').trim().toLowerCase();
+    const rName=String(row.name??'').trim().toLowerCase();
+    if(rPr!==p&&rName!==p) continue;
     const orgs=row.orgs&&typeof row.orgs==='object'?row.orgs:{};
     for(const k of Object.keys(orgs)) set.add(k);
   }
@@ -1124,8 +1210,7 @@ async function renderAccountsForSelectedOrg(ctx){
       if(nextCtx){
         host.querySelector('[data-inline-add-acc]')?.addEventListener('click', ()=>{
           pendingAddAccountOrgId = oid;
-          el('sa-modal-add-name').value = '';
-          el('sa-modal-add-pwd').value = '';
+          resetSaModalAddAccountForm();
           openModal('sa-modal-add-account');
         });
       }
@@ -1199,8 +1284,7 @@ async function renderAccountsForSelectedOrg(ctx){
     if(nextCtx){
       host.querySelector('[data-inline-add-acc]')?.addEventListener('click', ()=>{
         pendingAddAccountOrgId = oid;
-        el('sa-modal-add-name').value = '';
-        el('sa-modal-add-pwd').value = '';
+        resetSaModalAddAccountForm();
         openModal('sa-modal-add-account');
       });
     }
@@ -1216,33 +1300,115 @@ el('sa-add-account-btn').addEventListener('click', ()=>{
   const oid = selectedComptesOrgId();
   if(!oid){ showToast('Choisissez une organisation'); return; }
   pendingAddAccountOrgId = oid;
-  el('sa-modal-add-name').value = '';
-  el('sa-modal-add-pwd').value = '';
+  resetSaModalAddAccountForm();
   openModal('sa-modal-add-account');
 });
 el('sa-modal-add-cancel').addEventListener('click', ()=>{
   pendingAddAccountOrgId = '';
+  resetSaModalAddAccountForm();
   closeModal('sa-modal-add-account');
 });
 el('sa-modal-add-ok').addEventListener('click', async ()=>{
   const oid = pendingAddAccountOrgId || selectedComptesOrgId();
   if(!oid){ showToast('Choisissez une organisation'); return; }
-  const name = String(el('sa-modal-add-name').value||'').trim();
+  const prenom = String(el('sa-modal-add-name').value||'').trim();
+  const nom = String(el('sa-modal-add-nom').value||'').trim();
+  const pseudo = String(el('sa-modal-add-pseudo').value||'').trim();
+  const email = String(el('sa-modal-add-email').value||'').trim();
+  const tel = String(el('sa-modal-add-tel').value||'').trim();
   const pwd = el('sa-modal-add-pwd').value||'';
-  if(!name){ showToast('Indiquez un nom'); return; }
-  if(pwd.length<4){ showToast('Mot de passe : au moins 4 caractères'); return; }
+  const menage = el('sa-modal-add-menage').classList.contains('active');
+  const admin = el('sa-modal-add-admin').classList.contains('active');
+  const roles = [];
+  if(menage) roles.push('menage');
+  if(admin) roles.push('admin');
+  if(!prenom){ showToast('Prénom obligatoire'); return; }
+  if(!nom){ showToast('Nom obligatoire'); return; }
+  if(!pseudo){ showToast('Pseudo obligatoire'); return; }
+  if(!email){ showToast('Email obligatoire'); return; }
+  if(!pwd){ showToast('Mot de passe obligatoire'); return; }
+  if(!menage && !admin){ showToast('Choisissez au moins un rôle'); return; }
+  if(pwd.length < 4){ showToast('Mot de passe : au moins 4 caractères'); return; }
+  const btn = el('sa-modal-add-ok');
+  btn.disabled = true;
   try{
+    let snap;
+    try{
+      snap = await get(ref(db, 'accounts'));
+    }catch(_){
+      showToast('Erreur lecture comptes globaux');
+      return;
+    }
+    const entries = accEntriesFromSnapshotVal(snap.val());
+    const identity = accFindIdentityMatch(entries, prenom, nom, email);
+    if(identity){
+      const ps = identity.pseudo != null && String(identity.pseudo).trim() !== '' ? String(identity.pseudo).trim() : '(aucun)';
+      el('sa-modal-confirm-assoc-text').textContent = `Ce compte existe déjà (pseudo: ${ps}). Voulez-vous l'associer à cette organisation ?`;
+      openModal('sa-modal-confirm-assoc');
+      const accepted = await new Promise(resolve=>{
+        const okBtn = el('sa-modal-confirm-assoc-ok');
+        const cancelBtn = el('sa-modal-confirm-assoc-cancel');
+        const onOk = ()=>{
+          closeModal('sa-modal-confirm-assoc');
+          okBtn.removeEventListener('click', onOk);
+          cancelBtn.removeEventListener('click', onCancel);
+          resolve(true);
+        };
+        const onCancel = ()=>{
+          btn.disabled = false;
+          closeModal('sa-modal-confirm-assoc');
+          okBtn.removeEventListener('click', onOk);
+          cancelBtn.removeEventListener('click', onCancel);
+          resolve(false);
+        };
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+      });
+      if(!accepted) return;
+      const emailNorm = accNormalizeEmail(email);
+      const assocOk = await executeAssociation(identity, oid, pseudo, tel, pwd, menage, admin, emailNorm);
+      if(!assocOk) return;
+      return;
+    }
+    const psTrim = String(pseudo).trim();
+    if(entries.find(r=>String(r.pseudo ?? '').trim() === psTrim)){
+      showToast('Ce pseudo est déjà utilisé');
+      return;
+    }
     let list = await getAccountsForOrg(oid);
-    if(list.find(a=>a.name===name)){ showToast('Ce prénom existe déjà'); return; }
-    list = [...list, { name, pwdHash: hashSimple(pwd), menage:true, admin:false, sharedWith:[] }];
+    if(list.find(a=>a.name === prenom)){ showToast('Ce prénom existe déjà dans cette organisation'); return; }
+    let pwdHash256;
+    try{
+      pwdHash256 = await sha256Hex(pwd);
+    }catch(_){
+      showToast('Erreur hash mot de passe');
+      return;
+    }
+    const newRef = push(ref(db, 'accounts'));
+    const payload = {
+      nom, prenom, pseudo, email, tel: tel || '',
+      pwdHash: pwdHash256,
+      orgs: { [oid]: { roles } },
+      defaultOrg: oid
+    };
+    try{
+      await set(newRef, payload);
+    }catch(_){
+      showToast('Erreur création compte global — réessayez');
+      return;
+    }
+    list = [...list, { name: prenom, nom, email: accNormalizeEmail(email), pseudo, tel: tel || '', pwdHash: hashSimple(pwd), menage, admin, sharedWith: [] }];
     await saveAccountsArray(oid, list);
     pendingAddAccountOrgId = '';
+    resetSaModalAddAccountForm();
     closeModal('sa-modal-add-account');
-    showToast('Compte ajouté');
+    showToast(`${prenom} ajouté ✓`);
     await afterOrgAccountsChanged(oid);
   }catch(e){
     console.warn(e);
     showToast('Erreur d’enregistrement');
+  }finally{
+    btn.disabled = false;
   }
 });
 
@@ -1282,6 +1448,24 @@ el('sa-modal-del-acc-ok').addEventListener('click', async ()=>{
   };
   tog(el('sa-acc-edit-menage'));
   tog(el('sa-acc-edit-admin'));
+})();
+
+(function wireSaModalAddAccount(){
+  const tog = (n)=>{
+    n.addEventListener('click', ()=>n.classList.toggle('active'));
+    n.addEventListener('keydown', e=>{
+      if(e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      n.classList.toggle('active');
+    });
+  };
+  tog(el('sa-modal-add-menage'));
+  tog(el('sa-modal-add-admin'));
+  el('sa-modal-add-name').addEventListener('input', ()=>{
+    if(window._saModalAddPseudoDirty) return;
+    el('sa-modal-add-pseudo').value = el('sa-modal-add-name').value;
+  });
+  el('sa-modal-add-pseudo').addEventListener('input', ()=>{ window._saModalAddPseudoDirty = true; });
 })();
 
 el('sa-acc-edit-cancel').addEventListener('click', ()=>closeModal('sa-modal-edit-account'));
