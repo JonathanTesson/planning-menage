@@ -1426,7 +1426,32 @@ el('sa-modal-del-acc-ok').addEventListener('click', async ()=>{
   if(!oid || i<0) return;
   try{
     let list = await getAccountsForOrg(oid);
-    if(!list[i]) return;
+    const acc = list[i];
+    if(!acc) return;
+    let snap;
+    try{
+      snap = await get(ref(db, 'accounts'));
+    }catch(_){
+      showToast('Erreur lecture comptes globaux');
+      return;
+    }
+    const entries = accEntriesFromSnapshotVal(snap.val());
+    const global = accEditFindGlobal(entries, acc);
+    if(global){
+      const orgs = global.orgs && typeof global.orgs === 'object' ? global.orgs : {};
+      const nOrg = Object.keys(orgs).length;
+      if(nOrg > 1){
+        await update(ref(db), { [`accounts/${global.id}/orgs/${oid}`]: null });
+      }else{
+        await remove(ref(db, `accounts/${global.id}`));
+        const prenom = String(acc.name ?? '').trim();
+        if(prenom){
+          try{
+            await remove(ref(db, `orgs/${oid}/unavailability/${prenom}`));
+          }catch(_){}
+        }
+      }
+    }
     list = list.filter((_,j)=>j!==i);
     await saveAccountsArray(oid, list);
     showToast('Compte supprimé');
