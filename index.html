@@ -489,6 +489,8 @@ let S = {
   assignments: {},
   reservations: [],
   adminConfig: { authEnabled: false, accounts: [], defaultOrgId: 'tesson' },
+  /** Intervenantes pour l’org courante (depuis /accounts), ordre aligné sur le legacy pour les couleurs. */
+  cleanerList: [],
   currentMonth: new Date().getMonth(),
   currentYear: new Date().getFullYear(),
   showSettings: false,
@@ -652,7 +654,7 @@ function essentialDataLoaded(){
 }
 /** True dès que Firebase a au moins un compte pour l’org chargée (chemin orgs/{orgId}/adminConfig). */
 function orgHasConfiguredAccounts(){
-  return (S.adminConfig.accounts||[]).length > 0;
+  return (S.cleanerList&&S.cleanerList.length>0)||((S.adminConfig.accounts||[]).length>0);
 }
 
 // ─── Session ──────────────────────────────────────────────────────────────────
@@ -1299,11 +1301,13 @@ function initFirebaseAndApp(){
       S.adminConfig={ authEnabled:false, accounts:[], defaultOrgId:getStoredOrgId()||'tesson' };
     }
     loaded.adminConfig=true;
+    void refreshCleanerList();
     if(!fbReady) checkReady();
     else routeAfterFirebaseUpdate();
   }, ()=>{
     loaded.adminConfig=true;
     S.adminConfig={ authEnabled:false, accounts:[], defaultOrgId:getStoredOrgId()||'tesson' };
+    void refreshCleanerList();
     afterFbListener();
   });
 
@@ -1485,8 +1489,52 @@ function getAssignment(r){
   };
 }
 
+async function refreshCleanerList(){
+  try{
+    const snap=await get(ref(db,'accounts'));
+    const val=snap.val();
+    if(!val){
+      S.cleanerList=[];
+    }else{
+      const orgId=getStoredOrgId();
+      const list=[];
+      for(const [,row] of Object.entries(val)){
+        if(!row||typeof row!=='object') continue;
+        const orgs=row.orgs||{};
+        if(!orgs[orgId]) continue;
+        const roles=orgs[orgId].roles||[];
+        const name=String(row.name||row.prenom||'').trim();
+        if(!name) continue;
+        list.push({ name, menage: roles.includes('menage'), admin: roles.includes('admin') });
+      }
+      const legacyOrder=(S.adminConfig.accounts||[]).map(a=>a.name);
+      list.sort((a,b)=>{
+        const ia=legacyOrder.indexOf(a.name);
+        const ib=legacyOrder.indexOf(b.name);
+        if(ia>=0&&ib>=0) return ia-ib;
+        if(ia>=0) return -1;
+        if(ib>=0) return 1;
+        return a.name.localeCompare(b.name,'fr');
+      });
+      S.cleanerList=list;
+    }
+  }catch(_){
+    S.cleanerList=(S.adminConfig.accounts||[]).map(a=>({
+      name:a.name,
+      menage:!!a.menage,
+      admin:!!a.admin
+    }));
+  }
+  if(fbReady) routeAfterFirebaseUpdate();
+}
+
+function cleanerListOrLegacy(){
+  if(S.cleanerList&&S.cleanerList.length) return S.cleanerList;
+  return (S.adminConfig.accounts||[]).map(a=>({ name:a.name, menage:!!a.menage, admin:!!a.admin }));
+}
+
 function cleanerColor(n){
-  const accounts=S.adminConfig.accounts||[];
+  const accounts=cleanerListOrLegacy();
   const i=accounts.findIndex(a=>a.name===n);
   return i>=0?CLEANER_COLORS[i%CLEANER_COLORS.length]:'#aaa';
 }
@@ -1554,7 +1602,8 @@ function renderKpi(){
 }
 
 function renderControls(){
-  const cleaners=S.adminConfig.accounts?S.adminConfig.accounts.filter(a=>a.menage).map(a=>a.name):S.cleaners;
+  let cleaners=cleanerListOrLegacy().filter(a=>a.menage).map(a=>a.name);
+  if(!cleaners.length&&!S.adminConfig.accounts) cleaners=S.cleaners||[];
   const chips=cleaners.map(c=>{
     const col=cleanerColor(c);
     const isActive=S.filterCleaner===c;
@@ -1571,7 +1620,7 @@ function renderControls(){
 function buildUnavailPipsHtml(d){
   if(!S.showUnavailability) return '';
   const dateKey=localDateKey(d);
-  const cleaners=(S.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
+  const cleaners=cleanerListOrLegacy().filter(a=>a.menage).map(a=>a.name);
   const list=S.filterCleaner?cleaners.filter(c=>c===S.filterCleaner):cleaners;
   const names=[];
   for(const n of list){
@@ -2147,7 +2196,8 @@ window._oa = function(key){
   }
 
   // Vue admin : liste complète
-  const cleaners=S.adminConfig.accounts?S.adminConfig.accounts.filter(a=>a.menage).map(a=>a.name):S.cleaners;
+  let cleaners=cleanerListOrLegacy().filter(a=>a.menage).map(a=>a.name);
+  if(!cleaners.length&&!S.adminConfig.accounts) cleaners=S.cleaners||[];
   const opts=sel=>`<option value="">— Aucune —</option>`+cleaners.map(x=>`<option value="${x}"${sel===x?' selected':''}>${x}</option>`).join('');
   document.getElementById('modal-container').innerHTML=`
     <div class="modal-overlay" onclick="if(event.target===this)window._cm()">
