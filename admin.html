@@ -557,7 +557,9 @@ let A = {
   adminUnavailSelectedName: '',
   adminUnavailDates: {},
   /** @type {Record<string, Record<string, { by: string|null }>>} prénom → date → traçabilité (cf. normalizeUnavailabilityAdmin) */
-  unavailabilityAll: {}
+  unavailabilityAll: {},
+  /** Cache client : lignes legacy enrichies avec `_globalId` (jamais persisté dans Firebase). */
+  _enrichedAccounts: []
 };
 
 function hashSimple(str){
@@ -1050,7 +1052,7 @@ function renderAdminContent(){
   const ol=document.getElementById('admin-org-label');
   if(ol) ol.textContent=ORGANIZATIONS.find(o=>o.id===orgId)?.label||orgId;
   renderStats();
-  renderAccounts();
+  void renderAccounts();
   renderStudioFields();
   renderHisto();
   renderActivityLog();
@@ -1132,7 +1134,6 @@ async function studioFieldsClickHandler(e){
       const n=arr.length+1;
       arr.push(`Studio ${n}`);
       A.studioNames=arr;
-      await syncCleanersToConfig();
       showToast('Studio ajouté');
       await renderStudioFields();
     }catch(err){
@@ -1404,13 +1405,35 @@ function renderStats(){
     '</div>';
 }
 
-function renderAccounts(){
-  const accounts=A.adminConfig.accounts||[];
-  if(!accounts.length){
+async function renderAccounts(){
+  const legacy=A.adminConfig.accounts||[];
+  let enriched;
+  try{
+    const snap=await get(ref(db,'accounts'));
+    const val=snap.val();
+    const entries=val&&typeof val==='object'
+      ?Object.entries(val).filter(([,row])=>row&&typeof row==='object')
+      :[];
+    enriched=legacy.map(acc=>{
+      const p=String(acc.name??'').trim();
+      let gid=null;
+      for(const [id,row] of entries){
+        if(!row.orgs||!row.orgs[orgId]) continue;
+        const nm=String(row.name??'').trim();
+        const pr=String(row.prenom??'').trim();
+        if(nm===p||pr===p){ gid=id; break; }
+      }
+      return {...acc,_globalId:gid};
+    });
+  }catch(_){
+    enriched=legacy.map(acc=>({...acc,_globalId:null}));
+  }
+  A._enrichedAccounts=enriched;
+  if(!enriched.length){
     document.getElementById('accounts-list').innerHTML='<p style="font-size:12px;color:#aaa;padding:8px 0">Aucun compte — ajoutez le premier ci-dessous</p>';
     return;
   }
-  document.getElementById('accounts-list').innerHTML=accounts.map((acc,i)=>{
+  document.getElementById('accounts-list').innerHTML=enriched.map((acc,i)=>{
     const col=CLEANER_COLORS[i%CLEANER_COLORS.length];
     return `<div class="account-row">
       <div class="account-dot" style="background:${col}"></div>
@@ -1631,8 +1654,7 @@ window.submitAddAccountModal=async function(){
     A.adminConfig.accounts=accounts;
     saveAdminConfig();
     closeAddAccountModal();
-    renderAccounts();
-    syncCleanersToConfig();
+    await renderAccounts();
     pushActivity({type:'admin_config',text:`Compte existant associé : ${prenom} (${orgId})`});
     showToast('Compte associé ✓');
     btn.disabled=false;
@@ -1671,8 +1693,7 @@ window.submitAddAccountModal=async function(){
   A.adminConfig.accounts=accounts;
   saveAdminConfig();
   closeAddAccountModal();
-  renderAccounts();
-  syncCleanersToConfig();
+  await renderAccounts();
   pushActivity({type:'admin_config',text:`Nouveau compte : ${prenom}`});
   showToast(prenom+' ajouté ✓');
   btn.disabled=false;
@@ -1709,7 +1730,8 @@ window.openEditAccountModal=async function(i){
     showToast('Erreur lecture comptes globaux');
     return;
   }
-  window._accEditGlobalId=global?global.id:null;
+  const gidFromEnriched=A._enrichedAccounts?.[i]?._globalId;
+  window._accEditGlobalId=(gidFromEnriched!=null&&gidFromEnriched!=='')?gidFromEnriched:(global?global.id:null);
   const nomInp=document.getElementById('acc-edit-nom');
   const hadLegacyNom=acc.nom!=null&&String(acc.nom).trim()!=='';
   if(hadLegacyNom){
@@ -1818,8 +1840,7 @@ window.submitEditAccountModal=async function(){
   accounts[i]=leg;
   A.adminConfig.accounts=accounts;
   saveAdminConfig();
-  renderAccounts();
-  syncCleanersToConfig();
+  await renderAccounts();
   pushActivity({type:'admin_config',text:`Compte mis à jour : ${acc.name}`});
   showToast('Modifications enregistrées ✓');
   closeEditAccountModal();
@@ -1868,8 +1889,7 @@ window.submitDeleteAccountModal=async function(){
     accounts.splice(i,1);
     A.adminConfig.accounts=accounts;
     saveAdminConfig();
-    renderAccounts();
-    syncCleanersToConfig();
+    await renderAccounts();
     pushActivity({type:'admin_config',text:`Compte supprimé : ${prenom}`});
     showToast('Compte supprimé ✓');
     closeEditAccountModal();
@@ -1890,8 +1910,7 @@ window.removeAccount = function(i){
   accounts.splice(i,1);
   A.adminConfig.accounts=accounts;
   saveAdminConfig();
-  renderAccounts();
-  syncCleanersToConfig();
+  void renderAccounts();
   pushActivity({ type:'admin_config', text:`Compte supprimé : ${removed}` });
 };
 
@@ -1900,8 +1919,7 @@ window.toggleRole = function(i, role){
   accounts[i][role]=!accounts[i][role];
   A.adminConfig.accounts=accounts;
   saveAdminConfig();
-  renderAccounts();
-  syncCleanersToConfig();
+  void renderAccounts();
 };
 
 window.saveAccountPwd = function(i){
@@ -1916,12 +1934,6 @@ window.saveAccountPwd = function(i){
   showToast('Mot de passe mis à jour ✓');
 };
 
-function syncCleanersToConfig(){
-  // Synchronise la liste des ménage dans /config pour index.html
-  const cleaners=(A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
-  set(ref(db,ob('config')), { studioNames: A.studioNames, cleaners });
-}
-
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 window.saveAdminConfig = function(){
@@ -1935,7 +1947,7 @@ window.saveNames = function(){
     const inp=document.getElementById('name-s'+i);
     return (inp&&inp.value.trim())?inp.value.trim():('Studio '+(i+1));
   });
-  syncCleanersToConfig();
+  set(ref(db,ob('config')),{ studioNames:A.studioNames }).then(()=>setSyncStatus('ok')).catch(()=>setSyncStatus('err'));
   showToast('Studios enregistrés ✓');
 };
 
