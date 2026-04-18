@@ -996,15 +996,23 @@ function showLogin(){
     sel.innerHTML='<option value="">-</option>';
     void get(ref(db,'accounts')).then(snap=>{
       const val=snap.val();
-      const set=new Set();
+      const byLower=new Map();
       if(val&&typeof val==='object'){
         for(const row of Object.values(val)){
           if(!row||typeof row!=='object') continue;
-          const disp=String(row.name??'').trim()||String(row.prenom??'').trim();
-          if(disp) set.add(disp);
+          const nm=String(row.name??'').trim();
+          const pr=String(row.prenom??'').trim();
+          if(nm){
+            const k=nm.toLowerCase();
+            if(!byLower.has(k)) byLower.set(k,nm);
+          }
+          if(pr){
+            const k=pr.toLowerCase();
+            if(!byLower.has(k)) byLower.set(k,pr);
+          }
         }
       }
-      const sorted=[...set].sort((a,b)=>a.localeCompare(b,'fr'));
+      const sorted=[...byLower.values()].sort((a,b)=>a.localeCompare(b,'fr'));
       for(const n of sorted){
         const o=document.createElement('option');
         o.value=n;
