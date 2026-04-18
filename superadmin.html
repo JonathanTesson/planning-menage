@@ -1332,6 +1332,15 @@ el('sa-modal-add-ok').addEventListener('click', async ()=>{
   const btn = el('sa-modal-add-ok');
   btn.disabled = true;
   try{
+    const legacyList = await getAccountsForOrg(oid);
+    if(legacyList.find(a =>
+      String(a.name||'').trim().toLowerCase() ===
+      prenom.toLowerCase()
+    )){
+      showToast('Ce prénom existe déjà dans cette organisation');
+      btn.disabled = false;
+      return;
+    }
     let snap;
     try{
       snap = await get(ref(db, 'accounts'));
