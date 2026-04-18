@@ -278,6 +278,11 @@ function hashSimple(str){
   return h.toString(36);
 }
 
+async function sha256Hex(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
 /** Jour civil local → YYYY-MM-DD (aligné sur le calendrier principal). */
 function localDateKey(d){
   const y=d.getFullYear();
@@ -413,12 +418,36 @@ function formatTotalMinutes(mins){
   return `${h}h ${m}min`;
 }
 
-function verifyAndUnlock(){
-  const acc=(C.adminConfig.accounts||[]).find(a=>a.name===C.userName);
-  if(!acc||acc.admin){
-    window.location.replace('index.html');
-    return;
+async function verifyAndUnlock(){
+  const legacyAcc=(C.adminConfig.accounts||[]).find(a=>a.name===C.userName);
+  let globalId=null, globalRow=null;
+  try{
+    const snap=await get(ref(db,'accounts'));
+    const val=snap.val();
+    if(val&&typeof val==='object'){
+      for(const [id,row] of Object.entries(val)){
+        if(!row||typeof row!=='object') continue;
+        const nm=String(row.name??'').trim();
+        const pr=String(row.prenom??'').trim();
+        if(nm===C.userName||pr===C.userName){ globalId=id; globalRow=row; break; }
+      }
+    }
+  }catch(_){}
+  const roles=globalRow?.orgs?.[orgId]?.roles||[];
+  const globalAdmin=roles.includes('admin');
+  if(legacyAcc){
+    if(legacyAcc.admin){
+      window.location.replace('index.html');
+      return;
+    }
+  }else{
+    if(!globalRow||globalAdmin){
+      window.location.replace('index.html');
+      return;
+    }
   }
+  C._compteGlobalId=globalId;
+  C._compteGlobalRow=globalRow;
   C.unlocked=true;
   el('compte-gate-wait').style.display='none';
   el('compte-content').style.display='';
@@ -426,7 +455,7 @@ function verifyAndUnlock(){
   el('compte-topbar-title').textContent=C.userName;
   el('compte-org-label').textContent=ORGANIZATIONS.find(o=>o.id===orgId)?.label||orgId;
   setupCompteNavOnce();
-  setupAccountForm();
+  await setupAccountForm();
   const ucb=el('unavail-show-by-detail');
   if(ucb&&!ucb.dataset.bound){
     ucb.dataset.bound='1';
@@ -447,10 +476,24 @@ function verifyAndUnlock(){
   renderUnavailCal();
 }
 
-function setupAccountForm(){
-  const acc=(C.adminConfig.accounts||[]).find(a=>a.name===C.userName);
-  if(!acc) return;
-  const hasPwd=!!acc.pwdHash;
+async function setupAccountForm(){
+  const legacyAcc=(C.adminConfig.accounts||[]).find(a=>a.name===C.userName);
+  let globalRow=null;
+  try{
+    const snap=await get(ref(db,'accounts'));
+    const val=snap.val();
+    if(val&&typeof val==='object'){
+      for(const [id,row] of Object.entries(val)){
+        if(!row||typeof row!=='object') continue;
+        const nm=String(row.name??'').trim();
+        const pr=String(row.prenom??'').trim();
+        if(nm===C.userName||pr===C.userName){ globalRow=row; C._compteGlobalId=id; break; }
+      }
+    }
+  }catch(_){}
+  C._compteGlobalRow=globalRow;
+  if(!legacyAcc&&!globalRow) return;
+  const hasPwd=!!(legacyAcc?.pwdHash)||!!(globalRow?.pwdHash);
   el('compte-name-label').textContent=C.userName;
   el('compte-pwd-hint').textContent=hasPwd
     ? 'Saisissez votre mot de passe actuel, puis le nouveau.'
@@ -458,17 +501,46 @@ function setupAccountForm(){
   el('label-self-pwd-current').textContent=hasPwd?'Mot de passe actuel':'Mot de passe actuel (si déjà défini)';
 }
 
-window._saveOwnPassword=function(){
+window._saveOwnPassword=async function(){
   if(!C.unlocked) return;
-  const acc=(C.adminConfig.accounts||[]).find(a=>a.name===C.userName);
-  if(!acc){ showToast('Compte introuvable'); return; }
+  const legacyAcc=(C.adminConfig.accounts||[]).find(a=>a.name===C.userName);
+  let globalId=C._compteGlobalId, globalRow=C._compteGlobalRow;
+  if(!globalRow){
+    try{
+      const snap=await get(ref(db,'accounts'));
+      const val=snap.val();
+      if(val&&typeof val==='object'){
+        for(const [id,row] of Object.entries(val)){
+          if(!row||typeof row!=='object') continue;
+          const nm=String(row.name??'').trim();
+          const pr=String(row.prenom??'').trim();
+          if(nm===C.userName||pr===C.userName){ globalId=id; globalRow=row; break; }
+        }
+      }
+    }catch(_){}
+  }
+  if(!legacyAcc&&!globalRow){ showToast('Compte introuvable'); return; }
+  if(!legacyAcc&&globalRow){
+    showToast('Veuillez contacter l\'administrateur pour réinitialiser votre mot de passe');
+    return;
+  }
   const cur=String(el('self-pwd-current')?.value||'');
   const nw=String(el('self-pwd-new')?.value||'');
   const cf=String(el('self-pwd-confirm')?.value||'');
   if(nw.length<4){ showToast('Nouveau mot de passe : au moins 4 caractères'); return; }
   if(nw!==cf){ showToast('La confirmation ne correspond pas'); return; }
-  if(acc.pwdHash){
-    if(hashSimple(cur)!==acc.pwdHash){ showToast('Mot de passe actuel incorrect'); return; }
+  const legacyHasPwd=!!legacyAcc?.pwdHash;
+  const globalHasPwd=!!globalRow?.pwdHash;
+  if(legacyHasPwd||globalHasPwd){
+    let curOk=false;
+    if(legacyHasPwd&&hashSimple(cur)===legacyAcc.pwdHash) curOk=true;
+    if(!curOk&&globalHasPwd){
+      try{
+        const h=(await sha256Hex(cur)).toLowerCase();
+        if(h===String(globalRow.pwdHash??'').trim().toLowerCase()) curOk=true;
+      }catch(_){}
+    }
+    if(!curOk){ showToast('Mot de passe actuel incorrect'); return; }
   }
   const accounts=C.adminConfig.accounts.map(a=>({...a}));
   const i=accounts.findIndex(a=>a.name===C.userName);
@@ -476,6 +548,15 @@ window._saveOwnPassword=function(){
   accounts[i]={...accounts[i], pwdHash:hashSimple(nw)};
   const next={...C.adminConfig, accounts};
   fbSet(ob('adminConfig'),next);
+  if(legacyAcc&&globalId){
+    try{
+      const h=(await sha256Hex(nw)).toLowerCase();
+      await set(ref(db,`accounts/${globalId}/pwdHash`),h);
+    }catch(_){
+      showToast('Erreur enregistrement du mot de passe global');
+      return;
+    }
+  }
   logActivity({ type:'admin_config', actor:C.userName, text:`${C.userName} a modifié son mot de passe` });
   showToast('Mot de passe enregistré ✓');
   el('self-pwd-current').value='';
@@ -751,9 +832,9 @@ function setupCompteNavOnce(){
     }else{
       C.adminConfig={ authEnabled:false, accounts:[], defaultOrgId:orgId||'tesson' };
     }
-    if(!C.unlocked) verifyAndUnlock();
+    if(!C.unlocked) void verifyAndUnlock();
     else{
-      setupAccountForm();
+      void setupAccountForm();
       renderCompteDashboard();
     }
   }, ()=>{
