@@ -1276,7 +1276,8 @@ function initFirebaseAndApp(){
     const d=snap.val();
     if(d){ S.cleaners=d.cleaners||[]; S.studioNames=d.studioNames||S.studioNames; }
     setSyncStatus('ok'); loaded.config=true;
-    afterFbListener();
+    if(S.cleanerList.length>0) void refreshCleanerList().then(()=>afterFbListener());
+    else afterFbListener();
   });
 
   onValue(ref(db,ob('assignments')), snap=>{
