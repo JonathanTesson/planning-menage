@@ -107,3 +107,50 @@ export function buildAddAccountModalHTML() {
   </div>
 </div>`;
 }
+
+/**
+ * Fragment HTML — confirmation d’association d’un compte existant (message dynamique dans #shared-confirm-assoc-text).
+ */
+export function buildConfirmAssocModalHTML() {
+  return `<div id="shared-confirm-assoc-modal" class="shared-acc-modal" aria-hidden="true">
+  <div class="shared-acc-panel" onclick="event.stopPropagation()">
+    <div class="shared-acc-title">Compte existant</div>
+    <p id="shared-confirm-assoc-text" style="margin:0 0 12px;font-size:13px;color:#555;line-height:1.45"></p>
+    <div class="shared-acc-actions">
+      <button type="button" class="btn-secondary" id="shared-confirm-assoc-cancel">Annuler</button>
+      <button type="button" class="btn-primary" id="shared-confirm-assoc-ok">Associer</button>
+    </div>
+  </div>
+</div>`;
+}
+
+/**
+ * Fragment HTML — édition d’un compte (IDs stables ; branchement côté page).
+ */
+export function buildEditAccountModalHTML() {
+  return `<div id="shared-edit-acc-modal" class="shared-acc-modal" aria-hidden="true">
+  <div class="shared-acc-panel" onclick="event.stopPropagation()">
+    <div class="shared-acc-title">Modifier le compte</div>
+    <div class="shared-acc-field"><label for="shared-edit-prenom">Prénom</label><input type="text" id="shared-edit-prenom" class="shared-edit-input-ro" readonly autocomplete="off"></div>
+    <div class="shared-acc-field"><label for="shared-edit-nom">Nom<span class="shared-acc-req">*</span></label><input type="text" id="shared-edit-nom" autocomplete="off"></div>
+    <div class="shared-acc-field"><label for="shared-edit-email">Email<span class="shared-acc-req">*</span></label><input type="email" id="shared-edit-email" autocomplete="email"></div>
+    <div class="shared-acc-field"><label for="shared-edit-pseudo">Pseudo de connexion<span class="shared-acc-req">*</span></label><input type="text" id="shared-edit-pseudo" autocomplete="username"></div>
+    <div class="shared-acc-field"><label for="shared-edit-tel">Téléphone (optionnel)</label><input type="text" id="shared-edit-tel" autocomplete="tel"></div>
+    <div class="shared-acc-field"><label for="shared-edit-pwd">Nouveau mot de passe</label><input type="password" id="shared-edit-pwd" autocomplete="new-password" placeholder="Laisser vide pour ne pas changer"></div>
+    <div class="shared-acc-field">
+      <span style="font-size:12px;color:#888;font-weight:500">Rôles</span>
+      <div class="shared-acc-roles">
+        <span class="account-role" id="shared-edit-role-menage" title="Peut faire le ménage">🧹</span>
+        <span class="account-role" id="shared-edit-role-admin" title="Administrateur">👑</span>
+      </div>
+    </div>
+    <div class="shared-edit-actions">
+      <button type="button" class="btn-danger" id="shared-edit-delete">Supprimer</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn-secondary" id="shared-edit-cancel">Annuler</button>
+        <button type="button" class="btn-primary" id="shared-edit-save">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>`;
+}

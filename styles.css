@@ -34,6 +34,16 @@
 .nav-btn:hover{background:#f5f5f0}
 .nav-btn:disabled{opacity:0.35;cursor:not-allowed}
 
+.btn-danger{background:none;color:#E24B4A;border:1px solid #f0c0c0;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px}
+.btn-danger:hover{background:#fde8e8}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;z-index:200;padding:1rem;box-sizing:border-box}
+.modal-overlay.is-open{display:flex}
+.modal{background:#fff;border-radius:16px;padding:1.5rem;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.12);max-height:90vh;overflow-y:auto;box-sizing:border-box}
+
+.shared-edit-input-ro{background:#f5f5f0!important;color:#888!important;cursor:default}
+.shared-edit-actions{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-top:1rem}
+
 /* Popup « Ajouter un compte » (fragment injecté — buildAddAccountModalHTML) */
 .shared-acc-modal{
   position:fixed;
