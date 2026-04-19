@@ -1013,6 +1013,7 @@ function showLogin(){
         }
       }
       const sorted=[...byLower.values()].sort((a,b)=>a.localeCompare(b,'fr'));
+      sel.innerHTML='<option value="">-</option>';
       for(const n of sorted){
         const o=document.createElement('option');
         o.value=n;

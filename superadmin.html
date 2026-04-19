@@ -1395,7 +1395,7 @@ el('sa-modal-add-ok').addEventListener('click', async ()=>{
     }
     const newRef = push(ref(db, 'accounts'));
     const payload = {
-      nom, prenom, pseudo, email, tel: tel || '',
+      name: prenom, nom, prenom, pseudo, email, tel: tel || '',
       pwdHash: pwdHash256,
       orgs: { [oid]: { roles } },
       defaultOrg: oid
