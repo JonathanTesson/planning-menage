@@ -489,7 +489,7 @@ let S = {
   assignments: {},
   reservations: [],
   adminConfig: { authEnabled: false, accounts: [], defaultOrgId: 'tesson' },
-  /** Intervenantes pour l’org courante (depuis /accounts), ordre aligné sur le legacy pour les couleurs. */
+  /** Intervenantes pour l’org courante (depuis /accounts), ordre des couleurs aligné sur `config.cleaners` puis alphabétique pour les absents de cette liste. */
   cleanerList: [],
   currentMonth: new Date().getMonth(),
   currentYear: new Date().getFullYear(),
@@ -1513,10 +1513,10 @@ async function refreshCleanerList(){
         if(!name) continue;
         list.push({ name, menage: roles.includes('menage'), admin: roles.includes('admin') });
       }
-      const legacyOrder=(S.adminConfig.accounts||[]).map(a=>a.name);
+      const orderFromConfig=(Array.isArray(S.cleaners)?S.cleaners:[]).map(c=>String(c).trim()).filter(Boolean);
       list.sort((a,b)=>{
-        const ia=legacyOrder.indexOf(a.name);
-        const ib=legacyOrder.indexOf(b.name);
+        const ia=orderFromConfig.indexOf(a.name);
+        const ib=orderFromConfig.indexOf(b.name);
         if(ia>=0&&ib>=0) return ia-ib;
         if(ia>=0) return -1;
         if(ib>=0) return 1;
