@@ -238,7 +238,7 @@ body.sa-nav-ready .admin-burger{display:flex}
     <div id="sa-view-securite" class="sa-view" style="display:none">
       <div class="section">
         <h3>Sécurité</h3>
-        <p class="empty-hint" style="margin-bottom:12px">Modifier les identifiants Super Admin (SHA-256). Les comptes des organisations restent avec l’ancien hash (hashSimple).</p>
+        <p class="empty-hint" style="margin-bottom:12px">Modifier les identifiants Super Admin (SHA-256). Les comptes des organisations utilisent SHA-256 depuis v4.8.0.</p>
         <div class="field-row">
           <label for="sa-sec-user">Nouveau nom d’utilisateur</label>
           <input type="text" id="sa-sec-user" autocomplete="username">
@@ -480,7 +480,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const storage = getStorage(app);
 
-const APP_VERSION = '4.7.0';
+const APP_VERSION = '4.8.0';
 const SA_SESSION_KEY = 'sa_session';
 
 function hashSimple(str){
