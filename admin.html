@@ -475,6 +475,7 @@ body.admin-nav-ready .admin-burger{display:flex}
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, set, onValue, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+import { hashSimple, sha256Hex, accNormalizeEmail, accEntriesFromSnapshotVal, accFindIdentityMatch, accFindPseudoOwner, accFindPseudoOwnerExcluding, calcMaxOrder, buildAccountPayload } from './fonctions.js';
 
 /*
  * ⚠️ RÈGLES FIREBASE — à configurer dans la console Firebase
@@ -573,17 +574,6 @@ let A = {
   /** Cache client : lignes legacy enrichies avec `_globalId` (jamais persisté dans Firebase). */
   _enrichedAccounts: []
 };
-
-function hashSimple(str){
-  let h=0;
-  for(let i=0;i<str.length;i++) h=((h<<5)-h)+str.charCodeAt(i),h|=0;
-  return h.toString(36);
-}
-
-async function sha256Hex(str){
-  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
-  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
-}
 
 function setSyncStatus(s){
   document.getElementById('sync-dot').className='sync-dot '+(s==='ok'?'ok':'');
@@ -1622,43 +1612,6 @@ function renderHisto(){
 
 // ─── Accounts ────────────────────────────────────────────────────────────────
 
-function accNormalizeEmail(e){
-  return String(e||'').trim().toLowerCase();
-}
-
-function accEntriesFromSnapshotVal(val){
-  if(!val||typeof val!=='object') return [];
-  return Object.entries(val).filter(([,v])=>v&&typeof v==='object').map(([id,v])=>({id,...v}));
-}
-
-function accFindIdentityMatch(entries,prenom,nom,email){
-  const p=prenom.trim(),n=nom.trim(),em=accNormalizeEmail(email);
-  if(!p||!n||!em) return null;
-  for(const row of entries){
-    if(String(row.prenom??'').trim()===p&&String(row.nom??'').trim()===n&&accNormalizeEmail(row.email)===em) return row;
-  }
-  return null;
-}
-
-function accFindPseudoOwner(entries,pseudo){
-  const ps=String(pseudo||'').trim();
-  if(!ps) return null;
-  for(const row of entries){
-    if(String(row.pseudo??'').trim()===ps) return row;
-  }
-  return null;
-}
-
-function accFindPseudoOwnerExcluding(entries,pseudo,excludeId){
-  const ps=String(pseudo||'').trim();
-  if(!ps) return null;
-  for(const row of entries){
-    if(excludeId&&row.id===excludeId) continue;
-    if(String(row.pseudo??'').trim()===ps) return row;
-  }
-  return null;
-}
-
 function accEditFindGlobal(entries,legacyAcc){
   const p=String(legacyAcc.name??'').trim();
   const n=String(legacyAcc.nom??'').trim();
@@ -1801,18 +1754,11 @@ window.submitAddAccountModal=async function(){
     btn.disabled=false;
     return;
   }
-  let maxOrder=-1;
-  for(const e of entries){
-    if(typeof e.order==='number'&&Number.isFinite(e.order)) maxOrder=Math.max(maxOrder,e.order);
-  }
   const newRef=push(ref(db,'accounts'));
-  const payload={
-    name:prenom,nom,prenom,pseudo,email,tel:tel||'',
-    pwdHash:pwdHash256,
-    orgs:{[orgId]:{roles}},
-    defaultOrg:orgId,
-    order:maxOrder+1
-  };
+  const payload=buildAccountPayload({
+    prenom,nom,pseudo,email,tel,pwdHash:pwdHash256,orgId,roles,
+    order:calcMaxOrder(entries)+1
+  });
   try{
     await set(newRef,payload);
     setSyncStatus('ok');
