@@ -628,10 +628,30 @@ function menageAccountNamesForStats(){
   return (A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
 }
 
-const cleanerColor = n => {
-  const accounts=(A._enrichedAccounts&&A._enrichedAccounts.length)?A._enrichedAccounts:(A.adminConfig.accounts||[]);
-  const i=accounts.findIndex(a=>a.name===n);
-  return i>=0 ? CLEANER_COLORS[i%CLEANER_COLORS.length] : '#aaa';
+/** Même logique que `refreshCleanerList()` dans index.html : comptes org, tri par `order` puis prénom. */
+function adminSortedNamesForCleanerColor(){
+  const raw=(A._enrichedAccounts&&A._enrichedAccounts.length)?A._enrichedAccounts:(A.adminConfig.accounts||[]);
+  const items=raw.map(a=>{
+    const name=String(a.name??'').trim();
+    const ord=a.order;
+    const order=typeof ord==='number'&&Number.isFinite(ord)?ord:null;
+    return {name,order};
+  }).filter(x=>x.name);
+  items.sort((a,b)=>{
+    const aHas=a.order!=null;
+    const bHas=b.order!=null;
+    if(aHas&&bHas) return a.order-b.order;
+    if(aHas&&!bHas) return -1;
+    if(!aHas&&bHas) return 1;
+    return a.name.localeCompare(b.name,'fr');
+  });
+  return items.map(x=>x.name);
+}
+
+const cleanerColor=n=>{
+  const names=adminSortedNamesForCleanerColor();
+  const i=names.findIndex(nm=>nm===n);
+  return i>=0?CLEANER_COLORS[i%CLEANER_COLORS.length]:'#aaa';
 };
 
 /** Vue admin courante (pour re-rendre Indisponibilités après maj Firebase). */
@@ -1469,6 +1489,8 @@ async function syncLocalAccountsFromGlobal(){
         const admin=rolesArr.includes('admin');
         const name=String(row.name??row.prenom??'').trim();
         if(!name) continue;
+        const ordRaw=row.order;
+        const order=typeof ordRaw==='number'&&Number.isFinite(ordRaw)?ordRaw:null;
         list.push({
           name,
           nom:String(row.nom??'').trim(),
@@ -1478,7 +1500,8 @@ async function syncLocalAccountsFromGlobal(){
           pwdHash:'',
           menage,
           admin,
-          sharedWith:[]
+          sharedWith:[],
+          order
         });
       }
     }
@@ -1498,13 +1521,19 @@ async function renderAccounts(){
     enriched=legacy.map(acc=>{
       const p=String(acc.name??'').trim();
       let gid=null;
+      let orderVal=typeof acc.order==='number'&&Number.isFinite(acc.order)?acc.order:null;
       for(const [id,row] of entries){
         if(!row.orgs||!row.orgs[orgId]) continue;
         const nm=String(row.name??'').trim();
         const pr=String(row.prenom??'').trim();
-        if(nm===p||pr===p){ gid=id; break; }
+        if(nm===p||pr===p){
+          gid=id;
+          const ord=row.order;
+          orderVal=typeof ord==='number'&&Number.isFinite(ord)?ord:null;
+          break;
+        }
       }
-      return {...acc,_globalId:gid};
+      return {...acc,_globalId:gid,order:orderVal};
     });
   }catch(_){
     enriched=legacy.map(acc=>({...acc,_globalId:null}));
@@ -1515,7 +1544,7 @@ async function renderAccounts(){
     return;
   }
   document.getElementById('accounts-list').innerHTML=enriched.map((acc,i)=>{
-    const col=CLEANER_COLORS[i%CLEANER_COLORS.length];
+    const col=cleanerColor(acc.name);
     return `<div class="account-row">
       <div class="account-dot" style="background:${col}"></div>
       <div class="account-name">${acc.nom ? acc.name + ' ' + acc.nom : acc.name}</div>
