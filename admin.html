@@ -46,15 +46,8 @@ body.admin-nav-ready .admin-burger{display:flex}
 .lock-input{width:100%;max-width:280px;padding:10px 14px;border:1px solid #ddd;border-radius:10px;font-size:16px;text-align:center;letter-spacing:4px}
 .lock-input:focus{outline:none;border-color:#378ADD}
 .lock-error{color:#E24B4A;font-size:12px}
-.btn-danger{background:none;color:#E24B4A;border:none;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;line-height:1}
-.btn-danger:hover{background:#fde8e8}
 .btn-sm{padding:5px 10px;font-size:12px;border-radius:7px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#555}
 .btn-sm:hover{background:#f5f5f0}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;z-index:200;padding:1rem}
-.modal-overlay.is-open{display:flex}
-.modal{background:#fff;border-radius:16px;padding:1.5rem;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.12);max-height:90vh;overflow-y:auto}
-.modal h3{font-size:16px;font-weight:600;margin-bottom:0.75rem}
-.modal-shared-hint{font-size:13px;color:#666;margin-bottom:12px;line-height:1.45}
 .section{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
 .section h3{font-size:14px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
 .toggle{position:relative;width:44px;height:24px;flex-shrink:0}
@@ -168,30 +161,10 @@ body.admin-nav-ready .admin-burger{display:flex}
 .proc-avg-star{color:#e5e5e0;display:inline-block;width:1em;text-align:center}
 .proc-avg-star.full,.proc-avg-star.half{position:relative;color:#e5e5e0}
 .proc-avg-star.half::after{content:'★';position:absolute;left:0;top:0;width:50%;overflow:hidden;color:#F59E0B}
-/* Modale création compte (vue Comptes) */
-.acc-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:420;display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
-.acc-modal-backdrop.is-open{display:flex}
-.acc-modal-panel{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:1.1rem 1.25rem;max-width:400px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.12)}
-.acc-modal-title{font-size:15px;font-weight:600;margin-bottom:12px;color:#1a1a1a}
-.acc-modal-field{margin-bottom:10px}
-.acc-modal-field label{font-size:12px;color:#888;display:block;margin-bottom:4px;font-weight:500}
-.acc-modal-field input[type=text],.acc-modal-field input[type=password],.acc-modal-field input[type=email]{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;box-sizing:border-box}
-.acc-modal-field input:focus{outline:none;border-color:#378ADD}
-.acc-modal-req{color:#E24B4A;font-weight:600;margin-left:2px}
-.acc-modal-roles{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;align-items:center}
-.acc-modal-roles .account-role{margin:0;font:inherit;color:inherit;-webkit-appearance:none;appearance:none}
-.acc-modal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;justify-content:flex-end}
 .acc-add-btn{min-width:40px;padding:8px 14px;font-size:18px;line-height:1;font-weight:600}
 #accounts-list .account-row .account-name{flex:1;min-width:0}
-#acc-edit-modal{z-index:425}
-.acc-modal-field input.acc-modal-input-ro,.acc-modal-field input:read-only{background:#f5f5f0;color:#888;cursor:default}
-.acc-edit-actions-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;justify-content:space-between;align-items:center}
-.acc-edit-actions-row .acc-edit-actions-right{display:flex;gap:8px;flex-wrap:wrap}
-.acc-edit-del-btn{font-size:13px;padding:8px 14px;border-radius:8px;border:1px solid #f0c0c0;background:#fff}
-.acc-edit-del-btn:hover{background:#fde8e8}
 #shared-acc-prenom,#shared-acc-nom,#shared-acc-email{border:1.5px solid #F59E0B}
 .shared-acc-roles .account-role{cursor:pointer;user-select:none}
-#acc-modal-confirm-assoc{z-index:430}
 </style>
 </head>
 <body>
@@ -301,41 +274,6 @@ body.admin-nav-ready .admin-burger{display:flex}
       <div class="add-account-row">
         <button type="button" class="btn-primary acc-add-btn" onclick="openAddAccountModal()" title="Nouveau compte">+</button>
       </div>
-      <div id="acc-modal-confirm-assoc" class="acc-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="acc-modal-confirm-assoc-title" aria-hidden="true">
-        <div class="acc-modal-panel" onclick="event.stopPropagation()">
-          <div class="acc-modal-title" id="acc-modal-confirm-assoc-title">Compte existant</div>
-          <p id="acc-modal-confirm-assoc-text" style="margin:0 0 12px;font-size:13px;color:#555;line-height:1.45"></p>
-          <div class="acc-modal-actions">
-            <button type="button" class="btn-secondary" id="acc-modal-confirm-assoc-cancel">Annuler</button>
-            <button type="button" class="btn-primary" id="acc-modal-confirm-assoc-ok">Associer</button>
-          </div>
-        </div>
-      </div>
-      <div id="acc-edit-modal" class="acc-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="acc-edit-modal-title" aria-hidden="true" onclick="closeEditAccountModal()">
-        <div class="acc-modal-panel" onclick="event.stopPropagation()">
-          <div class="acc-modal-title" id="acc-edit-modal-title">Modifier le compte</div>
-          <div class="acc-modal-field"><label for="acc-edit-prenom">Prénom</label><input type="text" id="acc-edit-prenom" class="acc-modal-input-ro" readonly autocomplete="off"></div>
-          <div class="acc-modal-field"><label for="acc-edit-nom">Nom</label><input type="text" id="acc-edit-nom" autocomplete="off"></div>
-          <div class="acc-modal-field"><label for="acc-edit-email">Email</label><input type="email" id="acc-edit-email" autocomplete="email"></div>
-          <div class="acc-modal-field"><label for="acc-edit-pseudo">Pseudo<span class="acc-modal-req">*</span></label><input type="text" id="acc-edit-pseudo" autocomplete="username"></div>
-          <div class="acc-modal-field"><label for="acc-edit-tel">Téléphone (optionnel)</label><input type="text" id="acc-edit-tel" autocomplete="tel"></div>
-          <div class="acc-modal-field"><label for="acc-edit-pwd">Nouveau mot de passe</label><input type="password" id="acc-edit-pwd" autocomplete="new-password" placeholder="Laisser vide pour ne pas changer"></div>
-          <div class="acc-modal-field">
-            <span style="font-size:12px;color:#888;font-weight:500">Rôles</span>
-            <div class="acc-modal-roles">
-              <button type="button" class="account-role" id="acc-edit-menage-btn" onclick="accEditToggleRole('menage')" title="Peut faire le ménage">🧹</button>
-              <button type="button" class="account-role" id="acc-edit-admin-btn" onclick="accEditToggleRole('admin')" title="Administrateur">👑</button>
-            </div>
-          </div>
-          <div class="acc-edit-actions-row">
-            <button type="button" class="btn-danger acc-edit-del-btn" onclick="submitDeleteAccountModal()">Supprimer</button>
-            <div class="acc-edit-actions-right">
-              <button type="button" class="btn-secondary" onclick="closeEditAccountModal()">Annuler</button>
-              <button type="button" class="btn-primary" id="acc-edit-save" onclick="submitEditAccountModal()">Enregistrer</button>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Journal d'activité -->
@@ -434,11 +372,13 @@ body.admin-nav-ready .admin-burger{display:flex}
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, set, onValue, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
-import { hashSimple, sha256Hex, accNormalizeEmail, accEntriesFromSnapshotVal, accFindIdentityMatch, accFindPseudoOwner, accFindPseudoOwnerExcluding, calcMaxOrder, buildAccountPayload, buildAddAccountModalHTML } from './fonctions.js';
+import { hashSimple, sha256Hex, accNormalizeEmail, accEntriesFromSnapshotVal, accFindIdentityMatch, accFindPseudoOwner, accFindPseudoOwnerExcluding, calcMaxOrder, buildAccountPayload, buildAddAccountModalHTML, buildConfirmAssocModalHTML, buildEditAccountModalHTML } from './fonctions.js';
 
 document.body.insertAdjacentHTML('beforeend',
   buildAddAccountModalHTML()
 );
+document.body.insertAdjacentHTML('beforeend', buildConfirmAssocModalHTML());
+document.body.insertAdjacentHTML('beforeend', buildEditAccountModalHTML());
 
 /*
  * ⚠️ RÈGLES FIREBASE — à configurer dans la console Firebase
@@ -1665,10 +1605,10 @@ window.submitAddAccountModal=async function(){
   if(identity){
     const ps=identity.pseudo!=null&&String(identity.pseudo).trim()!==''?String(identity.pseudo).trim():'(aucun)';
     const accepted=await new Promise(resolve=>{
-      document.getElementById('acc-modal-confirm-assoc-text').textContent=`Ce compte existe déjà (pseudo: ${ps}). Voulez-vous l'associer à cette organisation ?`;
-      const backdrop=document.getElementById('acc-modal-confirm-assoc');
-      const okBtn=document.getElementById('acc-modal-confirm-assoc-ok');
-      const cancelBtn=document.getElementById('acc-modal-confirm-assoc-cancel');
+      document.getElementById('shared-confirm-assoc-text').textContent=`Ce compte existe déjà (pseudo: ${ps}). Voulez-vous l'associer à cette organisation ?`;
+      const backdrop=document.getElementById('shared-confirm-assoc-modal');
+      const okBtn=document.getElementById('shared-confirm-assoc-ok');
+      const cancelBtn=document.getElementById('shared-confirm-assoc-cancel');
       const finish=v=>{
         backdrop.classList.remove('is-open');
         backdrop.setAttribute('aria-hidden','true');
@@ -1740,7 +1680,7 @@ window.submitAddAccountModal=async function(){
 };
 
 window.closeEditAccountModal=function(){
-  const m=document.getElementById('acc-edit-modal');
+  const m=document.getElementById('shared-edit-acc-modal');
   m.classList.remove('is-open');
   m.setAttribute('aria-hidden','true');
   window._accEditIndex=-1;
@@ -1748,7 +1688,7 @@ window.closeEditAccountModal=function(){
 };
 
 window.accEditToggleRole=function(role){
-  const id=role==='menage'?'acc-edit-menage-btn':'acc-edit-admin-btn';
+  const id=role==='menage'?'shared-edit-role-menage':'shared-edit-role-admin';
   document.getElementById(id).classList.toggle('active');
 };
 
@@ -1758,8 +1698,8 @@ window.openEditAccountModal=async function(i){
   const acc=accounts[i];
   if(!acc) return;
   window._accEditIndex=i;
-  document.getElementById('acc-edit-prenom').value=acc.name||'';
-  document.getElementById('acc-edit-pwd').value='';
+  document.getElementById('shared-edit-prenom').value=acc.name||'';
+  document.getElementById('shared-edit-pwd').value='';
   let entries=[];
   let global=null;
   try{
@@ -1773,33 +1713,33 @@ window.openEditAccountModal=async function(i){
   }
   const gidFromEnriched=A._enrichedAccounts?.[i]?._globalId;
   window._accEditGlobalId=(gidFromEnriched!=null&&gidFromEnriched!=='')?gidFromEnriched:(global?global.id:null);
-  const nomInp=document.getElementById('acc-edit-nom');
+  const nomInp=document.getElementById('shared-edit-nom');
   const hadLegacyNom=acc.nom!=null&&String(acc.nom).trim()!=='';
   if(hadLegacyNom){
     nomInp.value=String(acc.nom).trim();
     nomInp.readOnly=true;
-    nomInp.classList.add('acc-modal-input-ro');
+    nomInp.classList.add('shared-edit-input-ro');
   }else{
     nomInp.value=global&&global.nom!=null?String(global.nom).trim():'';
     nomInp.readOnly=false;
-    nomInp.classList.remove('acc-modal-input-ro');
+    nomInp.classList.remove('shared-edit-input-ro');
   }
-  const emailInp=document.getElementById('acc-edit-email');
+  const emailInp=document.getElementById('shared-edit-email');
   const hadLegacyEmail=acc.email!=null&&String(acc.email).trim()!=='';
   if(hadLegacyEmail){
     emailInp.value=String(acc.email).trim();
     emailInp.readOnly=true;
-    emailInp.classList.add('acc-modal-input-ro');
+    emailInp.classList.add('shared-edit-input-ro');
   }else{
     emailInp.value=global&&global.email!=null?String(global.email).trim():'';
     emailInp.readOnly=false;
-    emailInp.classList.remove('acc-modal-input-ro');
+    emailInp.classList.remove('shared-edit-input-ro');
   }
-  document.getElementById('acc-edit-pseudo').value=acc.pseudo!=null&&String(acc.pseudo).trim()!==''?String(acc.pseudo).trim():(global&&global.pseudo?String(global.pseudo).trim():'');
-  document.getElementById('acc-edit-tel').value=acc.tel!=null&&String(acc.tel).trim()!==''?String(acc.tel):(global&&global.tel!=null?String(global.tel):'');
-  document.getElementById('acc-edit-menage-btn').classList.toggle('active',!!acc.menage);
-  document.getElementById('acc-edit-admin-btn').classList.toggle('active',!!acc.admin);
-  const m=document.getElementById('acc-edit-modal');
+  document.getElementById('shared-edit-pseudo').value=acc.pseudo!=null&&String(acc.pseudo).trim()!==''?String(acc.pseudo).trim():(global&&global.pseudo?String(global.pseudo).trim():'');
+  document.getElementById('shared-edit-tel').value=acc.tel!=null&&String(acc.tel).trim()!==''?String(acc.tel):(global&&global.tel!=null?String(global.tel):'');
+  document.getElementById('shared-edit-role-menage').classList.toggle('active',!!acc.menage);
+  document.getElementById('shared-edit-role-admin').classList.toggle('active',!!acc.admin);
+  const m=document.getElementById('shared-edit-acc-modal');
   m.classList.add('is-open');
   m.setAttribute('aria-hidden','false');
 };
@@ -1813,24 +1753,24 @@ window.submitEditAccountModal=async function(){
   if(!acc){ closeEditAccountModal(); return; }
   const hadLegacyEmail=acc.email!=null&&String(acc.email).trim()!=='';
   const hadLegacyNom=acc.nom!=null&&String(acc.nom).trim()!=='';
-  const pseudo=document.getElementById('acc-edit-pseudo').value.trim();
-  const tel=document.getElementById('acc-edit-tel').value.trim();
-  const pwd=document.getElementById('acc-edit-pwd').value;
-  const nomInpVal=document.getElementById('acc-edit-nom').value.trim();
-  const emailInpVal=document.getElementById('acc-edit-email').value.trim();
+  const pseudo=document.getElementById('shared-edit-pseudo').value.trim();
+  const tel=document.getElementById('shared-edit-tel').value.trim();
+  const pwd=document.getElementById('shared-edit-pwd').value;
+  const nomInpVal=document.getElementById('shared-edit-nom').value.trim();
+  const emailInpVal=document.getElementById('shared-edit-email').value.trim();
   const email=hadLegacyEmail?String(acc.email).trim():emailInpVal;
   if(!pseudo){ showToast('Pseudo obligatoire'); return; }
   if(!hadLegacyNom&&!nomInpVal){ showToast('Nom obligatoire'); return; }
   if(!hadLegacyEmail){
     if(!emailInpVal||emailInpVal.indexOf('@')<0){ showToast('Email obligatoire'); return; }
   }
-  const menage=document.getElementById('acc-edit-menage-btn').classList.contains('active');
-  const admin=document.getElementById('acc-edit-admin-btn').classList.contains('active');
+  const menage=document.getElementById('shared-edit-role-menage').classList.contains('active');
+  const admin=document.getElementById('shared-edit-role-admin').classList.contains('active');
   if(!menage&&!admin){ showToast('Choisissez au moins un rôle'); return; }
   const roles=[];
   if(menage) roles.push('menage');
   if(admin) roles.push('admin');
-  const btn=document.getElementById('acc-edit-save');
+  const btn=document.getElementById('shared-edit-save');
   btn.disabled=true;
   let entries=[];
   try{
@@ -1888,8 +1828,8 @@ window.submitDeleteAccountModal=async function(){
   if(!acc) return;
   const prenom=acc.name;
   if(!confirm(`Supprimer ${prenom} ? Cette action est irréversible.`)) return;
-  const btnDel=document.querySelector('#acc-edit-modal .acc-edit-del-btn');
-  const btnSave=document.getElementById('acc-edit-save');
+  const btnDel=document.getElementById('shared-edit-delete');
+  const btnSave=document.getElementById('shared-edit-save');
   if(btnDel) btnDel.disabled=true;
   if(btnSave) btnSave.disabled=true;
   try{
@@ -2785,6 +2725,19 @@ window.exportAll = function(){
   document.getElementById('shared-acc-role-admin').addEventListener('click',()=>window.accModalToggleRole('admin'));
   document.getElementById('shared-acc-prenom').addEventListener('input',window.accModalOnPrenomInput);
   document.getElementById('shared-acc-pseudo').addEventListener('input',window.accModalOnPseudoInput);
+})();
+
+(function bindSharedEditAccountModalEvents(){
+  if(window._sharedEditAccModalBound) return;
+  const root=document.getElementById('shared-edit-acc-modal');
+  if(!root) return;
+  window._sharedEditAccModalBound=true;
+  root.addEventListener('click',e=>{ if(e.target===root) window.closeEditAccountModal(); });
+  document.getElementById('shared-edit-cancel').addEventListener('click',()=>window.closeEditAccountModal());
+  document.getElementById('shared-edit-save').addEventListener('click',()=>window.submitEditAccountModal());
+  document.getElementById('shared-edit-delete').addEventListener('click',()=>window.submitDeleteAccountModal());
+  document.getElementById('shared-edit-role-menage').addEventListener('click',()=>window.accEditToggleRole('menage'));
+  document.getElementById('shared-edit-role-admin').addEventListener('click',()=>window.accEditToggleRole('admin'));
 })();
 </script>
 </body>

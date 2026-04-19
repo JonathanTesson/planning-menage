@@ -40,6 +40,8 @@
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;z-index:200;padding:1rem;box-sizing:border-box}
 .modal-overlay.is-open{display:flex}
 .modal{background:#fff;border-radius:16px;padding:1.5rem;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.12);max-height:90vh;overflow-y:auto;box-sizing:border-box}
+.modal h3{font-size:16px;font-weight:600;margin-bottom:0.75rem}
+.modal-shared-hint{font-size:13px;color:#666;margin-bottom:12px;line-height:1.45}
 
 .shared-edit-input-ro{background:#f5f5f0!important;color:#888!important;cursor:default}
 .shared-edit-actions{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-top:1rem}
