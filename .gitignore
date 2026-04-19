@@ -1,3 +1,6 @@
 # Compte de service Firebase (clé privée) — utiliser le secret GitHub Actions uniquement
 Firebase/*.json
 init-accounts-migration.js
+migration-passwords.local.js
+migration-report.local.json
+node_modules/

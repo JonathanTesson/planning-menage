@@ -1,0 +1,13 @@
+{
+  "name": "planning-menage",
+  "version": "4.8.2",
+  "private": true,
+  "description": "Planning Ménage Airbnb — scripts Node et back-office",
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  },
+  "scripts": {
+    "migrate-auth": "node migrate-to-firebase-auth.js",
+    "migrate-auth:apply": "node migrate-to-firebase-auth.js --apply"
+  }
+}
