@@ -489,7 +489,7 @@ let S = {
   assignments: {},
   reservations: [],
   adminConfig: { authEnabled: false, accounts: [], defaultOrgId: 'tesson' },
-  /** Intervenantes pour l’org courante (depuis /accounts), ordre des couleurs aligné sur `config.cleaners` puis alphabétique pour les absents de cette liste. */
+  /** Intervenantes pour l’org courante (depuis /accounts), ordre des couleurs selon le champ numérique `order` sur chaque compte, puis alphabétique pour les sans `order`. */
   cleanerList: [],
   currentMonth: new Date().getMonth(),
   currentYear: new Date().getFullYear(),
@@ -1276,8 +1276,7 @@ function initFirebaseAndApp(){
     const d=snap.val();
     if(d){ S.cleaners=d.cleaners||[]; S.studioNames=d.studioNames||S.studioNames; }
     setSyncStatus('ok'); loaded.config=true;
-    if(S.cleanerList.length>0) void refreshCleanerList().then(()=>afterFbListener());
-    else afterFbListener();
+    afterFbListener();
   });
 
   onValue(ref(db,ob('assignments')), snap=>{
@@ -1512,18 +1511,19 @@ async function refreshCleanerList(){
         const roles=orgs[orgId].roles||[];
         const name=String(row.name||row.prenom||'').trim();
         if(!name) continue;
-        list.push({ name, menage: roles.includes('menage'), admin: roles.includes('admin') });
+        const ord=row.order;
+        const order=typeof ord==='number'&&Number.isFinite(ord)?ord:null;
+        list.push({ name, menage: roles.includes('menage'), admin: roles.includes('admin'), order });
       }
-      const orderFromConfig=(Array.isArray(S.cleaners)?S.cleaners:[]).map(c=>String(c).trim()).filter(Boolean);
       list.sort((a,b)=>{
-        const ia=orderFromConfig.indexOf(a.name);
-        const ib=orderFromConfig.indexOf(b.name);
-        if(ia>=0&&ib>=0) return ia-ib;
-        if(ia>=0) return -1;
-        if(ib>=0) return 1;
+        const aHas=a.order!=null;
+        const bHas=b.order!=null;
+        if(aHas&&bHas) return a.order-b.order;
+        if(aHas&&!bHas) return -1;
+        if(!aHas&&bHas) return 1;
         return a.name.localeCompare(b.name,'fr');
       });
-      S.cleanerList=list;
+      S.cleanerList=list.map(({name,menage,admin})=>({name,menage,admin}));
     }
   }catch(_){
     S.cleanerList=(S.adminConfig.accounts||[]).map(a=>({
