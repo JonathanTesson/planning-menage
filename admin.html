@@ -58,7 +58,6 @@ body.admin-nav-ready .admin-burger{display:flex}
 .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0eb}
 .toggle-row:last-child{border-bottom:none}
 .toggle-label{font-size:13px;color:#333}
-.toggle-sub{font-size:11px;color:#aaa;margin-top:2px}
 .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem}
 .stat-card{background:#f5f5f0;border-radius:10px;padding:0.75rem;text-align:center}
 .stat-val{font-size:22px;font-weight:700;color:#1a1a1a}
@@ -371,7 +370,7 @@ body.admin-nav-ready .admin-burger{display:flex}
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, set, onValue, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
-import { hashSimple, sha256Hex, accNormalizeEmail, accEntriesFromSnapshotVal, accFindIdentityMatch, accFindPseudoOwner, accFindPseudoOwnerExcluding, calcMaxOrder, buildAccountPayload, buildAddAccountModalHTML, buildConfirmAssocModalHTML, buildEditAccountModalHTML } from './fonctions.js';
+import { sha256Hex, accNormalizeEmail, accEntriesFromSnapshotVal, accFindIdentityMatch, accFindPseudoOwner, accFindPseudoOwnerExcluding, calcMaxOrder, buildAccountPayload, buildAddAccountModalHTML, buildConfirmAssocModalHTML, buildEditAccountModalHTML } from './fonctions.js';
 
 document.body.insertAdjacentHTML('beforeend',
   buildAddAccountModalHTML()
@@ -1873,8 +1872,6 @@ window.submitDeleteAccountModal=async function(){
   }
 };
 
-window.removeAccount = function(){};
-
 window.toggleRole = async function(i, role){
   const en=A._enrichedAccounts||[];
   const row=en[i];
@@ -1914,8 +1911,6 @@ window.toggleRole = async function(i, role){
     setSyncStatus('err');
   }
 };
-
-window.saveAccountPwd = function(){};
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
