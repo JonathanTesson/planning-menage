@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mon compte — Planning Ménage</title>
+<link rel="stylesheet" href="styles.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f5f5f0;color:#1a1a1a;padding:0 0 2rem}
-.topbar{background:#fff;border-bottom:1px solid #e0e0d8;padding:0.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 .topbar-left{display:flex;align-items:center;gap:0;min-width:0}
 .admin-burger{display:none;align-items:center;justify-content:center;width:40px;height:40px;margin-right:10px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;flex-shrink:0;padding:0;-webkit-tap-highlight-color:transparent}
 .admin-burger:hover{background:#f5f5f0}
@@ -23,11 +23,6 @@ body.compte-nav-ready .admin-burger{display:flex}
 .admin-nav-panel-inner{padding:0.5rem 1rem 1.25rem 0.875rem;width:max-content;max-width:100%;box-sizing:border-box}
 .admin-nav-link{display:block;padding:12px 10px;margin:4px 0;border-radius:8px;font-size:14px;font-weight:600;color:#333;text-decoration:none;line-height:1.35;white-space:nowrap}
 .admin-nav-link:hover{background:#eeece6;color:#111}
-.topbar-title{font-size:16px;font-weight:600}
-.topbar-sub{font-size:12px;color:#888;margin-top:1px}
-.sync-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;margin-right:5px}
-.sync-dot.ok{background:#1D9E75}
-.sync-dot.err{background:#E24B4A}
 .back-btn{font-size:12px;color:#555;text-decoration:none;display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;white-space:nowrap;flex-shrink:0;line-height:1.2}
 .back-btn:hover{background:#f5f5f0}
 @media (max-width:540px){
@@ -48,25 +43,16 @@ body.compte-nav-ready .admin-burger{display:flex}
 .stat-val.green{color:#1D9E75}
 .stat-val.orange{color:#F59E0B}
 .stat-val.red{color:#E24B4A}
-.nav-btn{background:#fff;border:1px solid #ddd;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:13px;color:#333}
-.nav-btn:hover{background:#f5f5f0}
 .histo-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:0.5rem}
 .histo-table th{text-align:left;padding:5px 8px;color:#aaa;font-weight:500;border-bottom:1px solid #e8e8e2;font-size:11px}
 .histo-table td{padding:5px 8px;border-bottom:1px solid #f0f0eb;color:#555}
 .histo-table tr:last-child td{border-bottom:none}
-.btn-primary{background:#1a1a1a;color:#fff;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500}
-.btn-primary:hover{background:#333}
-.btn-cancel{background:#fff;border:1px solid #ddd;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;color:#333}
-.btn-cancel:hover{background:#f5f5f0}
 .field-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
 .field-row label{font-size:12px;color:#888;width:110px;flex-shrink:0}
 .field-row input[type=password]{flex:1;min-width:160px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
 .field-row input:focus{outline:none;border-color:#378ADD}
 .modal-shared-hint{font-size:11px;color:#999;line-height:1.45;margin:0 0 0.75rem}
 .modal-section-title{font-size:11px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin:1rem 0 0.5rem}
-.modal-btns{display:flex;gap:8px;margin-top:1.25rem;justify-content:flex-end;flex-wrap:wrap}
-.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
-.toast.show{opacity:1}
 .empty-hint{font-size:12px;color:#aaa;padding:8px 0}
 .compte-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}
 /* Indisponibilités : pas de carte blanche (évite décalage si la grille s’élargit avec « par … ») ; colonnes peuvent grandir. */
@@ -83,7 +69,6 @@ body.compte-nav-ready .admin-burger{display:flex}
 .unavail-cal-by{margin-top:auto;font-size:9px;font-style:italic;color:#aaa;line-height:1.2;max-width:100%;text-align:left;white-space:nowrap;padding-top:2px}
 .unavail-cal-note{font-size:11px;color:#888;line-height:1.45;margin-top:12px}
 .unavail-future-summary-line{margin-top:12px;font-size:13px;font-weight:600;color:#555;line-height:1.45}
-.nav-btn:disabled{opacity:0.35;cursor:not-allowed}
 .checkbox-compact{width:18px;height:18px;min-width:18px;accent-color:#1D9E75;cursor:pointer;margin:0;flex-shrink:0}
 .telegram-check-wrap{display:flex;align-items:flex-start;flex-shrink:0;padding-top:2px}
 </style>

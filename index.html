@@ -4,12 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Planning Ménage — Studios</title>
+<link rel="stylesheet" href="styles.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f5f5f0;color:#1a1a1a;padding:0 0 2rem}
-.topbar{background:#fff;border-bottom:1px solid #e0e0d8;padding:0.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
-.topbar-title{font-size:16px;font-weight:600}
-.topbar-sub{font-size:12px;color:#888;margin-top:1px}
 .topbar-sub-wrap{position:relative;display:inline-block;max-width:100%}
 .topbar-sub.org-switch-trigger{cursor:pointer;user-select:none}
 .org-switch-caret{margin-left:3px;font-size:10px}
@@ -18,16 +16,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .org-switch-item:hover{background:#f5f5f0}
 .org-switch-item--current{color:#888;cursor:default;font-weight:500}
 .org-switch-item--current:hover{background:transparent}
-.sync-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;margin-right:5px;transition:background 0.3s}
-.sync-dot.ok{background:#1D9E75}
-.sync-dot.err{background:#E24B4A}
 .sync-dot.loading{background:#FAC775;animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .container{max-width:960px;margin:0 auto;padding:1rem 1rem 0}
 .header{display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;margin-bottom:0;flex-wrap:wrap;gap:8px}
 .nav-btns{display:flex;gap:6px;align-items:center}
-.nav-btn{background:#fff;border:1px solid #ddd;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;color:#333}
-.nav-btn:hover{background:#f5f5f0}
 .month-title{font-size:20px;font-weight:600}
 .topbar-btns{display:flex;gap:6px}
 .logout-btn{background:#fff;border:1px solid #f0c0c0;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:11px;color:#a32d2d}
@@ -103,29 +96,20 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 .settings-row label{font-size:12px;color:#888;width:72px;flex-shrink:0}
 .settings-row input[type=text]{flex:1;min-width:200px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
 .settings-row input[type=text]:focus{outline:none;border-color:#378ADD}
-.btn-primary{background:#1a1a1a;color:#fff;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500}
-.btn-primary:hover{background:#333}
 .btn-danger{background:#fff;color:#a32d2d;border:1px solid #f0c0c0;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px}
 .btn-danger:hover{background:#fde8e8}
-.btn-cancel{background:#fff;border:1px solid #ddd;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;color:#333}
-.btn-cancel:hover{background:#f5f5f0}
-.btn-secondary{background:#fff;color:#555;border:1px solid #ddd;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px}
-.btn-secondary:hover{background:#f5f5f0}
 
 /* Modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem}
 .modal{background:#fff;border-radius:16px;padding:1.5rem;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,0.12);max-height:90vh;overflow-y:auto}
 .modal--wide{max-width:420px}
 .modal h3{font-size:16px;font-weight:600;margin-bottom:1rem}
-.modal-field{margin-bottom:0.875rem}
-.modal-field label{font-size:12px;color:#888;display:block;margin-bottom:4px;font-weight:500}
-.modal-field select,.modal-field input[type=text],.modal-field input[type=password]{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
+.modal-field select{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;box-sizing:border-box}
 .modal-field textarea{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;resize:vertical;min-height:64px;line-height:1.4}
 .modal-field input[type=number]{width:4.5rem;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
 .modal-shared-hint{font-size:11px;color:#999;line-height:1.45;margin:0 0 0.75rem}
 .modal-duration-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .modal-duration-row label{font-size:12px;color:#888;margin:0}
-.modal-btns{display:flex;gap:8px;margin-top:1.25rem;justify-content:flex-end}
 .modal-header-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:1rem}
 .modal-header-row h3{margin:0;flex:1;font-size:16px;font-weight:600;line-height:1.35;padding-right:4px}
 .modal-close-x{flex-shrink:0;width:36px;height:36px;border:none;background:transparent;border-radius:10px;font-size:26px;line-height:1;color:#888;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;margin:-6px -8px 0 0}
@@ -211,10 +195,6 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 .login-error{color:#E24B4A;font-size:12px}
 .login-unconfig-title{font-size:18px;font-weight:600;color:#185FA5;text-decoration:none;text-align:center;cursor:pointer;max-width:320px;line-height:1.35}
 .login-unconfig-title:hover{text-decoration:underline}
-
-/* Toast */
-.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
-.toast.show{opacity:1}
 
 /* Plein écran pendant changement d’org (évite l’éclair du calendrier au reload) */
 .org-change-gate{

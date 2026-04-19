@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Administration — Planning Ménage</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="styles.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f5f5f0;color:#1a1a1a;padding:0 0 2rem}
-.topbar{background:#fff;border-bottom:1px solid #e0e0d8;padding:0.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 .topbar-left{display:flex;align-items:center;gap:0;min-width:0}
 .admin-burger{display:none;align-items:center;justify-content:center;width:40px;height:40px;margin-right:10px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;flex-shrink:0;padding:0;-webkit-tap-highlight-color:transparent}
 .admin-burger:hover{background:#f5f5f0}
@@ -33,10 +33,6 @@ body.admin-nav-ready .admin-burger{display:flex}
   border-radius:8px;
 }
 #admin-content .section[id]{scroll-margin-top:72px}
-.topbar-title{font-size:16px;font-weight:600}
-.topbar-sub{font-size:12px;color:#888;margin-top:1px}
-.sync-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;margin-right:5px}
-.sync-dot.ok{background:#1D9E75}
 .back-btn{font-size:12px;color:#555;text-decoration:none;display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;white-space:nowrap;flex-shrink:0;line-height:1.2}
 .back-btn:hover{background:#f5f5f0}
 @media (max-width:540px){
@@ -50,10 +46,6 @@ body.admin-nav-ready .admin-burger{display:flex}
 .lock-input{width:100%;max-width:280px;padding:10px 14px;border:1px solid #ddd;border-radius:10px;font-size:16px;text-align:center;letter-spacing:4px}
 .lock-input:focus{outline:none;border-color:#378ADD}
 .lock-error{color:#E24B4A;font-size:12px}
-.btn-primary{background:#1a1a1a;color:#fff;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500}
-.btn-primary:hover{background:#333}
-.btn-secondary{background:#fff;color:#555;border:1px solid #ddd;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px}
-.btn-secondary:hover{background:#f5f5f0}
 .btn-danger{background:none;color:#E24B4A;border:none;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;line-height:1}
 .btn-danger:hover{background:#fde8e8}
 .btn-sm{padding:5px 10px;font-size:12px;border-radius:7px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#555}
@@ -63,13 +55,6 @@ body.admin-nav-ready .admin-burger{display:flex}
 .modal{background:#fff;border-radius:16px;padding:1.5rem;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.12);max-height:90vh;overflow-y:auto}
 .modal h3{font-size:16px;font-weight:600;margin-bottom:0.75rem}
 .modal-shared-hint{font-size:13px;color:#666;margin-bottom:12px;line-height:1.45}
-.modal-field{margin-bottom:0.875rem}
-.modal-field label{font-size:12px;color:#888;display:block;margin-bottom:4px;font-weight:500}
-.modal-field input[type=text]{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;box-sizing:border-box}
-.modal-field input[type=text]:focus{outline:none;border-color:#378ADD}
-.modal-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:1rem;justify-content:flex-end}
-.btn-cancel{background:#fff;color:#555;border:1px solid #ddd;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px}
-.btn-cancel:hover{background:#f5f5f0}
 .section{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
 .section h3{font-size:14px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
 .toggle{position:relative;width:44px;height:24px;flex-shrink:0}
@@ -87,9 +72,6 @@ body.admin-nav-ready .admin-burger{display:flex}
 .stat-val{font-size:22px;font-weight:700;color:#1a1a1a}
 .stat-lbl{font-size:10px;color:#aaa;margin-top:2px}
 .report-preview{background:#f5f5f0;border-radius:8px;padding:0.75rem;font-size:12px;color:#555;line-height:1.8;margin-top:0.75rem;max-height:200px;overflow-y:auto}
-.nav-btn{background:#fff;border:1px solid #ddd;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:13px;color:#333}
-.nav-btn:hover{background:#f5f5f0}
-.nav-btn:disabled{opacity:0.35;cursor:not-allowed}
 .compte-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}
 .section.section--unavail{background:transparent;border:none;padding-left:0;padding-right:0}
 .section.section--unavail .compte-cal-grid{grid-template-columns:repeat(7,minmax(min-content,1fr))}
@@ -113,8 +95,6 @@ body.admin-nav-ready .admin-burger{display:flex}
 .activity-log-wrap{background:#f5f5f0;border-radius:8px;padding:0.5rem 0.75rem;margin-top:0.5rem;max-height:280px;overflow-y:auto;font-size:12px;line-height:1.45}
 .activity-log-wrap .histo-table{margin-top:0}
 .activity-type{font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:0.04em}
-.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
-.toast.show{opacity:1}
 .field-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
 .field-row label{font-size:12px;color:#888;width:110px;flex-shrink:0}
 .field-row input[type=text],.field-row input[type=password]{flex:1;min-width:160px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff}
