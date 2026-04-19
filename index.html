@@ -862,6 +862,7 @@ function getOrCreateOrgSwitchMenu(){
 window.applyOrgSwitchFromTopbar=function(newOrgId){
   if(!newOrgId||newOrgId===getStoredOrgId()){ closeOrgSwitchMenu(); return; }
   setStoredOrgId(newOrgId);
+  try{ sessionStorage.setItem(ORG_CHANGE_GATE_KEY,'1'); }catch(e){}
   location.reload();
 };
 

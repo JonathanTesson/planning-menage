@@ -515,13 +515,15 @@ function escHtml(s){
 
 let orgEntries = [];
 
-const SA_AVATAR_PALETTE=[
-  {bg:'#5B8DEF',fg:'#fff'},
-  {bg:'#E24B8A',fg:'#fff'},
+/** Aligné sur `CLEANER_COLORS` dans index.html — couleurs planning pour avatars Super Admin. */
+const CLEANER_COLORS=[
+  {bg:'#378ADD',fg:'#fff'},
   {bg:'#1D9E75',fg:'#fff'},
-  {bg:'#9B59B6',fg:'#fff'},
-  {bg:'#E67E22',fg:'#fff'},
-  {bg:'#34495e',fg:'#fff'},
+  {bg:'#D85A30',fg:'#fff'},
+  {bg:'#9F3DBF',fg:'#fff'},
+  {bg:'#C8860A',fg:'#fff'},
+  {bg:'#2A8A6E',fg:'#fff'},
+  {bg:'#c0392b',fg:'#fff'},
 ];
 const SA_ORG_BADGE_PALETTE=[
   {bg:'#dce8fc',fg:'#1a3a6e'},
@@ -537,6 +539,14 @@ function saStrHash(str){
   let h=0;
   for(let i=0;i<s.length;i++) h=((h<<5)-h)+s.charCodeAt(i),h|=0;
   return Math.abs(h);
+}
+
+function saAccAvatarFromEntries(globalEntries, name){
+  const n=String(name??'').trim();
+  const row=(globalEntries||[]).find(e=>String(e.name??e.prenom??'').trim()===n);
+  const ord=row&&typeof row.order==='number'&&Number.isFinite(row.order)?row.order:null;
+  if(ord!==null) return CLEANER_COLORS[ord%CLEANER_COLORS.length];
+  return CLEANER_COLORS[saStrHash(name)%CLEANER_COLORS.length];
 }
 
 function accNormalizeEmail(e){
@@ -1280,7 +1290,7 @@ async function renderAccountsForSelectedOrg(ctx){
       const displayRaw = nom ? `${prenom} ${nom}`.trim() : prenom;
       const display = escHtml(displayRaw || '—');
       const initials = escHtml(saAccInitials(acc));
-      const av = SA_AVATAR_PALETTE[saStrHash(acc.name) % SA_AVATAR_PALETTE.length];
+      const av = saAccAvatarFromEntries(globalEntries, acc.name);
       const orgIds = saOrgIdsUnionForPrenom(globalEntries, acc.name);
       const badges = saRenderOrgBadgesHtml(orgIds);
       const roleIcons = acc.menage || acc.admin
