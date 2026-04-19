@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Administration — Planning Ménage</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="styles.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -2605,6 +2604,28 @@ function minutesFromHm(hm){
   return h*60+m;
 }
 
+const XLSX_CDN_URL='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+function loadXlsx(){
+  if(window.XLSX) return Promise.resolve();
+  if(window._xlsxLoadPromise) return window._xlsxLoadPromise;
+  showToast('Chargement export...');
+  window._xlsxLoadPromise=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src=XLSX_CDN_URL;
+    s.onload=()=>{
+      window._xlsxLoadPromise=null;
+      if(window.XLSX) resolve();
+      else reject(new Error('XLSX indisponible'));
+    };
+    s.onerror=()=>{
+      window._xlsxLoadPromise=null;
+      reject(new Error('Chargement XLSX échoué'));
+    };
+    document.head.appendChild(s);
+  });
+  return window._xlsxLoadPromise;
+}
+
 function buildExcel(reservations, label){
   const XLSX=window.XLSX;
   const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
@@ -2677,7 +2698,7 @@ function buildExcel(reservations, label){
   return wb;
 }
 
-window.exportSelected = function(){
+window.exportSelected = async function(){
   const mo=A.selectedMonth, yr=A.selectedYear;
   const label=`${MO_FR[mo]} ${yr}`;
   const resas=A.reservations.filter(r=>{
@@ -2701,14 +2722,26 @@ window.exportSelected = function(){
   const prev=document.getElementById('export-preview');
   prev.style.display='';
   prev.textContent=`${label} — ${resas.length} intervention(s)\n\nRécap :\n${recap}\n\nDétail :\n${detail}`;
+  try{
+    await loadXlsx();
+  }catch(_){
+    showToast('Impossible de charger l’export Excel');
+    return;
+  }
   window.XLSX.writeFile(buildExcel(resas,label),`rapport-${yr}-${String(mo+1).padStart(2,'0')}.xlsx`);
   showToast(`${label} exporté ✓`);
 };
 
-window.exportAll = function(){
+window.exportAll = async function(){
   const today=new Date(); today.setHours(0,0,0,0);
   const past=A.reservations.filter(r=>new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate())<today);
   if(!past.length){ showToast('Aucun historique'); return; }
+  try{
+    await loadXlsx();
+  }catch(_){
+    showToast('Impossible de charger l’export Excel');
+    return;
+  }
   window.XLSX.writeFile(buildExcel(past,'Historique complet'),'historique-menage.xlsx');
   showToast('Historique exporté ✓');
 };
