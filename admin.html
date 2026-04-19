@@ -209,6 +209,8 @@ body.admin-nav-ready .admin-burger{display:flex}
 .acc-edit-actions-row .acc-edit-actions-right{display:flex;gap:8px;flex-wrap:wrap}
 .acc-edit-del-btn{font-size:13px;padding:8px 14px;border-radius:8px;border:1px solid #f0c0c0;background:#fff}
 .acc-edit-del-btn:hover{background:#fde8e8}
+#acc-modal-prenom,#acc-modal-nom,#acc-modal-email{border:1.5px solid #F59E0B}
+#acc-modal-confirm-assoc{z-index:430}
 </style>
 </head>
 <body>
@@ -337,6 +339,16 @@ body.admin-nav-ready .admin-burger{display:flex}
           <div class="acc-modal-actions">
             <button type="button" class="btn-secondary" onclick="closeAddAccountModal()">Annuler</button>
             <button type="button" class="btn-primary" id="acc-modal-submit" onclick="submitAddAccountModal()">Créer</button>
+          </div>
+        </div>
+      </div>
+      <div id="acc-modal-confirm-assoc" class="acc-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="acc-modal-confirm-assoc-title" aria-hidden="true">
+        <div class="acc-modal-panel" onclick="event.stopPropagation()">
+          <div class="acc-modal-title" id="acc-modal-confirm-assoc-title">Compte existant</div>
+          <p id="acc-modal-confirm-assoc-text" style="margin:0 0 12px;font-size:13px;color:#555;line-height:1.45"></p>
+          <div class="acc-modal-actions">
+            <button type="button" class="btn-secondary" id="acc-modal-confirm-assoc-cancel">Annuler</button>
+            <button type="button" class="btn-primary" id="acc-modal-confirm-assoc-ok">Associer</button>
           </div>
         </div>
       </div>
@@ -1707,10 +1719,29 @@ window.submitAddAccountModal=async function(){
   const identity=accFindIdentityMatch(entries,prenom,nom,email);
   if(identity){
     const ps=identity.pseudo!=null&&String(identity.pseudo).trim()!==''?String(identity.pseudo).trim():'(aucun)';
-    if(!confirm(`Ce compte existe déjà (pseudo: ${ps}). Voulez-vous l'associer à cette organisation ?`)){
-      btn.disabled=false;
-      return;
-    }
+    const accepted=await new Promise(resolve=>{
+      document.getElementById('acc-modal-confirm-assoc-text').textContent=`Ce compte existe déjà (pseudo: ${ps}). Voulez-vous l'associer à cette organisation ?`;
+      const backdrop=document.getElementById('acc-modal-confirm-assoc');
+      const okBtn=document.getElementById('acc-modal-confirm-assoc-ok');
+      const cancelBtn=document.getElementById('acc-modal-confirm-assoc-cancel');
+      const finish=v=>{
+        backdrop.classList.remove('is-open');
+        backdrop.setAttribute('aria-hidden','true');
+        okBtn.removeEventListener('click',onOk);
+        cancelBtn.removeEventListener('click',onCancel);
+        backdrop.removeEventListener('click',onBackdrop);
+        resolve(v);
+      };
+      const onOk=()=>finish(true);
+      const onCancel=()=>{ btn.disabled=false; finish(false); };
+      const onBackdrop=e=>{ if(e.target===backdrop) onCancel(); };
+      backdrop.classList.add('is-open');
+      backdrop.setAttribute('aria-hidden','false');
+      okBtn.addEventListener('click',onOk);
+      cancelBtn.addEventListener('click',onCancel);
+      backdrop.addEventListener('click',onBackdrop);
+    });
+    if(!accepted) return;
     try{
       await update(ref(db),{[`accounts/${identity.id}/orgs/${orgId}`]:{roles}});
       setSyncStatus('ok');
