@@ -1310,14 +1310,11 @@ function initFirebaseAndApp(){
       S.adminConfig={ authEnabled:false, accounts:[], defaultOrgId:getStoredOrgId()||'tesson' };
     }
     loaded.adminConfig=true;
-    void refreshCleanerList();
-    if(!fbReady) checkReady();
-    else routeAfterFirebaseUpdate();
+    void refreshCleanerList().then(()=>afterFbListener());
   }, ()=>{
     loaded.adminConfig=true;
     S.adminConfig={ authEnabled:false, accounts:[], defaultOrgId:getStoredOrgId()||'tesson' };
-    void refreshCleanerList();
-    afterFbListener();
+    void refreshCleanerList().then(()=>afterFbListener());
   });
 
   onValue(ref(db,ob('lastSync')), snap=>{
@@ -1534,7 +1531,6 @@ async function refreshCleanerList(){
       admin:!!a.admin
     }));
   }
-  if(fbReady) routeAfterFirebaseUpdate();
 }
 
 function cleanerListOrLegacy(){
