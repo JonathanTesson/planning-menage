@@ -79,3 +79,42 @@ export function buildAccountPayload({ prenom, nom, pseudo, email, tel, pwdHash, 
     order
   };
 }
+
+function escapeHtmlAttr(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * Fragment HTML pour la popup « Ajouter un compte » (IDs stables ; branchement événements côté page).
+ * @param {{ title: string, submitLabel: string }} opts
+ */
+export function buildAddAccountModalHTML({ title, submitLabel }) {
+  const t = escapeHtmlAttr(title);
+  const submit = escapeHtmlAttr(submitLabel);
+  return `<div id="shared-acc-modal" class="shared-acc-modal" aria-hidden="true">
+  <div class="shared-acc-panel" onclick="event.stopPropagation()">
+    <div class="shared-acc-title">${t}</div>
+    <div class="shared-acc-field"><label for="shared-acc-prenom">Prénom<span class="shared-acc-req">*</span></label><input type="text" id="shared-acc-prenom" autocomplete="given-name"></div>
+    <div class="shared-acc-field"><label for="shared-acc-nom">Nom<span class="shared-acc-req">*</span></label><input type="text" id="shared-acc-nom" autocomplete="family-name"></div>
+    <div class="shared-acc-field"><label for="shared-acc-pseudo">Pseudo de connexion<span class="shared-acc-req">*</span></label><input type="text" id="shared-acc-pseudo" autocomplete="username"></div>
+    <div class="shared-acc-field"><label for="shared-acc-email">Email<span class="shared-acc-req">*</span></label><input type="email" id="shared-acc-email" autocomplete="email"></div>
+    <div class="shared-acc-field"><label for="shared-acc-tel">Téléphone (optionnel)</label><input type="text" id="shared-acc-tel" autocomplete="tel"></div>
+    <div class="shared-acc-field"><label for="shared-acc-pwd">Mot de passe<span class="shared-acc-req">*</span></label><input type="password" id="shared-acc-pwd" autocomplete="new-password"></div>
+    <div class="shared-acc-field">
+      <span style="font-size:12px;color:#888;font-weight:500">Rôles</span>
+      <div class="shared-acc-roles">
+        <span class="account-role active" id="shared-acc-role-menage" title="Peut faire le ménage">🧹</span>
+        <span class="account-role" id="shared-acc-role-admin" title="Administrateur">👑</span>
+      </div>
+    </div>
+    <div class="shared-acc-actions">
+      <button type="button" class="btn-cancel" id="shared-acc-cancel">Annuler</button>
+      <button type="button" class="btn-primary" id="shared-acc-submit">${submit}</button>
+    </div>
+  </div>
+</div>`;
+}

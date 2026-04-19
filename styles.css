@@ -33,3 +33,52 @@
 .nav-btn{background:#fff;border:1px solid #ddd;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:13px;color:#333}
 .nav-btn:hover{background:#f5f5f0}
 .nav-btn:disabled{opacity:0.35;cursor:not-allowed}
+
+/* Popup « Ajouter un compte » (fragment injecté — buildAddAccountModalHTML) */
+.shared-acc-modal{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.4);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:420;
+  padding:1rem;
+  box-sizing:border-box;
+}
+.shared-acc-modal.is-open{display:flex}
+.shared-acc-panel{
+  background:#fff;
+  border-radius:16px;
+  padding:1.5rem;
+  width:100%;
+  max-width:400px;
+  max-height:90vh;
+  overflow-y:auto;
+  box-shadow:0 8px 32px rgba(0,0,0,0.12);
+  box-sizing:border-box;
+}
+.shared-acc-title{font-size:16px;font-weight:600;margin-bottom:1rem;color:#1a1a1a}
+.shared-acc-req{color:#E24B4A;font-weight:600}
+.shared-acc-field{margin-bottom:0.875rem}
+.shared-acc-field label{font-size:12px;color:#888;display:block;margin-bottom:4px;font-weight:500}
+.shared-acc-field input[type=text],
+.shared-acc-field input[type=email],
+.shared-acc-field input[type=password]{
+  width:100%;
+  padding:8px 10px;
+  border:1px solid #ddd;
+  border-radius:8px;
+  font-size:13px;
+  color:#1a1a1a;
+  background:#fff;
+  box-sizing:border-box;
+}
+.shared-acc-field input[type=text]:focus,
+.shared-acc-field input[type=email]:focus,
+.shared-acc-field input[type=password]:focus{
+  outline:none;
+  border-color:#378ADD;
+}
+.shared-acc-roles{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;align-items:center}
+.shared-acc-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:1rem;flex-wrap:wrap}
