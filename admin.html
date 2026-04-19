@@ -189,7 +189,8 @@ body.admin-nav-ready .admin-burger{display:flex}
 .acc-edit-actions-row .acc-edit-actions-right{display:flex;gap:8px;flex-wrap:wrap}
 .acc-edit-del-btn{font-size:13px;padding:8px 14px;border-radius:8px;border:1px solid #f0c0c0;background:#fff}
 .acc-edit-del-btn:hover{background:#fde8e8}
-#acc-modal-prenom,#acc-modal-nom,#acc-modal-email{border:1.5px solid #F59E0B}
+#shared-acc-prenom,#shared-acc-nom,#shared-acc-email{border:1.5px solid #F59E0B}
+.shared-acc-roles .account-role{cursor:pointer;user-select:none}
 #acc-modal-confirm-assoc{z-index:430}
 </style>
 </head>
@@ -299,28 +300,6 @@ body.admin-nav-ready .admin-burger{display:flex}
       <div id="accounts-list"></div>
       <div class="add-account-row">
         <button type="button" class="btn-primary acc-add-btn" onclick="openAddAccountModal()" title="Nouveau compte">+</button>
-      </div>
-      <div id="acc-create-modal" class="acc-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="acc-modal-title" aria-hidden="true" onclick="closeAddAccountModal()">
-        <div class="acc-modal-panel" onclick="event.stopPropagation()">
-          <div class="acc-modal-title" id="acc-modal-title">Nouveau compte</div>
-          <div class="acc-modal-field"><label for="acc-modal-prenom">Prénom<span class="acc-modal-req">*</span></label><input type="text" id="acc-modal-prenom" autocomplete="given-name" oninput="accModalOnPrenomInput()"></div>
-          <div class="acc-modal-field"><label for="acc-modal-nom">Nom<span class="acc-modal-req">*</span></label><input type="text" id="acc-modal-nom" autocomplete="family-name"></div>
-          <div class="acc-modal-field"><label for="acc-modal-pseudo">Pseudo de connexion<span class="acc-modal-req">*</span></label><input type="text" id="acc-modal-pseudo" autocomplete="username" oninput="accModalOnPseudoInput()"></div>
-          <div class="acc-modal-field"><label for="acc-modal-email">Email<span class="acc-modal-req">*</span></label><input type="email" id="acc-modal-email" autocomplete="email"></div>
-          <div class="acc-modal-field"><label for="acc-modal-tel">Téléphone (optionnel)</label><input type="text" id="acc-modal-tel" autocomplete="tel"></div>
-          <div class="acc-modal-field"><label for="acc-modal-pwd">Mot de passe<span class="acc-modal-req">*</span></label><input type="password" id="acc-modal-pwd" autocomplete="new-password"></div>
-          <div class="acc-modal-field">
-            <span style="font-size:12px;color:#888;font-weight:500">Rôles</span>
-            <div class="acc-modal-roles">
-              <button type="button" class="account-role active" id="acc-modal-menage-btn" onclick="accModalToggleRole('menage')" title="Peut faire le ménage">🧹</button>
-              <button type="button" class="account-role" id="acc-modal-admin-btn" onclick="accModalToggleRole('admin')" title="Administrateur">👑</button>
-            </div>
-          </div>
-          <div class="acc-modal-actions">
-            <button type="button" class="btn-secondary" onclick="closeAddAccountModal()">Annuler</button>
-            <button type="button" class="btn-primary" id="acc-modal-submit" onclick="submitAddAccountModal()">Créer</button>
-          </div>
-        </div>
       </div>
       <div id="acc-modal-confirm-assoc" class="acc-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="acc-modal-confirm-assoc-title" aria-hidden="true">
         <div class="acc-modal-panel" onclick="event.stopPropagation()">
@@ -455,7 +434,11 @@ body.admin-nav-ready .admin-burger{display:flex}
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, set, onValue, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
-import { hashSimple, sha256Hex, accNormalizeEmail, accEntriesFromSnapshotVal, accFindIdentityMatch, accFindPseudoOwner, accFindPseudoOwnerExcluding, calcMaxOrder, buildAccountPayload } from './fonctions.js';
+import { hashSimple, sha256Hex, accNormalizeEmail, accEntriesFromSnapshotVal, accFindIdentityMatch, accFindPseudoOwner, accFindPseudoOwnerExcluding, calcMaxOrder, buildAccountPayload, buildAddAccountModalHTML } from './fonctions.js';
+
+document.body.insertAdjacentHTML('beforeend',
+  buildAddAccountModalHTML()
+);
 
 /*
  * ⚠️ RÈGLES FIREBASE — à configurer dans la console Firebase
@@ -1605,8 +1588,8 @@ function accEditFindGlobal(entries,legacyAcc){
 }
 
 function accRolesFromCheckboxes(){
-  const menage=document.getElementById('acc-modal-menage-btn').classList.contains('active');
-  const admin=document.getElementById('acc-modal-admin-btn').classList.contains('active');
+  const menage=document.getElementById('shared-acc-role-menage').classList.contains('active');
+  const admin=document.getElementById('shared-acc-role-admin').classList.contains('active');
   const r=[];
   if(menage) r.push('menage');
   if(admin) r.push('admin');
@@ -1614,34 +1597,34 @@ function accRolesFromCheckboxes(){
 }
 
 window.accModalToggleRole=function(role){
-  const id=role==='menage'?'acc-modal-menage-btn':'acc-modal-admin-btn';
+  const id=role==='menage'?'shared-acc-role-menage':'shared-acc-role-admin';
   document.getElementById(id).classList.toggle('active');
 };
 
 window.openAddAccountModal=function(){
   window._accModalPseudoDirty=false;
-  document.getElementById('acc-modal-prenom').value='';
-  document.getElementById('acc-modal-nom').value='';
-  document.getElementById('acc-modal-pseudo').value='';
-  document.getElementById('acc-modal-email').value='';
-  document.getElementById('acc-modal-tel').value='';
-  document.getElementById('acc-modal-pwd').value='';
-  document.getElementById('acc-modal-menage-btn').classList.add('active');
-  document.getElementById('acc-modal-admin-btn').classList.remove('active');
-  const m=document.getElementById('acc-create-modal');
+  document.getElementById('shared-acc-prenom').value='';
+  document.getElementById('shared-acc-nom').value='';
+  document.getElementById('shared-acc-pseudo').value='';
+  document.getElementById('shared-acc-email').value='';
+  document.getElementById('shared-acc-tel').value='';
+  document.getElementById('shared-acc-pwd').value='';
+  document.getElementById('shared-acc-role-menage').classList.add('active');
+  document.getElementById('shared-acc-role-admin').classList.remove('active');
+  const m=document.getElementById('shared-acc-modal');
   m.classList.add('is-open');
   m.setAttribute('aria-hidden','false');
 };
 
 window.closeAddAccountModal=function(){
-  const m=document.getElementById('acc-create-modal');
+  const m=document.getElementById('shared-acc-modal');
   m.classList.remove('is-open');
   m.setAttribute('aria-hidden','true');
 };
 
 window.accModalOnPrenomInput=function(){
   if(window._accModalPseudoDirty) return;
-  document.getElementById('acc-modal-pseudo').value=document.getElementById('acc-modal-prenom').value;
+  document.getElementById('shared-acc-pseudo').value=document.getElementById('shared-acc-prenom').value;
 };
 
 window.accModalOnPseudoInput=function(){
@@ -1649,12 +1632,12 @@ window.accModalOnPseudoInput=function(){
 };
 
 window.submitAddAccountModal=async function(){
-  const prenom=document.getElementById('acc-modal-prenom').value.trim();
-  const nom=document.getElementById('acc-modal-nom').value.trim();
-  const pseudo=document.getElementById('acc-modal-pseudo').value.trim();
-  const email=document.getElementById('acc-modal-email').value.trim();
-  const tel=document.getElementById('acc-modal-tel').value.trim();
-  const pwd=document.getElementById('acc-modal-pwd').value;
+  const prenom=document.getElementById('shared-acc-prenom').value.trim();
+  const nom=document.getElementById('shared-acc-nom').value.trim();
+  const pseudo=document.getElementById('shared-acc-pseudo').value.trim();
+  const email=document.getElementById('shared-acc-email').value.trim();
+  const tel=document.getElementById('shared-acc-tel').value.trim();
+  const pwd=document.getElementById('shared-acc-pwd').value;
   const {menage,admin,roles}=accRolesFromCheckboxes();
   if(!prenom){ showToast('Prénom obligatoire'); return; }
   if(!nom){ showToast('Nom obligatoire'); return; }
@@ -1665,7 +1648,7 @@ window.submitAddAccountModal=async function(){
   await syncLocalAccountsFromGlobal();
   const accounts=A.adminConfig.accounts||[];
   if(accounts.find(a=>a.name===prenom)){ showToast('Ce prénom existe déjà dans cette organisation'); return; }
-  const btn=document.getElementById('acc-modal-submit');
+  const btn=document.getElementById('shared-acc-submit');
   btn.disabled=true;
   let snap;
   try{
@@ -2789,6 +2772,20 @@ window.exportAll = function(){
   window.XLSX.writeFile(buildExcel(past,'Historique complet'),'historique-menage.xlsx');
   showToast('Historique exporté ✓');
 };
+
+(function bindSharedAddAccountModalEvents(){
+  if(window._sharedAccModalBound) return;
+  const root=document.getElementById('shared-acc-modal');
+  if(!root) return;
+  window._sharedAccModalBound=true;
+  root.addEventListener('click',e=>{ if(e.target===root) window.closeAddAccountModal(); });
+  document.getElementById('shared-acc-cancel').addEventListener('click',()=>window.closeAddAccountModal());
+  document.getElementById('shared-acc-submit').addEventListener('click',()=>window.submitAddAccountModal());
+  document.getElementById('shared-acc-role-menage').addEventListener('click',()=>window.accModalToggleRole('menage'));
+  document.getElementById('shared-acc-role-admin').addEventListener('click',()=>window.accModalToggleRole('admin'));
+  document.getElementById('shared-acc-prenom').addEventListener('input',window.accModalOnPrenomInput);
+  document.getElementById('shared-acc-pseudo').addEventListener('input',window.accModalOnPseudoInput);
+})();
 </script>
 </body>
 </html>

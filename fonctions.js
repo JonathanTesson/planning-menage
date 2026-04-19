@@ -80,24 +80,13 @@ export function buildAccountPayload({ prenom, nom, pseudo, email, tel, pwdHash, 
   };
 }
 
-function escapeHtmlAttr(s) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 /**
  * Fragment HTML pour la popup « Ajouter un compte » (IDs stables ; branchement événements côté page).
- * @param {{ title: string, submitLabel: string }} opts
  */
-export function buildAddAccountModalHTML({ title, submitLabel }) {
-  const t = escapeHtmlAttr(title);
-  const submit = escapeHtmlAttr(submitLabel);
+export function buildAddAccountModalHTML() {
   return `<div id="shared-acc-modal" class="shared-acc-modal" aria-hidden="true">
   <div class="shared-acc-panel" onclick="event.stopPropagation()">
-    <div class="shared-acc-title">${t}</div>
+    <div class="shared-acc-title">Ajouter un compte</div>
     <div class="shared-acc-field"><label for="shared-acc-prenom">Prénom<span class="shared-acc-req">*</span></label><input type="text" id="shared-acc-prenom" autocomplete="given-name"></div>
     <div class="shared-acc-field"><label for="shared-acc-nom">Nom<span class="shared-acc-req">*</span></label><input type="text" id="shared-acc-nom" autocomplete="family-name"></div>
     <div class="shared-acc-field"><label for="shared-acc-pseudo">Pseudo de connexion<span class="shared-acc-req">*</span></label><input type="text" id="shared-acc-pseudo" autocomplete="username"></div>
@@ -113,7 +102,7 @@ export function buildAddAccountModalHTML({ title, submitLabel }) {
     </div>
     <div class="shared-acc-actions">
       <button type="button" class="btn-cancel" id="shared-acc-cancel">Annuler</button>
-      <button type="button" class="btn-primary" id="shared-acc-submit">${submit}</button>
+      <button type="button" class="btn-primary" id="shared-acc-submit">Ajouter</button>
     </div>
   </div>
 </div>`;
