@@ -1,6 +1,6 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 4.8.1** — Avril 2026
+**Version : 4.8.2** — Avril 2026
 
 Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin. **v4.6.0** : **Super Administration** (`superadmin.html`) — page autonome, login **SHA-256** contre **`/superAdmin/credentials`** (`username`, `pwdHash`), menu **Comptes** / **Organisations** / **Paramètres** / **Sécurité** ; liste des organisations chargée depuis **`/organizations`** dans **`index.html`**, **`admin.html`**, **`compte.html`** (fallback tesson/nade si besoin) ; flux iCal lus depuis **`/orgs/{orgId}/icalFeeds`** (`[{ url, studio, locked? }]`) par **`sync-ical.js`** ; **`notify-departs.js`** et **`purge-unavailability.js`** parcourent les orgs via **`/organizations`** (fallback tesson/nade si erreur ou liste vide) ; scripts d’init **`init-superadmin.js`**, **`init-ical-feeds.js`**. **v4.6.1 (Phase 2 complète)** : suppression d’**organisation** (cascade RTDB ciblée + **Storage** `orgs/{orgId}/`, re-auth Super Admin) ; **N studios** — création / renommage / suppression (**Super Admin**), renommage seul (**admin.html** vue Organisation, champs **`#studios-fields`**) ; **URLs iCal** par studio depuis **Super Admin** (re-auth) ; **`index.html`** — calendrier **N** studios, palette **`STUDIO_COLORS`** (couleurs cycliques) ; **`admin.html`** — procédures et exports alignés sur **`A.studioNames`**. **v4.6.2** : refonte **Super Admin** vue **Organisations** (accordéon **studios** / **comptes**, toggles **🔐💬** et badge **👤** sur la ligne org, badge **étapes** par studio) ; entrées menu **Comptes** / **Paramètres** **masquées** (code conservé) ; **`admin.html`** — retrait des réglages **auth** / **Telegram** / **org. par défaut** (gérés côté Super Admin / Firebase). **v4.6.3** : demandes de **suppression de studio** (admin → Super Admin, nœud **`/pendingDeletionRequests`**), **pastilles orange** (accueil hors app, planning si suggestions procédure, halo menu **Procédure** admin), **iCal** côté **admin** + verrouillage **`locked`** côté **Super Admin**, **+ Ajouter un studio** (admin), correctifs **liste orgs** (hydratation accordéon, sablier ⏳), **`telegramEnabled: false`** par défaut à la création d’org, UX **Super Admin** (login smartphone, topbar, **✏️** libellé, slug retiré de la ligne) — détail § **Historique des versions — v4.6.3**. **v4.7.0** : registre global **`/accounts/{id}`** (identité **`name`** / **`prenom`**, **`pwdHash`** SHA-256, **`orgs.{orgId}.roles`**, **`defaultOrg`**, champs optionnels **`pseudo`**, **`tel`**) en complément du legacy **`/orgs/{orgId}/adminConfig/accounts`** ; connexion **`index.html`** : **`<select id="login-name">`** rempli dans **`showLogin()`** depuis **`get(ref(db,'accounts'))`** (libellés distincts **`name`** ou **`prenom`**, tri **`fr`**) puis **`doLogin`** : essai **global** (**SHA-256**) puis **legacy** (**`hashSimple`**) — tant que le select n’énumère que **`/accounts`**, un compte **uniquement** legacy sans homonyme global reste **non sélectionnable** (voir **`patch-legacy-accounts.js`** ou évolution UI) ; cold start **sans** écran org obligatoire (**`menage_org_v1`** = première org **`/organizations`** ou **`tesson`**) ; sélecteur **Organisation** sur l’écran connexion ; scripts **`init-accounts.js`**, **`check-accounts.js`**, **`patch-legacy-accounts.js`** ; **`init-accounts-migration.js`** retiré du dépôt (nom dans **`.gitignore`** pour éviter un re-commit) ; suppression **`login-test.html`** ; **Super Admin** : panneau comptes **`/accounts`**. **v4.5.5** : calendriers **indisponibilités** sur **`compte.html`** et **`admin.html`** — la grille peut **s’élargir** pour afficher **« par … »** lisiblement (**`minmax(min-content, 1fr)`**) ; la vue utilise **`.section.section--unavail`** (**fond et bordure retirés**, sans barre de défilement) pour éviter tout décalage visuel ; case à cocher **« Afficher le détail (par qui) »** (défaut décochée), préférence **`localStorage`** **`menage_unavail_showby_v1`** (partagée entre les deux pages). **v4.5.4** : traçabilité des **étapes** de procédure (admin + calendrier), **copie** d’étape avec report des métadonnées, **indicateur** des suggestions en attente dans la modale ménage (onglet Procédure), **animation** des pastilles **Indispo**. **Note d’assignation** côté calendrier (**`note`** + traçage **`noteBy`**, indicateur **point bleu pulsant** sur les départs, lecture seule pour les ménagères) — détail § **`/assignments`** et § **index.html** ci-dessous. **v4.5.x** : **indisponibilités** — saisie sur **`compte.html`**, pastilles + filtre **Indispo** sur **`index.html`**, **vue admin** **`#indisponibilites`** (édition par intervenante **v4.5.1**, résumé global **v4.5.2**, traçabilité **`by` v4.5.3**), clés **`YYYY-MM-DD` en date locale** ; la **purge automatique** compare les mêmes clés au **seuil UTC** (voir § **`/unavailability`**).
 
@@ -50,6 +50,8 @@ planning-menage/
 ├── admin.html           → Back-office administration
 ├── compte.html          → Tableau de bord + compte (intervenantes, hors admin)
 ├── superadmin.html      → Super Administration (login, orgs, sécurité ; comptes/paramètres masqués au menu depuis v4.6.2)
+├── fonctions.js         → Utilitaires JS partagés (purs) et générateurs HTML des popups compte (`build*ModalHTML`)
+├── styles.css           → Feuille de styles partagée (boutons, topbar, modales de base, popups `shared-*`)
 ├── storage-cors.example.json → Exemple CORS bucket Storage (optionnel, si uploads / SDK bloqués en local)
 ├── sync-ical.js         → Sync iCal → Firebase par organisation (cron)
 ├── notify-departs.js    → Notifications Telegram départs du jour (cron)
@@ -67,6 +69,14 @@ planning-menage/
 │   └── purge-unavailability.yml
 └── README.md
 ```
+
+### Architecture partagée (à suivre pour toute évolution future)
+
+- **Fonctions utilitaires** réutilisables sur plusieurs pages → les ajouter dans **`fonctions.js`** en **export** de fonctions **pures** (sans DOM ni Firebase).
+- **Classes CSS** communes à plusieurs pages → les ajouter dans **`styles.css`** plutôt que de les dupliquer dans chaque `<style>` interne.
+- **Popups partagées** entre pages → générer le HTML dans **`fonctions.js`** via une fonction **`buildXxxModalHTML()`**, injecter au démarrage avec **`document.body.insertAdjacentHTML('beforeend', …)`**, utiliser des **IDs standardisés** (`shared-*`) et câbler les événements dans chaque page.
+- **CSS spécifique à une seule page** → rester dans le `<style>` interne du fichier concerné.
+- **Popups spécifiques à une seule page** → rester en HTML statique dans le fichier concerné.
 
 ---
 
@@ -432,7 +442,7 @@ Sur **`index.html`**, le calendrier boucle sur **`S.studioNames.length`** ; les 
 6. ~~**URLs iCal Airbnb** — stockage hors `sync-ical.js`~~ — **fait en v4.6.x** (`/orgs/{orgId}/icalFeeds` + Super Admin + **`init-ical-feeds.js`**)  
 7. ~~**Phase 2 — Studios dynamiques**~~ — **fait en v4.6.1** (N studios, iCal par studio, suppression d’org, calendrier N + palette, admin N champs)  
 8. **Phase 3** — **Finaliser** le refactoring des vues **Comptes** et **Paramètres** encore présentes mais **masquées** dans **superadmin.html** (aujourd’hui `display:none` + navigation par hash) ; **`defaultOrgId` global** à la racine Firebase (remplace l’effet dispersé du champ par org) ; **gestion `sharedWith`** (UI + règles RTDB) ; **« Visible sur calendrier »** par studio (filtrage affichage) ; **hub multi-plannings** (enfants, crèche, etc., réutilisation du socle multi-org)  
-9. **Factorisation modale création compte** — **`admin.html`** et **`superadmin.html`** partagent la même logique de création (validation, doublon, pseudo, SHA-256, association org). Prévu : extraire cette logique dans une fonction ou un module commun pour qu’une modification s’applique partout automatiquement (**Phase 3**).
+9. ~~**Factorisation UI des modales compte (admin / super admin)**~~ — **fait en v4.8.2** : HTML commun via **`fonctions.js`** (`buildAddAccountModalHTML`, `buildConfirmAssocModalHTML`, `buildEditAccountModalHTML`), styles dans **`styles.css`**, IDs **`shared-acc-*`** / **`shared-edit-*`**. Reste pour **Phase 3** (optionnel) : **factoriser la logique métier** dupliquée (validation, écritures Firebase) dans un module commun.
 
 ---
 
@@ -440,19 +450,61 @@ Sur **`index.html`**, le calendrier boucle sur **`S.studioNames.length`** ; les 
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 4.8.1
+Version : 4.8.2
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
 Compte : https://jonathantesson.github.io/planning-menage/compte.html
 Super Admin : https://jonathantesson.github.io/planning-menage/superadmin.html
-Fichiers : index.html, admin.html, compte.html, superadmin.html, sync-ical.js, notify-departs.js, purge-unavailability.js, init-superadmin.js, init-ical-feeds.js, init-accounts.js, check-accounts.js, patch-legacy-accounts.js, migrate.js, cleanup-legacy-root.js, set-accounts-order.js (scripts one-shot, archivés après usage), .gitignore
+Fichiers : index.html, admin.html, compte.html, superadmin.html, fonctions.js, styles.css, sync-ical.js, notify-departs.js, purge-unavailability.js, init-superadmin.js, init-ical-feeds.js, init-accounts.js, check-accounts.js, patch-legacy-accounts.js, migrate.js, cleanup-legacy-root.js, set-accounts-order.js (scripts one-shot, archivés après usage), .gitignore
 README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ```
 
 ---
 
 ## Historique des versions
+
+### v4.8.2 — Avril 2026
+
+#### Fichiers partagés
+
+- **`fonctions.js`** — module ES : utilitaires purs partagés entre pages (`hashSimple`, `sha256Hex`, `accNormalizeEmail`, `accEntriesFromSnapshotVal`, `accFindIdentityMatch`, `accFindPseudoOwner`, `accFindPseudoOwnerExcluding`, `calcMaxOrder`, `buildAccountPayload`).
+- **`styles.css`** — feuille partagée : boutons (`.btn-primary`, `.btn-secondary`, `.btn-cancel`, `.btn-danger`), topbar, toast, sync-dot, modales de base (`.modal-overlay`, `.modal`, `.modal-field`, `.modal-btns`, `.modal-actions`), navigation (`.nav-btn`).
+
+#### Popups unifiées (générateurs HTML dans `fonctions.js`)
+
+- **`buildAddAccountModalHTML()`** — popup « Ajouter un compte » partagée entre **`admin.html`** et **`superadmin.html`**.
+- **`buildConfirmAssocModalHTML()`** — popup « Compte existant » pour associer un compte global à une organisation.
+- **`buildEditAccountModalHTML()`** — popup « Modifier le compte » avec champs standardisés **`shared-edit-*`**.
+- **IDs** **`shared-acc-*`** et **`shared-edit-*`** pour uniformiser la logique JS entre pages.
+- **CSS dédié** : `.shared-acc-modal`, `.shared-acc-panel`, `.shared-acc-field`, `.shared-acc-title`, `.shared-acc-req`, `.shared-acc-roles`, `.shared-acc-actions`, `.shared-edit-input-ro`, `.shared-edit-actions`.
+
+#### Intégration dans les quatre fichiers HTML
+
+- **`index.html`**, **`admin.html`**, **`superadmin.html`**, **`compte.html`** chargent **`<link rel="stylesheet" href="styles.css">`**.
+- **`admin.html`** et **`superadmin.html`** importent depuis **`./fonctions.js`** et injectent les popups au démarrage avec **`document.body.insertAdjacentHTML('beforeend', buildXxxModalHTML())`**.
+
+#### Lazy loading XLSX (`admin.html`)
+
+- Suppression du chargement synchrone de **`xlsx.full.min.js`** au démarrage (~276 Ko économisés).
+- Fonction **`loadXlsx()`** : chargement depuis le CDN uniquement au premier export Excel.
+- Toast **« Chargement export... »** affiché uniquement si chargement réel.
+
+#### Bugs corrigés
+
+- Flash « Organisation non configurée » au démarrage : chaînage **`refreshCleanerList().then(afterFbListener)`** dans le callback **`onValue`** **`adminConfig`** (**`index.html`**).
+- Couleurs intervenantes incohérentes : tri par champ **`order`** (au lieu d’un ordre legacy vide).
+- Écran de transition manquant au changement d’organisation depuis la topbar : **`sessionStorage.setItem(ORG_CHANGE_GATE_KEY, '1')`** avant **`location.reload()`** (**`index.html`**).
+
+#### Nettoyage code mort
+
+- Suppression de **`window.removeAccount`** et **`window.saveAccountPwd`** dans **`admin.html`**.
+- Suppression de la règle CSS orpheline **`.toggle-sub`** dans **`admin.html`**.
+- Suppression du doublon **`.btn-danger`** dans **`superadmin.html`** (unifié dans **`styles.css`**).
+- Suppression du doublon **`.modal-shared-hint`** dans **`compte.html`** (unifié dans **`styles.css`**).
+- Nettoyage des imports inutilisés : **`hashSimple`** dans **`admin.html`** ; **`accFindPseudoOwner`** et **`accFindPseudoOwnerExcluding`** dans **`superadmin.html`**.
+
+- **`APP_VERSION` : 4.8.2** dans les quatre fichiers HTML.
 
 ### v4.8.0 — Avril 2026
 - **Migration complète `/accounts`** — suppression définitive du legacy **`/orgs/{orgId}/adminConfig/accounts[]`** dans Firebase. **`/accounts`** est désormais la source unique pour connexion, planning, admin et super admin.
