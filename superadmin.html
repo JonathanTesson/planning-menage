@@ -44,13 +44,8 @@ body.sa-nav-ready .admin-burger{display:flex}
 .login-input--pwd{text-align:center;letter-spacing:2px}
 .login-input:focus,.login-select:focus{outline:none;border-color:#378ADD}
 .login-error{color:#E24B4A;font-size:12px}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;z-index:200;padding:1rem}
-.modal-overlay.is-open{display:flex}
-.modal{background:#fff;border-radius:16px;padding:1.5rem;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,0.12);max-height:90vh;overflow-y:auto}
-.modal h3{font-size:16px;font-weight:600;margin-bottom:1rem}
 .modal-field select{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;box-sizing:border-box}
 .modal-field select:focus{outline:none;border-color:#378ADD}
-.modal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:1rem;justify-content:flex-end}
 #sa-modal-del-studio .modal-actions.sa-modal-del-studio-actions{justify-content:space-between;align-items:flex-start;flex-wrap:nowrap;gap:6px}
 #sa-modal-del-studio .sa-modal-del-studio-req-col{display:none;flex-direction:column;align-items:center;flex:0 1 auto;min-width:0}
 #sa-modal-del-studio .sa-modal-del-studio-req-col.is-visible{display:flex}
@@ -129,10 +124,7 @@ body.sa-nav-ready .admin-burger{display:flex}
 .sa-acc-edit-btn{background:transparent;border:none;cursor:pointer;font-size:15px;line-height:1;padding:4px 6px;border-radius:6px;color:#666;margin-left:auto;flex-shrink:0;-webkit-tap-highlight-color:transparent}
 .sa-acc-edit-btn:hover{background:#f0f0eb;color:#111}
 .sa-acc-edit-btn:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
-.sa-input-ro{background:#f5f5f0!important;color:#666!important;cursor:not-allowed}
-.sa-acc-modal-roles{display:flex;gap:8px;margin-top:4px}
-.sa-acc-modal-roles .account-role{font-size:18px;padding:6px 10px}
-#sa-modal-edit-account .modal{max-width:400px}
+#shared-edit-acc-modal .shared-acc-roles .account-role{font-size:18px;padding:6px 10px}
 .sa-org-cb-hid{display:none!important}
 .account-row .sa-acc-name{cursor:pointer;border-radius:6px;padding:2px 6px;margin:0 -2px;transition:background-color .15s ease,box-shadow .15s ease,color .15s ease,text-decoration .15s ease}
 .account-row .sa-acc-name:hover{background:#ecece6;box-shadow:inset 0 -1px 0 rgba(0,0,0,0.08);text-decoration:underline;text-decoration-color:#888;text-underline-offset:3px;color:#111}
@@ -245,17 +237,6 @@ body.sa-nav-ready .admin-burger{display:flex}
   </div>
 </div>
 
-<div class="modal-overlay" id="sa-modal-confirm-assoc" role="dialog" aria-modal="true" aria-labelledby="sa-modal-confirm-assoc-title">
-  <div class="modal">
-    <h3 id="sa-modal-confirm-assoc-title">Compte existant</h3>
-    <p class="empty-hint" id="sa-modal-confirm-assoc-text" style="color:#555;line-height:1.45"></p>
-    <div class="modal-actions">
-      <button type="button" class="btn-secondary" id="sa-modal-confirm-assoc-cancel">Annuler</button>
-      <button type="button" class="btn-primary" id="sa-modal-confirm-assoc-ok">Associer</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-overlay" id="sa-modal-del-account" role="dialog" aria-modal="true" aria-labelledby="sa-modal-del-acc-title">
   <div class="modal">
     <h3 id="sa-modal-del-acc-title">Supprimer le compte</h3>
@@ -362,61 +343,19 @@ body.sa-nav-ready .admin-burger{display:flex}
   </div>
 </div>
 
-<div class="modal-overlay" id="sa-modal-edit-account" role="dialog" aria-modal="true" aria-labelledby="sa-modal-edit-acc-title">
-  <div class="modal">
-    <h3 id="sa-modal-edit-acc-title">Modifier le compte</h3>
-    <div class="modal-field">
-      <label for="sa-acc-edit-prenom">Prénom</label>
-      <input type="text" id="sa-acc-edit-prenom" class="sa-input-ro" readonly autocomplete="off">
-    </div>
-    <div class="modal-field">
-      <label for="sa-acc-edit-nom">Nom</label>
-      <input type="text" id="sa-acc-edit-nom" autocomplete="family-name">
-    </div>
-    <div class="modal-field">
-      <label for="sa-acc-edit-email">Email</label>
-      <input type="text" id="sa-acc-edit-email" autocomplete="email">
-    </div>
-    <div class="modal-field">
-      <label for="sa-acc-edit-pseudo">Pseudo<span style="color:#E24B4A"> *</span></label>
-      <input type="text" id="sa-acc-edit-pseudo" autocomplete="username">
-    </div>
-    <div class="modal-field">
-      <label for="sa-acc-edit-tel">Téléphone (optionnel)</label>
-      <input type="text" id="sa-acc-edit-tel" autocomplete="tel">
-    </div>
-    <div class="modal-field">
-      <label for="sa-acc-edit-pwd">Nouveau mot de passe</label>
-      <input type="password" id="sa-acc-edit-pwd" autocomplete="new-password" placeholder="Laisser vide pour ne pas changer">
-    </div>
-    <div class="modal-field">
-      <span style="font-size:12px;color:#888;font-weight:500">Rôles</span>
-      <div class="sa-acc-modal-roles">
-        <span class="account-role" id="sa-acc-edit-menage" data-sa-acc-role="menage" title="Ménage" role="button" tabindex="0">🧹</span>
-        <span class="account-role" id="sa-acc-edit-admin" data-sa-acc-role="admin" title="Admin" role="button" tabindex="0">👑</span>
-      </div>
-    </div>
-    <div class="modal-actions" style="flex-wrap:wrap;justify-content:space-between">
-      <button type="button" class="btn-danger" id="sa-acc-edit-del" style="border:1px solid #f0c0c0;padding:8px 16px">Supprimer</button>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button type="button" class="btn-secondary" id="sa-acc-edit-cancel">Annuler</button>
-        <button type="button" class="btn-primary" id="sa-acc-edit-save">Enregistrer</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <div class="toast" id="sa-toast"></div>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, get, set, update, onValue, remove, push } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { getStorage, ref as sRef, deleteObject, listAll } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
-import { hashSimple, sha256Hex, accNormalizeEmail, accEntriesFromSnapshotVal, accFindIdentityMatch, accFindPseudoOwner, accFindPseudoOwnerExcluding, calcMaxOrder, buildAccountPayload, buildAddAccountModalHTML } from './fonctions.js';
+import { hashSimple, sha256Hex, accNormalizeEmail, accEntriesFromSnapshotVal, accFindIdentityMatch, accFindPseudoOwner, accFindPseudoOwnerExcluding, calcMaxOrder, buildAccountPayload, buildAddAccountModalHTML, buildConfirmAssocModalHTML, buildEditAccountModalHTML } from './fonctions.js';
 
 document.body.insertAdjacentHTML('beforeend',
   buildAddAccountModalHTML()
 );
+document.body.insertAdjacentHTML('beforeend', buildConfirmAssocModalHTML());
+document.body.insertAdjacentHTML('beforeend', buildEditAccountModalHTML());
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
@@ -961,6 +900,15 @@ function closeSharedAddAccountModal(){
   m.setAttribute('aria-hidden', 'true');
 }
 
+function openSharedEditAccountModal(){
+  openModal('shared-edit-acc-modal');
+  el('shared-edit-acc-modal').setAttribute('aria-hidden', 'false');
+}
+function closeSharedEditAccountModal(){
+  closeModal('shared-edit-acc-modal');
+  el('shared-edit-acc-modal').setAttribute('aria-hidden', 'true');
+}
+
 let pendingDeleteOrgId = '';
 let pendingDeleteOrgLabel = '';
 let pendingRenameOrgId = '';
@@ -1138,35 +1086,35 @@ async function openSaEditAccountModal(orgId, index){
   window._saAccEditOrgId = orgId;
   window._saAccEditIndex = index;
   window._saAccEditGlobalId = global ? global.id : null;
-  el('sa-acc-edit-prenom').value = String(acc.name || '').trim();
-  el('sa-acc-edit-pwd').value = '';
+  el('shared-edit-prenom').value = String(acc.name || '').trim();
+  el('shared-edit-pwd').value = '';
   const hadLegacyNom = acc.nom != null && String(acc.nom).trim() !== '';
-  const nomInp = el('sa-acc-edit-nom');
+  const nomInp = el('shared-edit-nom');
   if(hadLegacyNom){
     nomInp.value = String(acc.nom).trim();
     nomInp.readOnly = true;
-    nomInp.classList.add('sa-input-ro');
+    nomInp.classList.add('shared-edit-input-ro');
   }else{
     nomInp.value = global && global.nom != null ? String(global.nom).trim() : '';
     nomInp.readOnly = false;
-    nomInp.classList.remove('sa-input-ro');
+    nomInp.classList.remove('shared-edit-input-ro');
   }
-  const emailInp = el('sa-acc-edit-email');
+  const emailInp = el('shared-edit-email');
   const hadLegacyEmail = acc.email != null && String(acc.email).trim() !== '';
   if(hadLegacyEmail){
     emailInp.value = String(acc.email).trim();
     emailInp.readOnly = true;
-    emailInp.classList.add('sa-input-ro');
+    emailInp.classList.add('shared-edit-input-ro');
   }else{
     emailInp.value = global && global.email != null ? String(global.email).trim() : '';
     emailInp.readOnly = false;
-    emailInp.classList.remove('sa-input-ro');
+    emailInp.classList.remove('shared-edit-input-ro');
   }
-  el('sa-acc-edit-pseudo').value = acc.pseudo != null && String(acc.pseudo).trim() !== '' ? String(acc.pseudo).trim() : (global && global.pseudo ? String(global.pseudo).trim() : '');
-  el('sa-acc-edit-tel').value = acc.tel != null && String(acc.tel).trim() !== '' ? String(acc.tel) : (global && global.tel != null ? String(global.tel) : '');
-  el('sa-acc-edit-menage').classList.toggle('active', !!acc.menage);
-  el('sa-acc-edit-admin').classList.toggle('active', !!acc.admin);
-  openModal('sa-modal-edit-account');
+  el('shared-edit-pseudo').value = acc.pseudo != null && String(acc.pseudo).trim() !== '' ? String(acc.pseudo).trim() : (global && global.pseudo ? String(global.pseudo).trim() : '');
+  el('shared-edit-tel').value = acc.tel != null && String(acc.tel).trim() !== '' ? String(acc.tel) : (global && global.tel != null ? String(global.tel) : '');
+  el('shared-edit-role-menage').classList.toggle('active', !!acc.menage);
+  el('shared-edit-role-admin').classList.toggle('active', !!acc.admin);
+  openSharedEditAccountModal();
 }
 
 async function renderAccountsForSelectedOrg(ctx){
@@ -1332,26 +1280,30 @@ el('shared-acc-submit').addEventListener('click', async ()=>{
     const identity = accFindIdentityMatch(entries, prenom, nom, email);
     if(identity){
       const ps = identity.pseudo != null && String(identity.pseudo).trim() !== '' ? String(identity.pseudo).trim() : '(aucun)';
-      el('sa-modal-confirm-assoc-text').textContent = `Ce compte existe déjà (pseudo: ${ps}). Voulez-vous l'associer à cette organisation ?`;
-      openModal('sa-modal-confirm-assoc');
       const accepted = await new Promise(resolve=>{
-        const okBtn = el('sa-modal-confirm-assoc-ok');
-        const cancelBtn = el('sa-modal-confirm-assoc-cancel');
-        const onOk = ()=>{
-          closeModal('sa-modal-confirm-assoc');
+        el('shared-confirm-assoc-text').textContent = `Ce compte existe déjà (pseudo: ${ps}). Voulez-vous l'associer à cette organisation ?`;
+        const backdrop = el('shared-confirm-assoc-modal');
+        const okBtn = el('shared-confirm-assoc-ok');
+        const cancelBtn = el('shared-confirm-assoc-cancel');
+        const finish = v=>{
+          backdrop.classList.remove('is-open');
+          backdrop.setAttribute('aria-hidden', 'true');
           okBtn.removeEventListener('click', onOk);
           cancelBtn.removeEventListener('click', onCancel);
-          resolve(true);
+          backdrop.removeEventListener('click', onBackdrop);
+          resolve(v);
         };
+        const onOk = ()=>finish(true);
         const onCancel = ()=>{
           btn.disabled = false;
-          closeModal('sa-modal-confirm-assoc');
-          okBtn.removeEventListener('click', onOk);
-          cancelBtn.removeEventListener('click', onCancel);
-          resolve(false);
+          finish(false);
         };
+        const onBackdrop = e=>{ if(e.target === backdrop) onCancel(); };
+        backdrop.classList.add('is-open');
+        backdrop.setAttribute('aria-hidden', 'false');
         okBtn.addEventListener('click', onOk);
         cancelBtn.addEventListener('click', onCancel);
+        backdrop.addEventListener('click', onBackdrop);
       });
       if(!accepted) return;
       const emailNorm = accNormalizeEmail(email);
@@ -1458,8 +1410,10 @@ el('sa-modal-del-acc-ok').addEventListener('click', async ()=>{
       n.classList.toggle('active');
     });
   };
-  tog(el('sa-acc-edit-menage'));
-  tog(el('sa-acc-edit-admin'));
+  tog(el('shared-edit-role-menage'));
+  tog(el('shared-edit-role-admin'));
+  const editRoot = el('shared-edit-acc-modal');
+  if(editRoot) editRoot.addEventListener('click', e=>{ if(e.target === editRoot) closeSharedEditAccountModal(); });
 })();
 
 (function wireSaModalAddAccount(){
@@ -1482,13 +1436,13 @@ el('sa-modal-del-acc-ok').addEventListener('click', async ()=>{
   el('shared-acc-pseudo').addEventListener('input', ()=>{ window._saModalAddPseudoDirty = true; });
 })();
 
-el('sa-acc-edit-cancel').addEventListener('click', ()=>closeModal('sa-modal-edit-account'));
+el('shared-edit-cancel').addEventListener('click', ()=>closeSharedEditAccountModal());
 
-el('sa-acc-edit-del').addEventListener('click', ()=>{
+el('shared-edit-delete').addEventListener('click', ()=>{
   const orgId = window._saAccEditOrgId;
   const idx = window._saAccEditIndex;
   if(!orgId || idx == null || idx < 0) return;
-  closeModal('sa-modal-edit-account');
+  closeSharedEditAccountModal();
   const pane = document.getElementById('sa-accounts-panel-' + orgId) || el('sa-accounts-list');
   requestAnimationFrame(()=>{
     const row = pane && pane.querySelector(`.account-row[data-acc-i="${idx}"]`);
@@ -1497,35 +1451,35 @@ el('sa-acc-edit-del').addEventListener('click', ()=>{
   });
 });
 
-el('sa-acc-edit-save').addEventListener('click', async ()=>{
+el('shared-edit-save').addEventListener('click', async ()=>{
   const orgId = window._saAccEditOrgId;
   const i = window._saAccEditIndex;
   if(!orgId || i == null || i < 0) return;
   const listCur = await getAccountsForOrg(orgId);
   const acc = listCur[i];
   if(!acc){
-    closeModal('sa-modal-edit-account');
+    closeSharedEditAccountModal();
     return;
   }
   const hadLegacyEmail = acc.email != null && String(acc.email).trim() !== '';
   const hadLegacyNom = acc.nom != null && String(acc.nom).trim() !== '';
-  const pseudo = el('sa-acc-edit-pseudo').value.trim();
-  const tel = el('sa-acc-edit-tel').value.trim();
-  const pwd = el('sa-acc-edit-pwd').value;
-  const nomInpVal = el('sa-acc-edit-nom').value.trim();
-  const emailInpVal = el('sa-acc-edit-email').value.trim();
+  const pseudo = el('shared-edit-pseudo').value.trim();
+  const tel = el('shared-edit-tel').value.trim();
+  const pwd = el('shared-edit-pwd').value;
+  const nomInpVal = el('shared-edit-nom').value.trim();
+  const emailInpVal = el('shared-edit-email').value.trim();
   if(!pseudo){ showToast('Pseudo obligatoire'); return; }
   if(!hadLegacyNom && !nomInpVal){ showToast('Nom obligatoire'); return; }
   if(!hadLegacyEmail){
     if(!emailInpVal || emailInpVal.indexOf('@') < 0){ showToast('Email obligatoire'); return; }
   }
-  const menage = el('sa-acc-edit-menage').classList.contains('active');
-  const admin = el('sa-acc-edit-admin').classList.contains('active');
+  const menage = el('shared-edit-role-menage').classList.contains('active');
+  const admin = el('shared-edit-role-admin').classList.contains('active');
   if(!menage && !admin){ showToast('Choisissez au moins un rôle'); return; }
   const roles = [];
   if(menage) roles.push('menage');
   if(admin) roles.push('admin');
-  const btn = el('sa-acc-edit-save');
+  const btn = el('shared-edit-save');
   btn.disabled = true;
   let entries = [];
   try{
@@ -1599,9 +1553,9 @@ el('sa-acc-edit-save').addEventListener('click', async ()=>{
   const pane = document.getElementById('sa-accounts-panel-' + orgId) || el('sa-accounts-list');
   const hidInp = pane && pane.querySelector(`[data-pwd-i="${i}"]`);
   if(hidInp) hidInp.value = '';
-  el('sa-acc-edit-pwd').value = '';
+  el('shared-edit-pwd').value = '';
   showToast('Modifications enregistrées');
-  closeModal('sa-modal-edit-account');
+  closeSharedEditAccountModal();
   btn.disabled = false;
   await afterOrgAccountsChanged(orgId);
 });
