@@ -868,11 +868,18 @@ async function loadOrgParamsForOrgRow(host, orgId){
     const snap = await get(ref(db, `orgs/${orgId}/adminConfig`));
     const d = snap.val() || {};
     const prev = orgParamsCache[orgId] || {};
+    let accountsCount = 0;
+    try{
+      const list = await getAccountsForOrg(orgId);
+      accountsCount = list.length;
+    }catch(_){
+      accountsCount = 0;
+    }
     orgParamsCache[orgId] = {
       ...prev,
       authEnabled: !!d.authEnabled,
       telegramEnabled: d.telegramEnabled !== false,
-      accountsCount: normalizeAccounts(d.accounts).length,
+      accountsCount,
       deletionRequests: prev.deletionRequests !== undefined ? prev.deletionRequests : null
     };
   }catch(e){
@@ -1036,6 +1043,23 @@ async function deleteStorageTree(rootRef){
 }
 
 async function performOrgCascadeDelete(orgId){
+  try{
+    const accSnap = await get(ref(db, 'accounts'));
+    const accVal = accSnap.val();
+    if(accVal && typeof accVal === 'object'){
+      for(const [id, row] of Object.entries(accVal)){
+        if(!row || typeof row !== 'object') continue;
+        if(!row.orgs || !row.orgs[orgId]) continue;
+        const orgs = row.orgs && typeof row.orgs === 'object' ? row.orgs : {};
+        const nOrg = Object.keys(orgs).length;
+        if(nOrg > 1){
+          await update(ref(db), { [`accounts/${id}/orgs/${orgId}`]: null });
+        }else{
+          await remove(ref(db, `accounts/${id}`));
+        }
+      }
+    }
+  }catch(_){}
   const updates = {
     [`organizations/${orgId}`]: null,
     [`orgs/${orgId}/adminConfig`]: null,
@@ -1070,14 +1094,41 @@ let pendingAddAccountOrgId = '';
 
 async function getAccountsForOrg(orgId){
   if(!orgId) return [];
-  const snap = await get(ref(db, `orgs/${orgId}/adminConfig`));
-  const d = snap.val() || {};
-  return normalizeAccounts(d.accounts);
+  try{
+    const snap = await get(ref(db, 'accounts'));
+    const val = snap.val();
+    if(!val||typeof val!=='object') return [];
+    const out = [];
+    for(const [id,row] of Object.entries(val)){
+      if(!row||typeof row!=='object') continue;
+      const orgEnt = row.orgs && row.orgs[orgId];
+      if(!orgEnt) continue;
+      const rolesRaw = orgEnt.roles;
+      const rolesArr = Array.isArray(rolesRaw) ? rolesRaw.map(x=>String(x).toLowerCase()) : [];
+      const menage = rolesArr.includes('menage');
+      const admin = rolesArr.includes('admin');
+      const name = String(row.name ?? row.prenom ?? '').trim();
+      if(!name) continue;
+      out.push({
+        name,
+        nom: String(row.nom ?? '').trim(),
+        email: row.email != null && String(row.email).trim() !== '' ? accNormalizeEmail(row.email) : '',
+        pseudo: String(row.pseudo ?? '').trim(),
+        tel: String(row.tel ?? '').trim(),
+        pwdHash: row.pwdHash != null ? String(row.pwdHash) : '',
+        menage,
+        admin,
+        sharedWith: [],
+        _globalId: id
+      });
+    }
+    return out;
+  }catch(_){
+    return [];
+  }
 }
 
-async function saveAccountsArray(orgId, accounts){
-  await set(ref(db, `orgs/${orgId}/adminConfig/accounts`), accounts);
-}
+async function saveAccountsArray(orgId, accounts){}
 
 function formatStepsBadgeLabel(n){
   const x = Number(n) || 0;
@@ -2066,7 +2117,7 @@ el('sa-modal-org-ok').addEventListener('click', async ()=>{
     if(ex.val()!=null){ showToast('Cet identifiant existe déjà'); return; }
     await set(ref(db, `organizations/${slug}`), { label });
     await set(ref(db, `orgs/${slug}/config`), { studioNames: [] });
-    await set(ref(db, `orgs/${slug}/adminConfig`), { authEnabled: false, telegramEnabled: false, accounts: [] });
+    await set(ref(db, `orgs/${slug}/adminConfig`), { authEnabled: false, telegramEnabled: false });
     delete orgParamsCache[slug];
     delete studiosOpen[slug];
     delete accountsOpen[slug];
