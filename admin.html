@@ -610,9 +610,15 @@ function pushActivity(entry){
   }).then(()=>trimActivityLogIfNeeded()).catch(()=>{});
 }
 
+function menageAccountNamesForStats(){
+  const en=A._enrichedAccounts||[];
+  if(en.length) return en.filter(a=>a.menage).map(a=>a.name);
+  return (A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
+}
+
 const cleanerColor = n => {
-  const accounts = A.adminConfig.accounts||[];
-  const i = accounts.findIndex(a=>a.name===n);
+  const accounts=(A._enrichedAccounts&&A._enrichedAccounts.length)?A._enrichedAccounts:(A.adminConfig.accounts||[]);
+  const i=accounts.findIndex(a=>a.name===n);
   return i>=0 ? CLEANER_COLORS[i%CLEANER_COLORS.length] : '#aaa';
 };
 
@@ -734,7 +740,7 @@ function bindAdminUnavailListener(prenom){
 function syncAdminUnavailSelect(){
   const sel=document.getElementById('admin-unavail-cleaner-select');
   if(!sel) return;
-  const cleaners=(A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
+  const cleaners=menageAccountNamesForStats();
   if(!cleaners.length){
     sel.innerHTML='<option value="">— Aucun compte ménage —</option>';
     A.adminUnavailSelectedName='';
@@ -904,8 +910,11 @@ async function loadOrganizations(){
 
   onValue(ref(db,ob('adminConfig')), snap=>{
     const d=snap.val();
-    if(d) A.adminConfig={...A.adminConfig,...d, accounts: d.accounts||[], defaultOrgId:d.defaultOrgId||A.adminConfig.defaultOrgId||'tesson', telegramEnabled:d.telegramEnabled!==false};
-    verifyAdminAccess();
+    if(d){
+      const { accounts: _ignored, ...rest } = d;
+      A.adminConfig={...A.adminConfig,...rest, defaultOrgId:d.defaultOrgId||A.adminConfig.defaultOrgId||'tesson', telegramEnabled:d.telegramEnabled!==false};
+    }
+    void verifyAdminAccess();
   });
 
   onValue(ref(db,ob('activityLog')), snap=>{
@@ -933,22 +942,46 @@ async function loadOrganizations(){
 
 // ─── Accès admin (session calendrier + rôle 👑) ────────────────────────────────
 
-function verifyAdminAccess(){
+async function verifyAdminAccess(){
+  const waitEl=document.getElementById('admin-gate-wait');
+  const contentEl=document.getElementById('admin-content');
   const authOn=!!A.adminConfig.authEnabled;
   let ok=!authOn;
   if(authOn){
+    if(waitEl) waitEl.style.display='';
+    if(contentEl) contentEl.style.display='none';
     let session=null;
     try{ session=JSON.parse(localStorage.getItem(SESSION_KEY)); }catch(e){}
-    const name=session&&session.name;
-    const acc=name?(A.adminConfig.accounts||[]).find(a=>a.name===name):null;
-    ok=!!(acc&&acc.admin);
+    const name=session&&session.name&&String(session.name).trim();
+    if(name){
+      try{
+        const snap=await get(ref(db,'accounts'));
+        const val=snap.val();
+        let adminRole=false;
+        if(val&&typeof val==='object'){
+          for(const row of Object.values(val)){
+            if(!row||typeof row!=='object') continue;
+            const nm=String(row.name??'').trim();
+            const pr=String(row.prenom??'').trim();
+            if(nm!==name&&pr!==name) continue;
+            const roles=(row.orgs&&row.orgs[orgId]&&row.orgs[orgId].roles)||[];
+            const r=Array.isArray(roles)?roles.map(x=>String(x).toLowerCase()):[];
+            if(r.includes('admin')){ adminRole=true; break; }
+          }
+        }
+        ok=adminRole;
+      }catch(_){
+        const acc=(A.adminConfig.accounts||[]).find(a=>a.name===name);
+        ok=!!(acc&&acc.admin);
+      }
+    }else{
+      ok=false;
+    }
   }
   if(!ok){
     window.location.replace('index.html');
     return;
   }
-  const waitEl=document.getElementById('admin-gate-wait');
-  const contentEl=document.getElementById('admin-content');
   if(waitEl) waitEl.style.display='none';
   if(contentEl) contentEl.style.display='';
   document.body.classList.add('admin-nav-ready');
@@ -1051,28 +1084,31 @@ function paintProcedureSuggestionsNav(){
 function renderAdminContent(){
   const ol=document.getElementById('admin-org-label');
   if(ol) ol.textContent=ORGANIZATIONS.find(o=>o.id===orgId)?.label||orgId;
-  renderStats();
-  void renderAccounts();
-  renderStudioFields();
-  renderHisto();
-  renderActivityLog();
-  renderProcedures();
-  bindProcedureFileInputOnce();
-  const av=document.getElementById('admin-app-version');
-  if(av) av.textContent='Planning Ménage · version '+APP_VERSION;
-  if(A.unlocked&&adminCurrentView==='indisponibilites'){
-    syncAdminUnavailSelect();
-    renderAdminUnavailCal();
-    renderAdminUnavailFutureSummary();
-  }
-  if(A.unlocked&&!adminUiHashApplied){
-    adminUiHashApplied=true;
-    let h=location.hash.slice(1);
-    if(h==='procedures-section') h='procedures';
-    if(h==='general') h='dashboard';
-    if(ADMIN_VIEW_IDS.includes(h)&&h!=='dashboard') window.setAdminUiView(h,{noScroll:true});
-  }
-  paintProcedureSuggestionsNav();
+  void (async()=>{
+    await syncLocalAccountsFromGlobal();
+    await renderAccounts();
+    renderStats();
+    renderStudioFields();
+    renderHisto();
+    renderActivityLog();
+    renderProcedures();
+    bindProcedureFileInputOnce();
+    const av=document.getElementById('admin-app-version');
+    if(av) av.textContent='Planning Ménage · version '+APP_VERSION;
+    if(A.unlocked&&adminCurrentView==='indisponibilites'){
+      syncAdminUnavailSelect();
+      renderAdminUnavailCal();
+      renderAdminUnavailFutureSummary();
+    }
+    if(A.unlocked&&!adminUiHashApplied){
+      adminUiHashApplied=true;
+      let h=location.hash.slice(1);
+      if(h==='procedures-section') h='procedures';
+      if(h==='general') h='dashboard';
+      if(ADMIN_VIEW_IDS.includes(h)&&h!=='dashboard') window.setAdminUiView(h,{noScroll:true});
+    }
+    paintProcedureSuggestionsNav();
+  })();
 }
 
 const ACTIVITY_TYPE_LABEL={ login:'Connexion', logout:'Déconnexion', assign:'Assignation', assign_admin:'Assignation (admin)', admin:'Admin', admin_config:'Comptes', event:'Événement' };
@@ -1319,7 +1355,7 @@ function renderAdminUnavailFutureSummary(){
   const t=new Date();
   t.setHours(0,0,0,0);
   const todayKey=localDateKeyAdmin(t);
-  const cleaners=(A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
+  const cleaners=menageAccountNamesForStats();
   const rows=[];
   for(const name of cleaners){
     const flat=A.unavailabilityAll[name];
@@ -1392,7 +1428,7 @@ function renderStats(){
     if(sl.c1) counts[sl.c1]=(counts[sl.c1]||0)+1;
     if(sl.c2) counts[sl.c2]=(counts[sl.c2]||0)+1;
   }
-  const cleaners=(A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
+  const cleaners=menageAccountNamesForStats();
   document.getElementById('cleaner-stats').innerHTML=
     '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
     cleaners.filter(c=>counts[c]).map(c=>`
@@ -1403,6 +1439,39 @@ function renderStats(){
       </div>`).join('')+
     (cleaners.filter(c=>counts[c]).length?'':'<span style="font-size:12px;color:#aaa">Aucune intervention ce mois</span>')+
     '</div>';
+}
+
+async function syncLocalAccountsFromGlobal(){
+  try{
+    const snap=await get(ref(db,'accounts'));
+    const val=snap.val();
+    const list=[];
+    if(val&&typeof val==='object'){
+      for(const [,row] of Object.entries(val)){
+        if(!row||typeof row!=='object') continue;
+        const orgEnt=row.orgs&&row.orgs[orgId];
+        if(!orgEnt) continue;
+        const rolesRaw=orgEnt.roles;
+        const rolesArr=Array.isArray(rolesRaw)?rolesRaw.map(x=>String(x).toLowerCase()):[];
+        const menage=rolesArr.includes('menage');
+        const admin=rolesArr.includes('admin');
+        const name=String(row.name??row.prenom??'').trim();
+        if(!name) continue;
+        list.push({
+          name,
+          nom:String(row.nom??'').trim(),
+          email:row.email!=null&&String(row.email).trim()!==''?accNormalizeEmail(row.email):'',
+          pseudo:String(row.pseudo??'').trim(),
+          tel:String(row.tel??'').trim(),
+          pwdHash:'',
+          menage,
+          admin,
+          sharedWith:[]
+        });
+      }
+    }
+    A.adminConfig.accounts=list;
+  }catch(_){}
 }
 
 async function renderAccounts(){
@@ -1619,6 +1688,7 @@ window.submitAddAccountModal=async function(){
   if(!email){ showToast('Email obligatoire'); return; }
   if(!pwd){ showToast('Mot de passe obligatoire'); return; }
   if(!menage&&!admin){ showToast('Choisissez au moins un rôle'); return; }
+  await syncLocalAccountsFromGlobal();
   const accounts=A.adminConfig.accounts||[];
   if(accounts.find(a=>a.name===prenom)){ showToast('Ce prénom existe déjà dans cette organisation'); return; }
   const btn=document.getElementById('acc-modal-submit');
@@ -1650,10 +1720,8 @@ window.submitAddAccountModal=async function(){
       btn.disabled=false;
       return;
     }
-    accounts.push({name:prenom,nom,email:accNormalizeEmail(email),pseudo,tel:tel||'',pwdHash:hashSimple(pwd),menage,admin,sharedWith:[]});
-    A.adminConfig.accounts=accounts;
-    saveAdminConfig();
     closeAddAccountModal();
+    await syncLocalAccountsFromGlobal();
     await renderAccounts();
     pushActivity({type:'admin_config',text:`Compte existant associé : ${prenom} (${orgId})`});
     showToast('Compte associé ✓');
@@ -1675,7 +1743,7 @@ window.submitAddAccountModal=async function(){
   }
   const newRef=push(ref(db,'accounts'));
   const payload={
-    nom,prenom,pseudo,email,tel:tel||'',
+    name:prenom,nom,prenom,pseudo,email,tel:tel||'',
     pwdHash:pwdHash256,
     orgs:{[orgId]:{roles}},
     defaultOrg:orgId
@@ -1689,10 +1757,8 @@ window.submitAddAccountModal=async function(){
     btn.disabled=false;
     return;
   }
-  accounts.push({name:prenom,nom,email:accNormalizeEmail(email),pseudo,tel:tel||'',pwdHash:hashSimple(pwd),menage,admin,sharedWith:[]});
-  A.adminConfig.accounts=accounts;
-  saveAdminConfig();
   closeAddAccountModal();
+  await syncLocalAccountsFromGlobal();
   await renderAccounts();
   pushActivity({type:'admin_config',text:`Nouveau compte : ${prenom}`});
   showToast(prenom+' ajouté ✓');
@@ -1713,6 +1779,7 @@ window.accEditToggleRole=function(role){
 };
 
 window.openEditAccountModal=async function(i){
+  await syncLocalAccountsFromGlobal();
   const accounts=A.adminConfig.accounts||[];
   const acc=accounts[i];
   if(!acc) return;
@@ -1766,6 +1833,7 @@ window.openEditAccountModal=async function(i){
 window.submitEditAccountModal=async function(){
   const i=window._accEditIndex;
   if(i==null||i<0) return;
+  await syncLocalAccountsFromGlobal();
   const accounts=A.adminConfig.accounts||[];
   const acc=accounts[i];
   if(!acc){ closeEditAccountModal(); return; }
@@ -1807,14 +1875,6 @@ window.submitEditAccountModal=async function(){
   }
   const emailNorm=hadLegacyEmail?accNormalizeEmail(acc.email):accNormalizeEmail(emailInpVal);
   const nomFinal=hadLegacyNom?String(acc.nom).trim():nomInpVal;
-  const leg={...acc};
-  leg.nom=nomFinal;
-  leg.pseudo=pseudo;
-  leg.tel=tel;
-  leg.menage=menage;
-  leg.admin=admin;
-  if(!hadLegacyEmail) leg.email=emailNorm;
-  if(pwd) leg.pwdHash=hashSimple(pwd);
   const updates={};
   if(gid){
     updates[`accounts/${gid}/pseudo`]=pseudo;
@@ -1837,9 +1897,7 @@ window.submitEditAccountModal=async function(){
     btn.disabled=false;
     return;
   }
-  accounts[i]=leg;
-  A.adminConfig.accounts=accounts;
-  saveAdminConfig();
+  await syncLocalAccountsFromGlobal();
   await renderAccounts();
   pushActivity({type:'admin_config',text:`Compte mis à jour : ${acc.name}`});
   showToast('Modifications enregistrées ✓');
@@ -1850,6 +1908,7 @@ window.submitEditAccountModal=async function(){
 window.submitDeleteAccountModal=async function(){
   const i=window._accEditIndex;
   if(i==null||i<0) return;
+  await syncLocalAccountsFromGlobal();
   const accounts=A.adminConfig.accounts||[];
   const acc=accounts[i];
   if(!acc) return;
@@ -1886,9 +1945,7 @@ window.submitDeleteAccountModal=async function(){
       }
     }
     await remove(ref(db,ob(`unavailability/${prenom}`)));
-    accounts.splice(i,1);
-    A.adminConfig.accounts=accounts;
-    saveAdminConfig();
+    await syncLocalAccountsFromGlobal();
     await renderAccounts();
     pushActivity({type:'admin_config',text:`Compte supprimé : ${prenom}`});
     showToast('Compte supprimé ✓');
@@ -1903,43 +1960,60 @@ window.submitDeleteAccountModal=async function(){
   }
 };
 
-window.removeAccount = function(i){
-  const accounts=A.adminConfig.accounts||[];
-  if(!confirm('Supprimer '+accounts[i].name+' ?')) return;
-  const removed=accounts[i].name;
-  accounts.splice(i,1);
-  A.adminConfig.accounts=accounts;
-  saveAdminConfig();
-  void renderAccounts();
-  pushActivity({ type:'admin_config', text:`Compte supprimé : ${removed}` });
+window.removeAccount = function(){};
+
+window.toggleRole = async function(i, role){
+  const en=A._enrichedAccounts||[];
+  const row=en[i];
+  if(!row) return;
+  const gid=row._globalId;
+  if(!gid){
+    showToast('Compte non lié au registre global');
+    return;
+  }
+  const r=String(role).toLowerCase();
+  if(r!=='menage'&&r!=='admin') return;
+  try{
+    const snap=await get(ref(db,'accounts'));
+    const val=snap.val();
+    const global=val&&typeof val==='object'?val[gid]:null;
+    if(!global||typeof global!=='object'){
+      showToast('Compte introuvable');
+      return;
+    }
+    const orgEnt=global.orgs&&global.orgs[orgId];
+    const rolesArr=Array.isArray(orgEnt&&orgEnt.roles)?[...orgEnt.roles].map(x=>String(x).toLowerCase()):[];
+    const set=new Set(rolesArr);
+    if(set.has(r)) set.delete(r); else set.add(r);
+    const next=[];
+    if(set.has('menage')) next.push('menage');
+    if(set.has('admin')) next.push('admin');
+    if(!next.length){
+      showToast('Choisissez au moins un rôle');
+      return;
+    }
+    await update(ref(db),{[`accounts/${gid}/orgs/${orgId}/roles`]:next});
+    setSyncStatus('ok');
+    await syncLocalAccountsFromGlobal();
+    await renderAccounts();
+  }catch(_){
+    showToast('Erreur');
+    setSyncStatus('err');
+  }
 };
 
-window.toggleRole = function(i, role){
-  const accounts=A.adminConfig.accounts||[];
-  accounts[i][role]=!accounts[i][role];
-  A.adminConfig.accounts=accounts;
-  saveAdminConfig();
-  void renderAccounts();
-};
-
-window.saveAccountPwd = function(i){
-  const inp=document.getElementById(`pwd-acc-${i}`);
-  const val=inp.value;
-  if(!val){ showToast('Entrez un nouveau mot de passe'); return; }
-  const accounts=A.adminConfig.accounts||[];
-  accounts[i].pwdHash=hashSimple(val);
-  A.adminConfig.accounts=accounts;
-  saveAdminConfig();
-  inp.value='';
-  showToast('Mot de passe mis à jour ✓');
-};
+window.saveAccountPwd = function(){};
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 window.saveAdminConfig = function(){
   delete A.adminConfig.pwdEnabled;
   delete A.adminConfig.pwdHash;
-  fbSet(ob('adminConfig'), A.adminConfig);
+  update(ref(db, ob('adminConfig')), {
+    authEnabled: A.adminConfig.authEnabled,
+    defaultOrgId: A.adminConfig.defaultOrgId,
+    telegramEnabled: A.adminConfig.telegramEnabled
+  }).then(()=>setSyncStatus('ok')).catch(()=>setSyncStatus('err'));
 };
 
 window.saveNames = function(){
@@ -2652,7 +2726,7 @@ function buildExcel(reservations, label){
     if(c2&&rep.hours[c2]!=null) totalMinutesByCleaner[c2]=(totalMinutesByCleaner[c2]||0)+minutesFromHm(rep.hours[c2]);
   }
   const recap=[['Intervenante',"Nb d'interventions",'Total heures']];
-  const cleaners=(A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
+  const cleaners=menageAccountNamesForStats();
   let grandMinutes=0;
   for(const c of cleaners){
     if(!counts[c]) continue;
@@ -2704,7 +2778,7 @@ window.exportSelected = function(){
     if(sl.c1) counts[sl.c1]=(counts[sl.c1]||0)+1;
     if(sl.c2) counts[sl.c2]=(counts[sl.c2]||0)+1;
   }
-  const cleaners=(A.adminConfig.accounts||[]).filter(a=>a.menage).map(a=>a.name);
+  const cleaners=menageAccountNamesForStats();
   const recap=cleaners.filter(c=>counts[c]).map(c=>`  ${c} : ${counts[c]} intervention(s)`).join('\n');
   const detail=resas.sort((a,b)=>a.end-b.end).map(r=>{
     const sl=getAssignmentSlots(r.uid);
