@@ -327,6 +327,22 @@ html[data-menage-org-gate="1"] #main-app{display:none!important}
   </div>
 </div>
 
+<!-- MODALE CHANGEMENT MOT DE PASSE (bloquante au premier login) -->
+<div id="change-pwd-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:32px 24px;max-width:320px;width:90%;display:flex;flex-direction:column;gap:14px;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
+    <div style="font-size:28px;text-align:center">🔑</div>
+    <div style="font-size:17px;font-weight:600;text-align:center;color:#1a1a1a">Bienvenue !</div>
+    <div style="font-size:13px;color:#666;text-align:center;line-height:1.45">Pour sécuriser votre compte, veuillez choisir un mot de passe personnel.</div>
+    <div id="change-pwd-prenom" style="font-size:13px;color:#378ADD;text-align:center;font-weight:500"></div>
+    <label style="font-size:11px;color:#aaa;font-weight:500">Nouveau mot de passe</label>
+    <input type="password" id="change-pwd-new" placeholder="••••••••" autocomplete="new-password" style="padding:10px 14px;border:1px solid #ddd;border-radius:10px;font-size:16px;width:100%;box-sizing:border-box">
+    <label style="font-size:11px;color:#aaa;font-weight:500">Confirmer le mot de passe</label>
+    <input type="password" id="change-pwd-confirm" placeholder="••••••••" autocomplete="new-password" style="padding:10px 14px;border:1px solid #ddd;border-radius:10px;font-size:16px;width:100%;box-sizing:border-box">
+    <div id="change-pwd-error" style="display:none;color:#E24B4A;font-size:12px;text-align:center"></div>
+    <button type="button" id="change-pwd-submit" class="btn-primary" style="width:100%">Valider mon mot de passe</button>
+  </div>
+</div>
+
 <!-- MAIN APP (masqué par défaut jusqu’à showApp — évite flash au chargement Firebase) -->
 <div id="main-app" style="display:none">
 <div class="container">
@@ -817,7 +833,11 @@ async function resolveSessionFromFirebaseUser(user){
     S.globalAccount = { id: matchedId, ...matched };
     S.globalAccountLoaded = true;
     logActivity({ type:'login', actor:sessionName, text:sessionName+' s\'est connectée au planning' });
-    showApp();
+    if(matched.needsPasswordChange === true){
+      showChangePwdModal(sessionName, matchedId);
+    }else{
+      showApp();
+    }
   }catch(e){
     console.error('[firebase-auth] resolveSessionFromFirebaseUser error:', e);
     showLogin();
@@ -1023,6 +1043,69 @@ function hideOrgChangeGate(){
   if(g){ g.style.display='none'; g.setAttribute('aria-busy','false'); }
 }
 
+/**
+ * Étape 2.2-C — Modale bloquante de changement de mot de passe.
+ * Appelée si needsPasswordChange === true après login Firebase Auth.
+ * @param {string} prenom — prénom de l'intervenante pour personnaliser l'affichage
+ * @param {string} accId  — identifiant RTDB du compte (/accounts/{accId})
+ */
+function showChangePwdModal(prenom, accId){
+  const modal = el('change-pwd-modal');
+  const prenomEl = el('change-pwd-prenom');
+  const newEl = el('change-pwd-new');
+  const confirmEl = el('change-pwd-confirm');
+  const errEl = el('change-pwd-error');
+  const submitBtn = el('change-pwd-submit');
+  if(!modal) return;
+
+  if(newEl) newEl.value = '';
+  if(confirmEl) confirmEl.value = '';
+  if(errEl){ errEl.style.display='none'; errEl.textContent=''; }
+  if(prenomEl) prenomEl.textContent = prenom ? `Connectée en tant que ${prenom}` : '';
+
+  modal.style.display = 'flex';
+
+  setTimeout(() => { if(newEl) newEl.focus(); }, 100);
+
+  const handleSubmit = async () => {
+    const newPwd = newEl ? newEl.value : '';
+    const confirmPwd = confirmEl ? confirmEl.value : '';
+    if(!newPwd || newPwd.length < 8){
+      if(errEl){ errEl.style.display=''; errEl.textContent='Le mot de passe doit contenir au moins 8 caractères.'; }
+      return;
+    }
+    if(newPwd !== confirmPwd){
+      if(errEl){ errEl.style.display=''; errEl.textContent='Les deux mots de passe ne correspondent pas.'; }
+      return;
+    }
+    if(errEl) errEl.style.display='none';
+    if(submitBtn){ submitBtn.disabled=true; submitBtn.textContent='Enregistrement…'; }
+    try{
+      await updatePassword(auth.currentUser, newPwd);
+      await update(ref(db, `accounts/${accId}`), { needsPasswordChange: false });
+      if(S.globalAccount && S.globalAccount.id === accId){
+        S.globalAccount.needsPasswordChange = false;
+      }
+      modal.style.display = 'none';
+      showApp();
+    }catch(e){
+      if(errEl){ errEl.style.display=''; errEl.textContent='Erreur lors du changement : '+((e && e.code)||e.message||'inconnu'); }
+      if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Valider mon mot de passe'; }
+    }
+  };
+
+  if(submitBtn){
+    submitBtn.onclick = null;
+    submitBtn.onclick = handleSubmit;
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Valider mon mot de passe';
+  }
+
+  const onKeydown = (e) => { if(e.key === 'Enter') handleSubmit(); };
+  if(newEl){ newEl.onkeydown = onKeydown; }
+  if(confirmEl){ confirmEl.onkeydown = onKeydown; }
+}
+
 function showApp(){
   if(el('auth-loading-screen')) el('auth-loading-screen').style.display='none';
   hideOrgChangeGate();
@@ -1190,6 +1273,8 @@ window.doLogout = async function(){
     logActivity({ type:'logout', actor:S.currentUser.name, text:S.currentUser.name+' s\'est déconnectée' });
   }
   try{ await signOut(auth); }catch(_){}
+  const changePwdModal = el('change-pwd-modal');
+  if(changePwdModal) changePwdModal.style.display = 'none';
   clearSession();
   S.currentUser=null;
   S.globalAccountLoaded=false;
