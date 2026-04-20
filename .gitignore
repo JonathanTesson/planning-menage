@@ -4,3 +4,5 @@ init-accounts-migration.js
 migration-passwords.local.js
 migration-report.local.json
 node_modules/
+update-accounts-auth.local.js
+update-report.local.json

@@ -8,6 +8,8 @@
   },
   "scripts": {
     "migrate-auth": "node migrate-to-firebase-auth.js",
-    "migrate-auth:apply": "node migrate-to-firebase-auth.js --apply"
+    "migrate-auth:apply": "node migrate-to-firebase-auth.js --apply",
+    "update-auth": "node update-accounts-auth.js",
+    "update-auth:apply": "node update-accounts-auth.js --apply"
   }
 }
