@@ -283,19 +283,36 @@ html[data-menage-org-gate="1"] #main-app{display:none!important}
   </div>
 </div>
 
+<!-- AUTH LOADING (affiché pendant que Firebase Auth vérifie la session) -->
+<div id="auth-loading-screen" style="display:none">
+  <div class="login-screen">
+    <div class="login-icon">⏳</div>
+    <div class="login-title">Chargement…</div>
+    <div class="login-sub">Vérification de la session</div>
+  </div>
+</div>
+
 <!-- LOGIN SCREEN -->
 <div id="login-screen" style="display:none">
   <div class="login-screen">
     <div class="login-icon">🔑</div>
     <div class="login-title">Planning Ménage</div>
     <div class="login-sub">Identifiez-vous pour accéder<br>au planning</div>
-    <label for="login-name" style="font-size:11px;color:#aaa;max-width:260px;width:100%">Nom</label>
-    <select class="login-select" id="login-name" aria-label="Nom">
-      <option value="">-</option>
-    </select>
-    <input type="password" class="login-input" id="login-pwd" placeholder="••••••" onkeydown="if(event.key==='Enter')doLogin()">
-    <div class="login-error" id="login-error" style="display:none">Mot de passe incorrect</div>
+    <label for="login-email" style="font-size:11px;color:#aaa;max-width:260px;width:100%">Email</label>
+    <input type="email" class="login-input" id="login-email" placeholder="votre email" autocomplete="email" style="letter-spacing:normal;text-align:left" onkeydown="if(event.key==='Enter')doLogin()">
+    <label for="login-pwd" style="font-size:11px;color:#aaa;max-width:260px;width:100%">Mot de passe</label>
+    <input type="password" class="login-input" id="login-pwd" placeholder="••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="login-error" id="login-error" style="display:none">Email ou mot de passe incorrect</div>
     <button class="btn-primary" onclick="doLogin()">Connexion</button>
+    <div class="login-separator" style="display:flex;align-items:center;gap:10px;max-width:260px;width:100%;color:#aaa;font-size:12px;margin:8px 0">
+      <div style="flex:1;height:1px;background:#e0e0e0"></div>
+      <span>ou</span>
+      <div style="flex:1;height:1px;background:#e0e0e0"></div>
+    </div>
+    <button type="button" class="btn-secondary" id="login-google-btn" onclick="doGoogleLogin()" style="display:flex;align-items:center;justify-content:center;gap:8px;max-width:260px;width:100%">
+      <svg width="18" height="18" viewBox="0 0 48 48" style="flex:none"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571.001-.001.002-.001.003-.002l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+      <span>Se connecter avec Google</span>
+    </button>
   </div>
 </div>
 
@@ -388,16 +405,31 @@ function paintSuggestionsPip(){
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// --- Étape 2.2-A — Filet Firebase Auth en parallèle ---
+// --- Étape 2.2-B — Firebase Auth actif (pilote la session) ---
 const auth = getAuth(app);
-onAuthStateChanged(auth, (user) => {
-  if (user) {
+let __authInitialResolved = false;
+onAuthStateChanged(auth, async (user) => {
+  if(user){
     console.log('[firebase-auth] Utilisateur connecté :', user.email, '— uid =', user.uid);
-  } else {
+  }else{
     console.log('[firebase-auth] Aucun utilisateur connecté.');
   }
+  if(!__authInitialResolved){
+    __authInitialResolved = true;
+    return;
+  }
+  if(user){
+    if(typeof resolveSessionFromFirebaseUser === 'function' && fbReady){
+      await resolveSessionFromFirebaseUser(user);
+    }
+  }else{
+    if(typeof showLogin === 'function' && fbReady){
+      S.currentUser = null;
+      showLogin();
+    }
+  }
 });
-// --- Fin 2.2-A ---
+// --- Fin 2.2-B ---
 
 onValue(ref(db, 'pendingDeletionRequests'), snap=>{
   paintPendingDeletionPipFromVal(!!snap.val());
@@ -729,6 +761,69 @@ function normalizeUnavailability(raw){
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
+/**
+ * À partir d'un user Firebase Auth, retrouve le /accounts/{id} correspondant (via authUid puis email),
+ * bascule l'org, alimente S.currentUser, et affiche l'app.
+ */
+async function resolveSessionFromFirebaseUser(user){
+  if(!user){ showLogin(); return; }
+  try{
+    const snap = await get(ref(db,'accounts'));
+    const val = snap.val();
+    let matched = null;
+    let matchedId = null;
+    if(val && typeof val === 'object'){
+      for(const [id,row] of Object.entries(val)){
+        if(!row || typeof row !== 'object') continue;
+        if(String(row.authUid||'').trim() === user.uid){
+          matched = row; matchedId = id; break;
+        }
+      }
+      if(!matched && user.email){
+        const em = String(user.email).trim().toLowerCase();
+        for(const [id,row] of Object.entries(val)){
+          if(!row || typeof row !== 'object') continue;
+          if(String(row.email||'').trim().toLowerCase() === em){
+            matched = row; matchedId = id;
+            if(!row.authUid){
+              try{ await update(ref(db,`accounts/${id}`), { authUid: user.uid }); }catch(_){}
+            }
+            break;
+          }
+        }
+      }
+    }
+    if(!matched){
+      const errEl = document.getElementById('login-error');
+      try{ await signOut(auth); }catch(_){}
+      if(errEl){ errEl.style.display=''; errEl.textContent='Compte inconnu dans le planning'; }
+      showLogin();
+      return;
+    }
+    const defOrg = String(matched.defaultOrg||'').trim() || getStoredOrgId() || 'tesson';
+    const roles = matched.orgs?.[defOrg]?.roles || [];
+    const {menage, admin} = rolesToMenageAdmin(roles);
+    const sessionName = String(matched.name||matched.prenom||'').trim() || (user.email||'');
+    if(window.__menageFbInit && window.__menageActiveOrg && window.__menageActiveOrg !== defOrg){
+      saveSession({ name: sessionName });
+      setStoredOrgId(defOrg);
+      try{ sessionStorage.setItem(ORG_CHANGE_GATE_KEY,'1'); }catch(e){}
+      location.reload();
+      return;
+    }
+    setStoredOrgId(defOrg);
+    S.currentUser = { name: sessionName, menage, admin };
+    saveSession({ name: sessionName });
+    S.globalAccount = { id: matchedId, ...matched };
+    S.globalAccountLoaded = true;
+    logActivity({ type:'login', actor:sessionName, text:sessionName+' s\'est connectée au planning' });
+    showApp();
+  }catch(e){
+    console.error('[firebase-auth] resolveSessionFromFirebaseUser error:', e);
+    showLogin();
+  }
+}
+
 async function checkAuth(){
   const authEnabled = S.adminConfig?.authEnabled || false;
   if(!authEnabled){
@@ -736,6 +831,11 @@ async function checkAuth(){
       S.currentUser = { name:'', menage:true, admin:true, noAuth:true };
     }
     showApp();
+    return;
+  }
+  const fbUser = auth.currentUser;
+  if(fbUser){
+    await resolveSessionFromFirebaseUser(fbUser);
     return;
   }
   const session = loadSession();
@@ -924,6 +1024,7 @@ function hideOrgChangeGate(){
 }
 
 function showApp(){
+  if(el('auth-loading-screen')) el('auth-loading-screen').style.display='none';
   hideOrgChangeGate();
   setVersionFootVisible(false);
   if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='none';
@@ -978,44 +1079,27 @@ function fillOrgSelect(selectEl){
   if(!selectEl) return;
   selectEl.innerHTML=ORGANIZATIONS.map(o=>`<option value="${o.id}">${o.label}</option>`).join('');
 }
+function showAuthLoading(){
+  if(el('auth-loading-screen')) el('auth-loading-screen').style.display='';
+  if(el('login-screen')) el('login-screen').style.display='none';
+  if(el('org-first-screen')) el('org-first-screen').style.display='none';
+  if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='none';
+  if(el('main-app')) el('main-app').style.display='none';
+}
 function showLogin(){
   hideOrgChangeGate();
   setVersionFootVisible(true);
+  if(el('auth-loading-screen')) el('auth-loading-screen').style.display='none';
   if(el('org-unconfigured-screen')) el('org-unconfigured-screen').style.display='none';
   if(el('org-first-screen')) el('org-first-screen').style.display='none';
   if(el('login-screen')) el('login-screen').style.display='';
   if(el('main-app')) el('main-app').style.display='none';
-  const sel=el('login-name');
-  if(sel){
-    sel.innerHTML='<option value="">-</option>';
-    void get(ref(db,'accounts')).then(snap=>{
-      const val=snap.val();
-      const byLower=new Map();
-      if(val&&typeof val==='object'){
-        for(const row of Object.values(val)){
-          if(!row||typeof row!=='object') continue;
-          const nm=String(row.name??'').trim();
-          const pr=String(row.prenom??'').trim();
-          if(nm){
-            const k=nm.toLowerCase();
-            if(!byLower.has(k)) byLower.set(k,nm);
-          }
-          if(pr){
-            const k=pr.toLowerCase();
-            if(!byLower.has(k)) byLower.set(k,pr);
-          }
-        }
-      }
-      const sorted=[...byLower.values()].sort((a,b)=>a.localeCompare(b,'fr'));
-      sel.innerHTML='<option value="">-</option>';
-      for(const n of sorted){
-        const o=document.createElement('option');
-        o.value=n;
-        o.textContent=n;
-        sel.appendChild(o);
-      }
-    }).catch(()=>{});
-  }
+  const emailEl = el('login-email');
+  const pwdEl = el('login-pwd');
+  const errEl = el('login-error');
+  if(emailEl) emailEl.value = '';
+  if(pwdEl) pwdEl.value = '';
+  if(errEl) errEl.style.display = 'none';
   const topTitleLogin=document.querySelector('.topbar-title');
   if(topTitleLogin) topTitleLogin.textContent='Accueil';
   closeOrgSwitchMenu();
@@ -1045,101 +1129,74 @@ function rolesToMenageAdmin(roles){
 }
 
 window.doLogin = async function(){
-  const name=document.getElementById('login-name').value;
-  const pwd=document.getElementById('login-pwd').value;
-  const errEl=document.getElementById('login-error');
-  if(!name){ errEl.style.display=''; errEl.textContent='Choisissez votre nom'; return; }
-  let accountGlobal=null;
+  const emailEl = document.getElementById('login-email');
+  const pwdEl = document.getElementById('login-pwd');
+  const errEl = document.getElementById('login-error');
+  const email = String(emailEl?.value || '').trim();
+  const pwd = pwdEl?.value || '';
+  if(!email){ errEl.style.display=''; errEl.textContent='Saisissez votre email'; return; }
+  if(!pwd){ errEl.style.display=''; errEl.textContent='Saisissez votre mot de passe'; return; }
+  errEl.style.display='none';
   try{
-    const snap=await get(ref(db,'accounts'));
-    const val=snap.val();
-    const candidates=[];
-    if(val&&typeof val==='object'){
-      for(const row of Object.values(val)){
-        if(!row||typeof row!=='object') continue;
-        const nm=String(row.name??'').trim();
-        const pr=String(row.prenom??'').trim();
-        if(nm===name||pr===name) candidates.push(row);
-      }
-    }
-    if(candidates.length){
-      const h=await sha256Hex(pwd);
-      for(const row of candidates){
-        const stored=String(row.pwdHash??'').trim().toLowerCase();
-        if(h===stored){
-          accountGlobal=row;
-          break;
+    await signInWithEmailAndPassword(auth, email, pwd);
+    return;
+  }catch(e){
+    const accSnap = await get(ref(db,'accounts')).catch(()=>null);
+    const val = accSnap ? accSnap.val() : null;
+    if(val && typeof val === 'object'){
+      const h = await sha256Hex(pwd);
+      for(const [id,row] of Object.entries(val)){
+        if(!row || typeof row !== 'object') continue;
+        const rowEmail = String(row.email||'').trim().toLowerCase();
+        if(rowEmail && rowEmail === email.toLowerCase()){
+          const stored = String(row.pwdHash||'').trim().toLowerCase();
+          if(h === stored){
+            const defOrg = String(row.defaultOrg||'').trim() || getStoredOrgId();
+            const roles = row.orgs?.[defOrg]?.roles || [];
+            const {menage, admin} = rolesToMenageAdmin(roles);
+            const sessionName = String(row.name||row.prenom||'').trim();
+            setStoredOrgId(defOrg);
+            S.currentUser = { name: sessionName, menage, admin };
+            saveSession({ name: sessionName });
+            await ensureGlobalAccountCache(sessionName);
+            logActivity({ type:'login', actor:sessionName, text:sessionName+' s\'est connectée au planning (legacy)' });
+            showApp();
+            return;
+          }
         }
       }
-      if(!accountGlobal){
-        errEl.style.display='';
-        errEl.textContent='Mot de passe incorrect';
-        document.getElementById('login-pwd').value='';
-        return;
-      }
     }
-  }catch(_){
-    accountGlobal=null;
-  }
-  if(accountGlobal){
-    const defOrg=String(accountGlobal.defaultOrg||'').trim()||getStoredOrgId();
-    const roles=(accountGlobal.orgs&&accountGlobal.orgs[defOrg]&&accountGlobal.orgs[defOrg].roles)||[];
-    const {menage,admin}=rolesToMenageAdmin(roles);
-    const sessionName=String(accountGlobal.name??'').trim()||String(accountGlobal.prenom??'').trim()||name;
-    errEl.style.display='none';
-    if(window.__menageFbInit&&window.__menageActiveOrg&&window.__menageActiveOrg!==defOrg){
-      saveSession({ name:sessionName });
-      setStoredOrgId(defOrg);
-      try{ sessionStorage.setItem(ORG_CHANGE_GATE_KEY,'1'); }catch(e){}
-      location.reload();
-      return;
-    }
-    setStoredOrgId(defOrg);
-    S.currentUser={ name:sessionName, menage, admin };
-    saveSession({ name:sessionName });
-    S.globalAccountLoaded=false;
-    S.globalAccount=null;
-    void ensureGlobalAccountCache(sessionName).then(()=>{
-      logActivity({ type:'login', actor:sessionName, text:sessionName+' s\'est connectée au planning' });
-      showApp();
-    });
-    return;
-  }
-  const acc=(S.adminConfig.accounts||[]).find(a=>a.name===name);
-  if(!acc){ errEl.style.display=''; errEl.textContent='Compte introuvable'; return; }
-  if(acc.pwdHash&&hashSimple(pwd)!==acc.pwdHash){
     errEl.style.display='';
-    errEl.textContent='Mot de passe incorrect';
-    document.getElementById('login-pwd').value='';
-    return;
+    errEl.textContent='Email ou mot de passe incorrect';
+    pwdEl.value = '';
   }
-  errEl.style.display='none';
-  const orgId=getStoredOrgId();
-  if(window.__menageFbInit&&window.__menageActiveOrg&&orgId&&window.__menageActiveOrg!==orgId){
-    try{ sessionStorage.setItem(ORG_CHANGE_GATE_KEY,'1'); }catch(e){}
-    location.reload();
-    return;
-  }
-  S.currentUser={ name:acc.name, menage:acc.menage, admin:acc.admin };
-  saveSession({ name:acc.name });
-  S.globalAccountLoaded=false;
-  S.globalAccount=null;
-  void ensureGlobalAccountCache(acc.name).then(()=>{
-    logActivity({ type:'login', actor:acc.name, text:acc.name+' s\'est connectée au planning' });
-    showApp();
-  });
 };
 
-window.doLogout = function(){
+window.doGoogleLogin = async function(){
+  const errEl = document.getElementById('login-error');
+  errEl.style.display='none';
+  try{
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+  }catch(e){
+    if(e && e.code === 'auth/popup-closed-by-user') return;
+    errEl.style.display='';
+    errEl.textContent = 'Connexion Google impossible. Utilisez votre email et mot de passe.';
+  }
+};
+
+window.doLogout = async function(){
   if(S.currentUser && !S.currentUser.noAuth && S.currentUser.name){
     logActivity({ type:'logout', actor:S.currentUser.name, text:S.currentUser.name+' s\'est déconnectée' });
   }
+  try{ await signOut(auth); }catch(_){}
   clearSession();
   S.currentUser=null;
   S.globalAccountLoaded=false;
   S.globalAccount=null;
   closeOrgSwitchMenu();
   const pe=el('login-pwd'); if(pe) pe.value='';
+  const ee=el('login-email'); if(ee) ee.value='';
   if(!essentialDataLoaded()) return;
   if(!orgHasConfiguredAccounts()) showOrgUnconfigured();
   else checkAuth();
@@ -1204,6 +1261,7 @@ function hideOrgUnconfiguredScreen(){
 }
 
 function showOrgUnconfigured(){
+  if(el('auth-loading-screen')) el('auth-loading-screen').style.display='none';
   hideOrgChangeGate();
   setVersionFootVisible(true);
   if(el('org-first-screen')) el('org-first-screen').style.display='none';
@@ -1226,6 +1284,9 @@ function routeAfterFirebaseReady(){
     return;
   }
   hideOrgUnconfiguredScreen();
+  if(S.adminConfig?.authEnabled){
+    showAuthLoading();
+  }
   checkAuth();
 }
 
@@ -1333,6 +1394,7 @@ function initFirebaseAndApp(){
 }
 
 function showOrgFirst(){
+  if(el('auth-loading-screen')) el('auth-loading-screen').style.display='none';
   hideOrgChangeGate();
   setVersionFootVisible(true);
   el('org-first-screen').style.display='';
