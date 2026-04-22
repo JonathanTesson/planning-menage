@@ -816,17 +816,26 @@ async function resolveSessionFromFirebaseUser(user){
       showLogin();
       return;
     }
-    const defOrg = String(matched.defaultOrg||'').trim() || getStoredOrgId() || 'tesson';
+    let storedOrgRaw = '';
+    try{
+      const raw = localStorage.getItem(ORG_STORAGE_KEY);
+      if(raw) storedOrgRaw = String(raw).trim();
+    }catch(_){}
+    let defOrg = '';
+    if(
+      storedOrgRaw &&
+      matched.orgs &&
+      typeof matched.orgs === 'object' &&
+      matched.orgs[storedOrgRaw] &&
+      typeof matched.orgs[storedOrgRaw] === 'object'
+    ){
+      defOrg = storedOrgRaw;
+    }else{
+      defOrg = String(matched.defaultOrg||'').trim() || 'tesson';
+    }
     const roles = matched.orgs?.[defOrg]?.roles || [];
     const {menage, admin} = rolesToMenageAdmin(roles);
     const sessionName = String(matched.name||matched.prenom||'').trim() || (user.email||'');
-    if(window.__menageFbInit && window.__menageActiveOrg && window.__menageActiveOrg !== defOrg){
-      saveSession({ name: sessionName });
-      setStoredOrgId(defOrg);
-      try{ sessionStorage.setItem(ORG_CHANGE_GATE_KEY,'1'); }catch(e){}
-      location.reload();
-      return;
-    }
     setStoredOrgId(defOrg);
     S.currentUser = { name: sessionName, menage, admin };
     saveSession({ name: sessionName });
