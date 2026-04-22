@@ -370,6 +370,7 @@ body.admin-nav-ready .admin-burger{display:flex}
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, set, onValue, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { sha256Hex, accNormalizeEmail, accEntriesFromSnapshotVal, accFindIdentityMatch, accFindPseudoOwner, accFindPseudoOwnerExcluding, calcMaxOrder, buildAccountPayload, buildAddAccountModalHTML, buildConfirmAssocModalHTML, buildEditAccountModalHTML } from './fonctions.js';
 
 document.body.insertAdjacentHTML('beforeend',
@@ -381,9 +382,9 @@ document.body.insertAdjacentHTML('beforeend', buildEditAccountModalHTML());
 /*
  * ⚠️ RÈGLES FIREBASE — à configurer dans la console Firebase
  *
- * Cette app utilise une auth maison (localStorage), PAS Firebase Authentication.
- * request.auth est donc null côté navigateur → ne pas utiliser auth != null dans les règles,
- * ça bloquerait tous les accès depuis le site.
+ * Session admin : Firebase Authentication (priorité) + localStorage menage_session_v1 (fallback),
+ * aligné sur index.html / compte.html (v4.8.2). La vérification du rôle admin reste côté client
+ * via /accounts (ne pas supposer request.auth dans les règles tant que la base est en règles larges).
  *
  * Option actuelle (petite app, accès restreint par domaine dans Google Cloud) :
  * Realtime Database : autoriser read/write sous orgs/{orgId}/ (souvent une règle large sur orgs).
@@ -399,7 +400,7 @@ document.body.insertAdjacentHTML('beforeend', buildEditAccountModalHTML());
  *
  * Snippets à coller (si règles fines par enfant) — voir README § Sécurité v4.3.0 ; suggestions / Storage : § procedureSuggestions + rétrospective v4.3.1.
  *
- * Sécurisation future : Firebase Auth ou App Check pour des règles strictes.
+ * Sécurisation future : règles fines + App Check / contrôle request.auth une fois tous les chemins couverts.
  */
 
 const firebaseConfig = {
@@ -415,6 +416,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const storage = getStorage(app);
+const auth = getAuth(app);
 /** Même plafond que index.html — rotation après chaque nouvel événement. */
 const MAX_ACTIVITY_LOG_ENTRIES = 450;
 const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A6E','#c0392b'];
@@ -863,6 +865,19 @@ async function loadOrganizations(){
   });
 })();
 
+(async () => {
+  let hadFirebaseUser = false;
+  await auth.authStateReady();
+  if(auth.currentUser) hadFirebaseUser = true;
+  onAuthStateChanged(auth, user => {
+    if(user){
+      hadFirebaseUser = true;
+      return;
+    }
+    if(hadFirebaseUser) window.location.replace('index.html');
+  });
+})();
+
 // ─── Accès admin (session calendrier + rôle 👑) ────────────────────────────────
 
 async function verifyAdminAccess(){
@@ -873,9 +888,30 @@ async function verifyAdminAccess(){
   if(authOn){
     if(waitEl) waitEl.style.display='';
     if(contentEl) contentEl.style.display='none';
-    let session=null;
-    try{ session=JSON.parse(localStorage.getItem(SESSION_KEY)); }catch(e){}
-    const name=session&&session.name&&String(session.name).trim();
+    await auth.authStateReady();
+    const fbUser=auth.currentUser;
+    let name=null;
+    if(fbUser){
+      try{
+        const snap=await get(ref(db,'accounts'));
+        const val=snap.val();
+        if(val&&typeof val==='object'){
+          for(const row of Object.values(val)){
+            if(!row||typeof row!=='object') continue;
+            if(String(row.authUid||'').trim()===fbUser.uid){
+              const n=String(row.name??row.prenom??'').trim();
+              if(n) name=n;
+              break;
+            }
+          }
+        }
+      }catch(_){}
+    }
+    if(!name){
+      let session=null;
+      try{ session=JSON.parse(localStorage.getItem(SESSION_KEY)); }catch(e){}
+      name=session&&session.name&&String(session.name).trim();
+    }
     if(name){
       try{
         const snap=await get(ref(db,'accounts'));
@@ -922,6 +958,7 @@ async function verifyAdminAccess(){
 }
 
 window.logout = function(){
+  void signOut(auth);
   window.location.href='index.html';
 };
 
