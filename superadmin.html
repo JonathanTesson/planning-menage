@@ -147,13 +147,15 @@ body.sa-nav-ready .admin-burger{display:flex}
   <div class="login-screen">
     <div class="login-icon">🔐</div>
     <div class="login-title">Super Administration</div>
-    <div class="login-sub">Identifiez-vous pour gérer les organisations et les comptes.</div>
-    <label class="login-sub" for="sa-login-user" style="align-self:stretch;max-width:260px;margin:0 auto;text-align:left">Nom d’utilisateur</label>
-    <input type="text" class="login-input login-input--user" id="sa-login-user" autocomplete="username" aria-label="Nom d'utilisateur">
+    <div class="login-sub">Identifiez-vous avec Firebase pour gérer les organisations et les comptes.</div>
+    <button type="button" class="btn-primary" style="max-width:260px;width:100%" onclick="window._saDoLoginGoogle()">Continuer avec Google</button>
+    <div class="login-sub" style="margin-top:0.5rem">ou par e-mail</div>
+    <label class="login-sub" for="sa-login-email" style="align-self:stretch;max-width:260px;margin:0 auto;text-align:left">E-mail</label>
+    <input type="email" class="login-input login-input--user" id="sa-login-email" autocomplete="username" aria-label="E-mail">
     <label class="login-sub" for="sa-login-pwd" style="align-self:stretch;max-width:260px;margin:0 auto;text-align:left">Mot de passe</label>
     <input type="password" class="login-input login-input--pwd" id="sa-login-pwd" autocomplete="current-password" aria-label="Mot de passe" onkeydown="if(event.key==='Enter')window._saDoLogin()">
-    <div class="login-error" id="sa-login-error" style="display:none">Identifiants incorrects</div>
-    <button type="button" class="btn-primary" onclick="window._saDoLogin()">Connexion</button>
+    <div class="login-error" id="sa-login-error" style="display:none"></div>
+    <button type="button" class="btn-secondary" style="max-width:260px;width:100%" onclick="window._saDoLogin()">Connexion</button>
     <p style="font-size:11px;color:#bbb;text-align:center;margin-top:4px">L'interface Super Administration n'est pas prévue pour un smartphone</p>
     <a href="index.html" style="font-size:12px;color:#aaa;text-decoration:none;margin-top:4px">← Retour au planning</a>
   </div>
@@ -287,9 +289,12 @@ body.sa-nav-ready .admin-burger{display:flex}
       <label for="sa-modal-del-org-confirm">Tapez le libellé exact pour confirmer</label>
       <input type="text" id="sa-modal-del-org-confirm" autocomplete="off">
     </div>
-    <div class="modal-field">
+    <div class="modal-field" id="sa-modal-del-org-reauth-pwd-wrap">
       <label for="sa-modal-del-org-pwd">Mot de passe Super Admin</label>
       <input type="password" id="sa-modal-del-org-pwd" autocomplete="current-password">
+    </div>
+    <div class="modal-field" id="sa-modal-del-org-reauth-google-wrap" style="display:none">
+      <button type="button" class="btn-primary" id="sa-modal-del-org-reauth-google">Confirmer avec Google</button>
     </div>
     <div class="login-error" id="sa-modal-del-org-error" style="display:none;margin-bottom:8px"></div>
     <div class="modal-actions">
@@ -304,9 +309,12 @@ body.sa-nav-ready .admin-burger{display:flex}
     <h3 id="sa-modal-del-studio-title">Supprimer le studio</h3>
     <p class="empty-hint" id="sa-modal-del-studio-studio" style="color:#555;line-height:1.45;font-weight:600"></p>
     <p class="empty-hint" style="color:#555;line-height:1.45">Les étapes et photos associées à ce studio seront définitivement supprimées (RTDB et Storage).</p>
-    <div class="modal-field">
+    <div class="modal-field" id="sa-modal-del-studio-reauth-pwd-wrap">
       <label for="sa-modal-del-studio-pwd">Mot de passe Super Admin</label>
       <input type="password" id="sa-modal-del-studio-pwd" autocomplete="current-password">
+    </div>
+    <div class="modal-field" id="sa-modal-del-studio-reauth-google-wrap" style="display:none">
+      <button type="button" class="btn-primary" id="sa-modal-del-studio-reauth-google">Confirmer avec Google</button>
     </div>
     <div class="login-error" id="sa-modal-del-studio-error" style="display:none;margin-bottom:8px"></div>
     <div class="modal-actions sa-modal-del-studio-actions">
@@ -324,9 +332,12 @@ body.sa-nav-ready .admin-burger{display:flex}
   <div class="modal">
     <h3 id="sa-modal-edit-ical-title">Modifier l’URL iCal</h3>
     <p class="empty-hint" id="sa-modal-edit-ical-info" style="color:#555;line-height:1.45"></p>
-    <div class="modal-field">
+    <div class="modal-field" id="sa-modal-edit-ical-reauth-pwd-wrap">
       <label for="sa-modal-edit-ical-pwd">Mot de passe Super Admin</label>
       <input type="password" id="sa-modal-edit-ical-pwd" autocomplete="current-password">
+    </div>
+    <div class="modal-field" id="sa-modal-edit-ical-reauth-google-wrap" style="display:none">
+      <button type="button" class="btn-primary" id="sa-modal-edit-ical-reauth-google">Confirmer avec Google</button>
     </div>
     <div class="modal-field">
       <label for="sa-modal-edit-ical-url">URL iCal</label>
@@ -347,6 +358,7 @@ body.sa-nav-ready .admin-burger{display:flex}
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, get, set, update, onValue, remove, push } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { getStorage, ref as sRef, deleteObject, listAll } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup, reauthenticateWithCredential, reauthenticateWithPopup, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { hashSimple, sha256Hex, accNormalizeEmail, accEntriesFromSnapshotVal, accFindIdentityMatch, calcMaxOrder, buildAccountPayload, buildAddAccountModalHTML, buildConfirmAssocModalHTML, buildEditAccountModalHTML } from './fonctions.js';
 
 document.body.insertAdjacentHTML('beforeend',
@@ -368,9 +380,15 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const storage = getStorage(app);
+const auth = getAuth(app);
+const googleAuthProvider = new GoogleAuthProvider();
 
 const APP_VERSION = '4.8.2';
 const SA_SESSION_KEY = 'sa_session';
+const SA_ALLOWED_EMAIL = 'tessonjonathan@gmail.com';
+
+let hadFirebaseUser = false;
+let saSensitiveModalGoogleReauthed = false;
 
 function el(id){ return document.getElementById(id); }
 
@@ -835,6 +853,100 @@ function setupNav(){
   });
 }
 
+function isSaEmailAllowed(user){
+  const em = user && user.email != null ? String(user.email).trim().toLowerCase() : '';
+  return em === String(SA_ALLOWED_EMAIL).toLowerCase();
+}
+
+function getSaPrimaryProviderId(){
+  const u = auth.currentUser;
+  if(!u || !Array.isArray(u.providerData) || !u.providerData.length) return '';
+  return String(u.providerData[0].providerId || '');
+}
+
+function prepareSensitiveModalReauth(modalPrefix){
+  saSensitiveModalGoogleReauthed = false;
+  const pwdWrap = el(modalPrefix + '-reauth-pwd-wrap');
+  const googleWrap = el(modalPrefix + '-reauth-google-wrap');
+  const pid = getSaPrimaryProviderId();
+  if(pid === 'google.com'){
+    if(pwdWrap) pwdWrap.style.display = 'none';
+    if(googleWrap) googleWrap.style.display = '';
+  }else{
+    if(pwdWrap) pwdWrap.style.display = '';
+    if(googleWrap) googleWrap.style.display = 'none';
+  }
+}
+
+function saEnsureGoogleReauthGateForAction(errEl){
+  if(!saSensitiveModalGoogleReauthed){
+    if(errEl){
+      errEl.textContent = 'Confirmez d’abord votre identité avec le bouton « Confirmer avec Google ».';
+      errEl.style.display = '';
+    }
+    throw new Error('sa-no-google-reauth');
+  }
+}
+
+async function saEnsurePasswordReauthOrThrow(pwdInputId, errEl){
+  const u = auth.currentUser;
+  if(!u) throw new Error('Non connecté');
+  const pwd = el(pwdInputId).value || '';
+  if(!pwd){
+    if(errEl){
+      errEl.textContent = 'Saisissez le mot de passe Super Admin.';
+      errEl.style.display = '';
+    }
+    el(pwdInputId).value = '';
+    throw new Error('sa-no-pwd');
+  }
+  try{
+    await reauthenticateWithCredential(u, EmailAuthProvider.credential(u.email, pwd));
+  }catch(e){
+    el(pwdInputId).value = '';
+    throw e;
+  }
+}
+
+async function handleSaModalGoogleReauth(errId){
+  const errEl = el(errId);
+  errEl.style.display = 'none';
+  errEl.textContent = '';
+  const u = auth.currentUser;
+  if(!u){
+    errEl.textContent = 'Session expirée. Reconnectez-vous.';
+    errEl.style.display = '';
+    return;
+  }
+  try{
+    await reauthenticateWithPopup(u, googleAuthProvider);
+    saSensitiveModalGoogleReauthed = true;
+    showToast('Identité confirmée');
+  }catch(e){
+    console.warn(e);
+    if(e && e.code === 'auth/popup-closed-by-user') return;
+    errEl.textContent = (e && e.message) ? String(e.message) : 'Échec de la confirmation Google.';
+    errEl.style.display = '';
+  }
+}
+
+async function loadSaAppAfterAuth(fromBootHash){
+  await fetchOrganizations();
+  fillOrgSelects();
+  renderAccountsForSelectedOrg();
+  renderOrgList();
+  renderParamsForSelectedOrg();
+  setupNav();
+  if(fromBootHash){
+    const h = location.hash.slice(1);
+    if(['comptes','organisations','parametres','securite'].includes(h)) setSaView(h);
+    else setSaView('organisations');
+  }else{
+    setSaView('organisations');
+  }
+  setupPendingDeletionRequestsListener();
+}
+
 function showAppShell(){
   el('sa-login').style.display = 'none';
   el('sa-app').style.display = '';
@@ -844,45 +956,74 @@ function showAppShell(){
 }
 
 async function doLogin(){
-  const user = String(el('sa-login-user').value||'').trim();
+  const email = String(el('sa-login-email').value||'').trim();
   const pwd = el('sa-login-pwd').value||'';
-  el('sa-login-error').style.display = 'none';
+  const err = el('sa-login-error');
+  err.style.display = 'none';
+  err.textContent = '';
+  if(!email || !pwd){
+    err.textContent = 'Indiquez l’e-mail et le mot de passe.';
+    err.style.display = '';
+    return;
+  }
   try{
-    const snap = await get(ref(db, 'superAdmin/credentials'));
-    const c = snap.val();
-    if(!c || typeof c!=='object'){
-      el('sa-login-error').style.display = '';
+    const cred = await signInWithEmailAndPassword(auth, email, pwd);
+    if(!isSaEmailAllowed(cred.user)){
+      await signOut(auth);
+      err.textContent = 'Ce compte n’est pas autorisé pour la Super Administration.';
+      err.style.display = '';
       return;
     }
-    const u = c.username!=null ? String(c.username).trim() : '';
-    const h = c.pwdHash!=null ? String(c.pwdHash).trim() : '';
-    const pwdHash = await sha256Hex(pwd);
-    if(!user || !u || user !== u || pwdHash !== h){
-      el('sa-login-error').style.display = '';
-      return;
-    }
-    try{ sessionStorage.setItem(SA_SESSION_KEY, '1'); }catch(_){}
     showAppShell();
-    await fetchOrganizations();
-    fillOrgSelects();
-    renderAccountsForSelectedOrg();
-    renderOrgList();
-    renderParamsForSelectedOrg();
-    setupNav();
-    setSaView('organisations');
-    setupPendingDeletionRequestsListener();
+    await loadSaAppAfterAuth(false);
   }catch(e){
     console.warn(e);
-    el('sa-login-error').style.display = '';
+    const code = e && e.code;
+    err.textContent =
+      code === 'auth/wrong-password' || code === 'auth/user-not-found' || code === 'auth/invalid-credential'
+        ? 'E-mail ou mot de passe incorrect.'
+        : 'Connexion impossible.';
+    err.style.display = '';
+  }
+}
+
+async function doLoginGoogle(){
+  const err = el('sa-login-error');
+  err.style.display = 'none';
+  err.textContent = '';
+  try{
+    const cred = await signInWithPopup(auth, googleAuthProvider);
+    if(!isSaEmailAllowed(cred.user)){
+      await signOut(auth);
+      err.textContent = 'Ce compte n’est pas autorisé pour la Super Administration.';
+      err.style.display = '';
+      return;
+    }
+    showAppShell();
+    await loadSaAppAfterAuth(false);
+  }catch(e){
+    console.warn(e);
+    if(e && e.code === 'auth/popup-closed-by-user') return;
+    err.textContent = 'Connexion Google annulée ou impossible.';
+    err.style.display = '';
   }
 }
 window._saDoLogin = doLogin;
+window._saDoLoginGoogle = doLoginGoogle;
 
-function logout(){
-  try{ sessionStorage.removeItem(SA_SESSION_KEY); }catch(_){}
-  window.location.replace('index.html');
+async function logout(){
+  try{
+    await signOut(auth);
+  }catch(_){}
+  document.body.classList.remove('sa-nav-ready');
+  el('sa-app').style.display = 'none';
+  el('sa-login').style.display = '';
 }
 el('sa-logout-btn').addEventListener('click', logout);
+
+el('sa-modal-del-org-reauth-google').addEventListener('click', ()=>handleSaModalGoogleReauth('sa-modal-del-org-error'));
+el('sa-modal-del-studio-reauth-google').addEventListener('click', ()=>handleSaModalGoogleReauth('sa-modal-del-studio-error'));
+el('sa-modal-edit-ical-reauth-google').addEventListener('click', ()=>handleSaModalGoogleReauth('sa-modal-edit-ical-error'));
 
 function openModal(id){ el(id).classList.add('is-open'); }
 function closeModal(id){ el(id).classList.remove('is-open'); }
@@ -960,6 +1101,7 @@ function openDeleteOrgModal(orgId, label){
   err.textContent = '';
   el('sa-modal-del-org-intro').textContent =
     `Organisation « ${label} » (${orgId}). Les nœuds réservations, assignations et comptes rendus ne sont pas supprimés ici ; le reste de la configuration et les fichiers Storage sous orgs/${orgId}/ seront effacés.`;
+  prepareSensitiveModalReauth('sa-modal-del-org');
   openModal('sa-modal-del-org');
 }
 
@@ -1656,6 +1798,7 @@ function openEditIcalModal(orgId, studioIndex){
   err.style.display = 'none';
   err.textContent = '';
   updateIcalLockButtonUi();
+  prepareSensitiveModalReauth('sa-modal-edit-ical');
   openModal('sa-modal-edit-ical');
 }
 
@@ -1755,6 +1898,7 @@ function wireStudiosPanel(panel, orgId){
       const nm = studioCache[orgId] && studioCache[orgId][i] != null ? String(studioCache[orgId][i]) : 'Studio ' + (i + 1);
       el('sa-modal-del-studio-studio').textContent = 'Studio concerné : « ' + nm + ' »';
       syncDelStudioModalRequestBanner(orgId, i);
+      prepareSensitiveModalReauth('sa-modal-del-studio');
       openModal('sa-modal-del-studio');
     });
   });
@@ -2054,6 +2198,7 @@ el('sa-modal-rename-org-ok').addEventListener('click', async ()=>{
 el('sa-modal-del-studio-cancel').addEventListener('click', ()=>{
   pendingDeleteStudioOrgId = '';
   pendingDeleteStudioIndex = -1;
+  saSensitiveModalGoogleReauthed = false;
   el('sa-modal-del-studio-pwd').value = '';
   const errC = el('sa-modal-del-studio-error');
   errC.style.display = 'none';
@@ -2078,6 +2223,7 @@ el('sa-modal-del-studio-cancel-req').addEventListener('click', async ()=>{
     if(listHost) paintOrgRow(listHost, orgId, orgParamsCache[orgId]);
     pendingDeleteStudioOrgId = '';
     pendingDeleteStudioIndex = -1;
+    saSensitiveModalGoogleReauthed = false;
     el('sa-modal-del-studio-pwd').value = '';
     const col = el('sa-modal-del-studio-req-col');
     const sub = el('sa-modal-del-studio-req-sub');
@@ -2097,9 +2243,10 @@ el('sa-modal-del-studio-ok').addEventListener('click', async ()=>{
   errEl.textContent = '';
   const orgId = pendingDeleteStudioOrgId;
   const i = pendingDeleteStudioIndex;
+  const pid = getSaPrimaryProviderId();
   const pwd = el('sa-modal-del-studio-pwd').value || '';
   if(!orgId || i < 0) return;
-  if(!pwd){
+  if(pid !== 'google.com' && !pwd){
     errEl.textContent = 'Saisissez le mot de passe Super Admin.';
     errEl.style.display = '';
     el('sa-modal-del-studio-pwd').value = '';
@@ -2108,21 +2255,23 @@ el('sa-modal-del-studio-ok').addEventListener('click', async ()=>{
   const okBtn = el('sa-modal-del-studio-ok');
   okBtn.disabled = true;
   try{
-    const snapCred = await get(ref(db, 'superAdmin/credentials'));
-    const c = snapCred.val();
-    if(!c || typeof c !== 'object'){
-      errEl.textContent = 'Identifiants Super Admin introuvables.';
-      errEl.style.display = '';
-      el('sa-modal-del-studio-pwd').value = '';
-      return;
-    }
-    const h = c.pwdHash != null ? String(c.pwdHash).trim() : '';
-    const pwdHash = await sha256Hex(pwd);
-    if(pwdHash !== h){
-      errEl.textContent = 'Mot de passe Super Admin incorrect.';
-      errEl.style.display = '';
-      el('sa-modal-del-studio-pwd').value = '';
-      return;
+    if(pid === 'google.com'){
+      try{
+        saEnsureGoogleReauthGateForAction(errEl);
+      }catch(re){
+        if(String(re.message) === 'sa-no-google-reauth') return;
+        throw re;
+      }
+    }else{
+      try{
+        await saEnsurePasswordReauthOrThrow('sa-modal-del-studio-pwd', errEl);
+      }catch(re){
+        if(String(re.message) === 'sa-no-pwd') return;
+        const code = re && re.code;
+        errEl.textContent = code === 'auth/wrong-password' || code === 'auth/invalid-credential' ? 'Mot de passe incorrect.' : (re && re.message ? String(re.message) : 'Échec de la vérification.');
+        errEl.style.display = '';
+        return;
+      }
     }
     await set(ref(db, `orgs/${orgId}/procedures/${i}`), null);
     await deleteStorageTree(sRef(storage, `orgs/${orgId}/procedures/${i}`));
@@ -2143,6 +2292,7 @@ el('sa-modal-del-studio-ok').addEventListener('click', async ()=>{
     }catch(_){}
     pendingDeleteStudioOrgId = '';
     pendingDeleteStudioIndex = -1;
+    saSensitiveModalGoogleReauthed = false;
     closeModal('sa-modal-del-studio');
     el('sa-modal-del-studio-pwd').value = '';
     await refreshStudiosPanelForOrg(orgId);
@@ -2162,6 +2312,7 @@ el('sa-modal-edit-ical-cancel').addEventListener('click', ()=>{
   pendingIcalOrgId = '';
   pendingIcalStudioIndex = -1;
   pendingIcalLocked = false;
+  saSensitiveModalGoogleReauthed = false;
   closeModal('sa-modal-edit-ical');
 });
 el('sa-modal-edit-ical-lock').addEventListener('click', ()=>{
@@ -2174,13 +2325,14 @@ el('sa-modal-edit-ical-ok').addEventListener('click', async ()=>{
   errEl.textContent = '';
   const orgId = pendingIcalOrgId;
   const studioIndex = pendingIcalStudioIndex;
+  const pid = getSaPrimaryProviderId();
   const pwd = el('sa-modal-edit-ical-pwd').value || '';
   const urlVal = el('sa-modal-edit-ical-url').value || '';
   if(!orgId || studioIndex < 0){
     showToast('Erreur');
     return;
   }
-  if(!pwd){
+  if(pid !== 'google.com' && !pwd){
     errEl.textContent = 'Saisissez le mot de passe Super Admin.';
     errEl.style.display = '';
     return;
@@ -2188,24 +2340,29 @@ el('sa-modal-edit-ical-ok').addEventListener('click', async ()=>{
   const okBtn = el('sa-modal-edit-ical-ok');
   okBtn.disabled = true;
   try{
-    const snap = await get(ref(db, 'superAdmin/credentials'));
-    const c = snap.val();
-    if(!c || typeof c !== 'object'){
-      errEl.textContent = 'Identifiants Super Admin introuvables.';
-      errEl.style.display = '';
-      return;
-    }
-    const h = c.pwdHash != null ? String(c.pwdHash).trim() : '';
-    const pwdHash = await sha256Hex(pwd);
-    if(pwdHash !== h){
-      errEl.textContent = 'Mot de passe Super Admin incorrect.';
-      errEl.style.display = '';
-      return;
+    if(pid === 'google.com'){
+      try{
+        saEnsureGoogleReauthGateForAction(errEl);
+      }catch(re){
+        if(String(re.message) === 'sa-no-google-reauth') return;
+        throw re;
+      }
+    }else{
+      try{
+        await saEnsurePasswordReauthOrThrow('sa-modal-edit-ical-pwd', errEl);
+      }catch(re){
+        if(String(re.message) === 'sa-no-pwd') return;
+        const code = re && re.code;
+        errEl.textContent = code === 'auth/wrong-password' || code === 'auth/invalid-credential' ? 'Mot de passe incorrect.' : (re && re.message ? String(re.message) : 'Échec de la vérification.');
+        errEl.style.display = '';
+        return;
+      }
     }
     await saveIcalUrlForStudio(orgId, studioIndex, urlVal, pendingIcalLocked);
     pendingIcalOrgId = '';
     pendingIcalStudioIndex = -1;
     pendingIcalLocked = false;
+    saSensitiveModalGoogleReauthed = false;
     closeModal('sa-modal-edit-ical');
     el('sa-modal-edit-ical-pwd').value = '';
     showToast('URL iCal enregistrée');
@@ -2223,6 +2380,8 @@ el('sa-modal-edit-ical-ok').addEventListener('click', async ()=>{
 el('sa-modal-del-org-cancel').addEventListener('click', ()=>{
   pendingDeleteOrgId = '';
   pendingDeleteOrgLabel = '';
+  saSensitiveModalGoogleReauthed = false;
+  el('sa-modal-del-org-pwd').value = '';
   closeModal('sa-modal-del-org');
 });
 el('sa-modal-del-org-ok').addEventListener('click', async ()=>{
@@ -2232,6 +2391,7 @@ el('sa-modal-del-org-ok').addEventListener('click', async ()=>{
   const orgId = pendingDeleteOrgId;
   const expectedLabel = pendingDeleteOrgLabel;
   const typed = String(el('sa-modal-del-org-confirm').value||'').trim();
+  const pid = getSaPrimaryProviderId();
   const pwd = el('sa-modal-del-org-pwd').value||'';
   if(!orgId){ showToast('Erreur : organisation inconnue'); return; }
   if(typed !== String(expectedLabel).trim()){
@@ -2239,7 +2399,7 @@ el('sa-modal-del-org-ok').addEventListener('click', async ()=>{
     errEl.style.display = '';
     return;
   }
-  if(!pwd){
+  if(pid !== 'google.com' && !pwd){
     errEl.textContent = 'Saisissez le mot de passe Super Admin.';
     errEl.style.display = '';
     return;
@@ -2248,19 +2408,23 @@ el('sa-modal-del-org-ok').addEventListener('click', async ()=>{
   okBtn.disabled = true;
   try{
     setOrgListLoading(true);
-    const snap = await get(ref(db, 'superAdmin/credentials'));
-    const c = snap.val();
-    if(!c || typeof c!=='object'){
-      errEl.textContent = 'Identifiants Super Admin introuvables.';
-      errEl.style.display = '';
-      return;
-    }
-    const h = c.pwdHash!=null ? String(c.pwdHash).trim() : '';
-    const pwdHash = await sha256Hex(pwd);
-    if(pwdHash !== h){
-      errEl.textContent = 'Mot de passe Super Admin incorrect.';
-      errEl.style.display = '';
-      return;
+    if(pid === 'google.com'){
+      try{
+        saEnsureGoogleReauthGateForAction(errEl);
+      }catch(re){
+        if(String(re.message) === 'sa-no-google-reauth') return;
+        throw re;
+      }
+    }else{
+      try{
+        await saEnsurePasswordReauthOrThrow('sa-modal-del-org-pwd', errEl);
+      }catch(re){
+        if(String(re.message) === 'sa-no-pwd') return;
+        const code = re && re.code;
+        errEl.textContent = code === 'auth/wrong-password' || code === 'auth/invalid-credential' ? 'Mot de passe incorrect.' : (re && re.message ? String(re.message) : 'Échec de la vérification.');
+        errEl.style.display = '';
+        return;
+      }
     }
     await performOrgCascadeDelete(orgId);
     delete orgParamsCache[orgId];
@@ -2271,6 +2435,7 @@ el('sa-modal-del-org-ok').addEventListener('click', async ()=>{
     delete lastAppliedAccountsOpen[orgId];
     pendingDeleteOrgId = '';
     pendingDeleteOrgLabel = '';
+    saSensitiveModalGoogleReauthed = false;
     closeModal('sa-modal-del-org');
     el('sa-modal-del-org-pwd').value = '';
     showToast('Organisation supprimée (hors réservations / assignations / comptes rendus).');
@@ -2360,23 +2525,42 @@ el('sa-sec-save').addEventListener('click', async ()=>{
   }
 });
 
-(function boot(){
+async function boot(){
   try{
-    if(sessionStorage.getItem(SA_SESSION_KEY)==='1'){
+    await auth.authStateReady();
+    const u = auth.currentUser;
+    if(u && isSaEmailAllowed(u)){
       showAppShell();
-      fetchOrganizations().then(()=>{
-        fillOrgSelects();
-        renderAccountsForSelectedOrg();
-        renderOrgList();
-        renderParamsForSelectedOrg();
-        setupNav();
-        const h = location.hash.slice(1);
-        if(['comptes','organisations','parametres','securite'].includes(h)) setSaView(h);
-        else setSaView('organisations');
-        setupPendingDeletionRequestsListener();
-      });
+      await loadSaAppAfterAuth(true);
     }
-  }catch(_){}
+  }catch(e){
+    console.warn(e);
+  }
+}
+
+(async function(){
+  await boot();
+  onAuthStateChanged(auth, (user)=>{
+    if(user){
+      if(isSaEmailAllowed(user)){
+        hadFirebaseUser = true;
+      }else{
+        document.body.classList.remove('sa-nav-ready');
+        el('sa-app').style.display = 'none';
+        el('sa-login').style.display = '';
+        const err = el('sa-login-error');
+        if(err){
+          err.textContent = 'Ce compte n’est pas autorisé pour la Super Administration.';
+          err.style.display = '';
+        }
+        signOut(auth).catch(()=>{});
+      }
+    }else if(hadFirebaseUser){
+      document.body.classList.remove('sa-nav-ready');
+      el('sa-app').style.display = 'none';
+      el('sa-login').style.display = '';
+    }
+  });
 })();
 </script>
 </body>
