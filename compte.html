@@ -191,6 +191,7 @@ body.compte-nav-ready .admin-burger{display:flex}
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, set, onValue, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
@@ -204,6 +205,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const auth = getAuth(app);
 
 const MAX_ACTIVITY_LOG_ENTRIES = 450;
 const SESSION_KEY = 'menage_session_v1';
@@ -774,13 +776,43 @@ function setupCompteNavOnce(){
 (async () => {
   await loadOrganizations();
   orgId = getStoredOrgId();
-  const session = loadSession();
-  if (!orgId || !session?.name) {
+  if (!orgId) {
     window.location.replace('index.html');
     return;
   }
+
+  let hadFirebaseUser = false;
+  await auth.authStateReady();
+  const fbUser = auth.currentUser;
+  if (fbUser) hadFirebaseUser = true;
+
+  let resolvedUserName = null;
+  if (fbUser) {
+    try {
+      const accSnap = await get(ref(db, 'accounts'));
+      const accVal = accSnap.val();
+      if (accVal && typeof accVal === 'object') {
+        for (const [, row] of Object.entries(accVal)) {
+          if (!row || typeof row !== 'object') continue;
+          if (String(row.authUid || '').trim() === fbUser.uid) {
+            resolvedUserName = String(row.name || row.prenom || '').trim() || null;
+            break;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+  if (!resolvedUserName) {
+    const session = loadSession();
+    if (session?.name) resolvedUserName = String(session.name).trim();
+  }
+  if (!resolvedUserName) {
+    window.location.replace('index.html');
+    return;
+  }
+
   C = {
-    userName: session.name,
+    userName: resolvedUserName,
     assignments: {},
     reservations: [],
     cleaningReports: {},
@@ -846,6 +878,14 @@ function setupCompteNavOnce(){
     if(!C.unlocked) return;
     const h=location.hash.slice(1);
     if(COMPTE_VIEW_IDS.includes(h)) window.setCompteView(h,{noScroll:true});
+  });
+
+  onAuthStateChanged(auth, user => {
+    if(user){
+      hadFirebaseUser = true;
+      return;
+    }
+    if(hadFirebaseUser) window.location.replace('index.html');
   });
 })();
 </script>
