@@ -841,6 +841,7 @@ async function resolveSessionFromFirebaseUser(user){
     saveSession({ name: sessionName });
     S.globalAccount = { id: matchedId, ...matched };
     S.globalAccountLoaded = true;
+    if(!window.__menageFbInit) initFirebaseAndApp();
     logActivity({ type:'login', actor:sessionName, text:sessionName+' s\'est connectée au planning' });
     if(matched.needsPasswordChange === true){
       showChangePwdModal(sessionName, matchedId);
@@ -1231,6 +1232,8 @@ window.doLogin = async function(){
   errEl.style.display='none';
   try{
     await signInWithEmailAndPassword(auth, email, pwd);
+    if(!window.__menageFbInit) initFirebaseAndApp();
+    await resolveSessionFromFirebaseUser(auth.currentUser);
     return;
   }catch(e){
     const accSnap = await get(ref(db,'accounts')).catch(()=>null);
@@ -1251,6 +1254,7 @@ window.doLogin = async function(){
             S.currentUser = { name: sessionName, menage, admin };
             saveSession({ name: sessionName });
             await ensureGlobalAccountCache(sessionName);
+            if(!window.__menageFbInit) initFirebaseAndApp();
             logActivity({ type:'login', actor:sessionName, text:sessionName+' s\'est connectée au planning (legacy)' });
             showApp();
             return;
@@ -1270,6 +1274,8 @@ window.doGoogleLogin = async function(){
   try{
     const provider = new GoogleAuthProvider();
     await signInWithPopup(auth, provider);
+    if(!window.__menageFbInit) initFirebaseAndApp();
+    await resolveSessionFromFirebaseUser(auth.currentUser);
   }catch(e){
     if(e && e.code === 'auth/popup-closed-by-user') return;
     errEl.style.display='';
@@ -1516,9 +1522,14 @@ window.confirmOrgFirst=function(){
 };
 
 async function bootstrap(){
+  await auth.authStateReady();
   await loadOrganizations();
   if(!getStoredOrgId()) setStoredOrgId(ORGANIZATIONS[0]?.id || 'tesson');
-  initFirebaseAndApp();
+  if(auth.currentUser){
+    initFirebaseAndApp();
+  }else{
+    showLogin();
+  }
 }
 bootstrap();
 syncAppVersionFootText();
