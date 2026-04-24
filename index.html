@@ -436,7 +436,9 @@ onAuthStateChanged(auth, async (user) => {
   }
   if(user){
     if(typeof resolveSessionFromFirebaseUser === 'function' && fbReady){
-      await resolveSessionFromFirebaseUser(user);
+      if(!S.currentUser || user.uid !== __lastLoginUid){
+        await resolveSessionFromFirebaseUser(user);
+      }
     }
   }else{
     if(typeof showLogin === 'function' && fbReady){
@@ -696,9 +698,9 @@ const loaded = { config: false, assignments: false, reservations: false, adminCo
 function essentialDataLoaded(){
   return loaded.config && loaded.assignments && loaded.reservations && loaded.adminConfig;
 }
-/** True dès que Firebase a au moins un compte pour l’org chargée (chemin orgs/{orgId}/adminConfig). */
+/** True si l’org a des comptes connus : liste nettoyeuses, comptes legacy dans adminConfig, ou compte global /accounts (v4.7+). */
 function orgHasConfiguredAccounts(){
-  return (S.cleanerList&&S.cleanerList.length>0)||((S.adminConfig.accounts||[]).length>0);
+  return (S.cleanerList&&S.cleanerList.length>0)||((S.adminConfig.accounts||[]).length>0)||(S.globalAccount!=null);
 }
 
 // ─── Session ──────────────────────────────────────────────────────────────────
@@ -844,6 +846,7 @@ async function resolveSessionFromFirebaseUser(user){
       __lastLoginUid = user.uid;
       __lastLoginTs = Date.now();
     }
+    await refreshCleanerList();
     if(matched.needsPasswordChange === true){
       showChangePwdModal(sessionName, matchedId);
     }else{
@@ -875,6 +878,7 @@ async function checkAuth(){
     if(acc){
       S.currentUser = { name:acc.name, menage:acc.menage, admin:acc.admin };
       await ensureGlobalAccountCache(session.name);
+      await refreshCleanerList();
       showApp();
       return;
     }
@@ -886,6 +890,7 @@ async function checkAuth(){
     if(ga && (String(ga.name ?? '').trim() === sn || String(ga.prenom ?? '').trim() === sn)){
       const roles = ga.orgs?.[getStoredOrgId()]?.roles || [];
       S.currentUser = { name: sn, menage: roles.includes('menage'), admin: roles.includes('admin') };
+      await refreshCleanerList();
       showApp();
       return;
     }
@@ -1248,6 +1253,7 @@ window.doLogin = async function(){
             await ensureGlobalAccountCache(sessionName);
             if(!window.__menageFbInit) initFirebaseAndApp();
             logActivity({ type:'login', actor:sessionName, text:sessionName+' s\'est connectée au planning (legacy)' });
+            await refreshCleanerList();
             showApp();
             return;
           }
@@ -1455,14 +1461,20 @@ function initFirebaseAndApp(){
     if(d){
       S.adminConfig={...S.adminConfig,...d, accounts:d.accounts||[], defaultOrgId:d.defaultOrgId||S.adminConfig.defaultOrgId||'tesson'};
     }else{
-      S.adminConfig={ authEnabled:false, accounts:[], defaultOrgId:getStoredOrgId()||'tesson' };
+      S.adminConfig={ ...S.adminConfig, defaultOrgId:getStoredOrgId()||'tesson' };
     }
-    loaded.adminConfig=true;
-    void refreshCleanerList().then(()=>afterFbListener());
+    void refreshCleanerList().then(()=>{
+      loaded.adminConfig=true;
+      if(!fbReady) afterFbListener();
+      else if(S.currentUser&&S.globalAccountLoaded) render();
+    });
   }, ()=>{
-    loaded.adminConfig=true;
-    S.adminConfig={ authEnabled:false, accounts:[], defaultOrgId:getStoredOrgId()||'tesson' };
-    void refreshCleanerList().then(()=>afterFbListener());
+    S.adminConfig={ ...S.adminConfig, defaultOrgId:getStoredOrgId()||'tesson' };
+    void refreshCleanerList().then(()=>{
+      loaded.adminConfig=true;
+      if(!fbReady) afterFbListener();
+      else if(S.currentUser&&S.globalAccountLoaded) render();
+    });
   });
 
   onValue(ref(db,ob('lastSync')), snap=>{
