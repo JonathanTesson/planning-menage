@@ -425,7 +425,7 @@ const SESSION_KEY = 'menage_session_v1';
 const ORG_STORAGE_KEY = 'menage_org_v1';
 let ORGANIZATIONS = [];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.8.2';
+const APP_VERSION = '4.9.0';
 const UNAVAIL_SHOWBY_KEY = 'menage_unavail_showby_v1';
 
 /** Studio sélectionné dans la section Procédures (persiste entre re-rendus). */
@@ -797,6 +797,7 @@ async function loadOrganizations(){
 }
 
 (async () => {
+  await auth.authStateReady();
   await loadOrganizations();
   if(!orgId || !ORGANIZATIONS.some(o => o.id === orgId)){
     window.location.replace('index.html');

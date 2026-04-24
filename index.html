@@ -484,7 +484,10 @@ const ORG_STORAGE_KEY = 'menage_org_v1';
 const ORG_CHANGE_GATE_KEY = 'menage_org_change_gate';
 let ORGANIZATIONS = [];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.8.2';
+const APP_VERSION = '4.9.0';
+
+let __lastLoginUid = null;
+let __lastLoginTs = 0;
 
 const STUDIO_COLORS = [
   { bg: '#daeafe', text: '#1047a0' },
@@ -721,12 +724,6 @@ window.goHomeOrgPick=function(){
   location.reload();
 };
 
-function hashSimple(str){
-  let h=0;
-  for(let i=0;i<str.length;i++) h=((h<<5)-h)+str.charCodeAt(i),h|=0;
-  return h.toString(36);
-}
-
 async function sha256Hex(str){
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
   return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
@@ -842,7 +839,11 @@ async function resolveSessionFromFirebaseUser(user){
     S.globalAccount = { id: matchedId, ...matched };
     S.globalAccountLoaded = true;
     if(!window.__menageFbInit) initFirebaseAndApp();
-    logActivity({ type:'login', actor:sessionName, text:sessionName+' s\'est connectée au planning' });
+    if(!(user.uid===__lastLoginUid && Date.now()-__lastLoginTs<10000)){
+      logActivity({ type:'login', actor:sessionName, text:sessionName+' s\'est connectée au planning' });
+      __lastLoginUid = user.uid;
+      __lastLoginTs = Date.now();
+    }
     if(matched.needsPasswordChange === true){
       showChangePwdModal(sessionName, matchedId);
     }else{
@@ -1202,15 +1203,6 @@ function showLogin(){
   void get(ref(db, 'pendingDeletionRequests')).then(s=>paintPendingDeletionPipFromVal(!!s.val())).catch(()=>paintPendingDeletionPipFromVal(false));
 }
 
-/** Le planning Firebase est lié à menage_org_v1 : changer l’org sur l’écran login recharge avec les bonnes données. */
-window.onLoginOrgChange=function(){
-  const sel=el('login-org');
-  if(!sel||!sel.value) return;
-  setStoredOrgId(sel.value);
-  try{ sessionStorage.setItem(ORG_CHANGE_GATE_KEY,'1'); }catch(e){}
-  location.reload();
-};
-
 window.clearOrgChoiceAndReload=function(){
   try{ localStorage.removeItem(ORG_STORAGE_KEY); }catch(e){}
   location.reload();
@@ -1292,14 +1284,14 @@ window.doLogout = async function(){
   if(changePwdModal) changePwdModal.style.display = 'none';
   clearSession();
   S.currentUser=null;
+  __lastLoginUid=null;
+  __lastLoginTs=0;
   S.globalAccountLoaded=false;
   S.globalAccount=null;
   closeOrgSwitchMenu();
   const pe=el('login-pwd'); if(pe) pe.value='';
   const ee=el('login-email'); if(ee) ee.value='';
-  if(!essentialDataLoaded()) return;
-  if(!orgHasConfiguredAccounts()) showOrgUnconfigured();
-  else checkAuth();
+  showLogin();
 };
 
 // ─── Firebase ─────────────────────────────────────────────────────────────────
@@ -1393,6 +1385,7 @@ function routeAfterFirebaseReady(){
 /** Après le premier chargement complet, réagit aux mises à jour (ex. premier compte créé depuis l’admin). */
 function routeAfterFirebaseUpdate(){
   if(!fbReady || !essentialDataLoaded()) return;
+  if(!auth.currentUser && !S.currentUser) return;
   if(!orgHasConfiguredAccounts()){
     showOrgUnconfigured();
     return;
