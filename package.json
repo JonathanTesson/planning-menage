@@ -1,6 +1,6 @@
 {
   "name": "planning-menage",
-  "version": "4.9.0",
+  "version": "4.9.1",
   "private": true,
   "description": "Planning Ménage Airbnb — scripts Node et back-office",
   "dependencies": {

@@ -191,7 +191,7 @@ body.compte-nav-ready .admin-burger{display:flex}
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, set, onValue, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getAuth, onAuthStateChanged, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
@@ -211,7 +211,7 @@ const MAX_ACTIVITY_LOG_ENTRIES = 450;
 const SESSION_KEY = 'menage_session_v1';
 const ORG_STORAGE_KEY = 'menage_org_v1';
 let ORGANIZATIONS = [];
-const APP_VERSION = '4.9.0';
+const APP_VERSION = '4.9.1';
 const UNAVAIL_SHOWBY_KEY = 'menage_unavail_showby_v1';
 const MO_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const COMPTE_VIEW_IDS = ['dashboard','compte','indisponibilites'];
@@ -487,6 +487,14 @@ async function setupAccountForm(){
   el('label-self-pwd-current').textContent=hasPwd?'Mot de passe actuel':'Mot de passe actuel (si déjà défini)';
 }
 
+function compteAfterPwdChangeSuccess(){
+  logActivity({ type:'admin_config', actor:C.userName, text:`${C.userName} a modifié son mot de passe` });
+  showToast('Mot de passe enregistré ✓');
+  el('self-pwd-current').value='';
+  el('self-pwd-new').value='';
+  el('self-pwd-confirm').value='';
+}
+
 window._saveOwnPassword=async function(){
   if(!C.unlocked) return;
   const legacyAcc=(C.adminConfig.accounts||[]).find(a=>a.name===C.userName);
@@ -506,15 +514,59 @@ window._saveOwnPassword=async function(){
     }catch(_){}
   }
   if(!legacyAcc&&!globalRow){ showToast('Compte introuvable'); return; }
-  if(!legacyAcc&&globalRow){
-    showToast('Veuillez contacter l\'administrateur pour réinitialiser votre mot de passe');
-    return;
-  }
   const cur=String(el('self-pwd-current')?.value||'');
   const nw=String(el('self-pwd-new')?.value||'');
   const cf=String(el('self-pwd-confirm')?.value||'');
   if(nw.length<4){ showToast('Nouveau mot de passe : au moins 4 caractères'); return; }
   if(nw!==cf){ showToast('La confirmation ne correspond pas'); return; }
+
+  const user=auth.currentUser;
+  if(user&&globalRow&&String(globalRow.authUid??'').trim()===user.uid){
+    if(user.providerData?.some(p=>p.providerId==='google.com')&&
+        !user.providerData?.some(p=>p.providerId==='password')){
+      showToast('Compte Google : changement de mot de passe indisponible ici. Utilisez la gestion de compte Google ou contactez un administrateur.');
+      return;
+    }
+    if(!user.email){
+      showToast('Adresse e-mail requise pour vérifier le mot de passe actuel.');
+      return;
+    }
+    try{
+      await reauthenticateWithCredential(user,EmailAuthProvider.credential(user.email,cur));
+    }catch(_){
+      showToast('Mot de passe actuel incorrect');
+      return;
+    }
+    try{
+      await updatePassword(user,nw);
+    }catch(e){
+      showToast('Erreur lors de la mise à jour du mot de passe : '+(e&&e.code?e.code:((e&&e.message)||'inconnu')));
+      return;
+    }
+    try{
+      const h=(await sha256Hex(nw)).toLowerCase();
+      await set(ref(db,`accounts/${globalId}/pwdHash`),h);
+    }catch(_){
+      showToast('Erreur enregistrement du mot de passe global');
+      return;
+    }
+    if(legacyAcc){
+      const accList=C.adminConfig.accounts.map(a=>({...a}));
+      const li=accList.findIndex(a=>a.name===C.userName);
+      if(li>=0){
+        accList[li]={...accList[li], pwdHash:hashSimple(nw)};
+        try{
+          await set(ref(db,ob('adminConfig')),{...C.adminConfig, accounts:accList});
+        }catch(_){
+          showToast('Erreur enregistrement compte local');
+          return;
+        }
+      }
+    }
+    compteAfterPwdChangeSuccess();
+    return;
+  }
+
   const legacyHasPwd=!!legacyAcc?.pwdHash;
   const globalHasPwd=!!globalRow?.pwdHash;
   if(legacyHasPwd||globalHasPwd){
@@ -528,13 +580,14 @@ window._saveOwnPassword=async function(){
     }
     if(!curOk){ showToast('Mot de passe actuel incorrect'); return; }
   }
-  const accounts=C.adminConfig.accounts.map(a=>({...a}));
-  const i=accounts.findIndex(a=>a.name===C.userName);
-  if(i<0){ showToast('Erreur'); return; }
-  accounts[i]={...accounts[i], pwdHash:hashSimple(nw)};
-  const next={...C.adminConfig, accounts};
-  fbSet(ob('adminConfig'),next);
-  if(legacyAcc&&globalId){
+  if(legacyAcc){
+    const accounts=C.adminConfig.accounts.map(a=>({...a}));
+    const i=accounts.findIndex(a=>a.name===C.userName);
+    if(i<0){ showToast('Erreur'); return; }
+    accounts[i]={...accounts[i], pwdHash:hashSimple(nw)};
+    fbSet(ob('adminConfig'),{...C.adminConfig, accounts});
+  }
+  if(globalId){
     try{
       const h=(await sha256Hex(nw)).toLowerCase();
       await set(ref(db,`accounts/${globalId}/pwdHash`),h);
@@ -542,12 +595,11 @@ window._saveOwnPassword=async function(){
       showToast('Erreur enregistrement du mot de passe global');
       return;
     }
+  }else if(!legacyAcc){
+    showToast('Compte introuvable');
+    return;
   }
-  logActivity({ type:'admin_config', actor:C.userName, text:`${C.userName} a modifié son mot de passe` });
-  showToast('Mot de passe enregistré ✓');
-  el('self-pwd-current').value='';
-  el('self-pwd-new').value='';
-  el('self-pwd-confirm').value='';
+  compteAfterPwdChangeSuccess();
 };
 
 window.compteChangeMonth=function(dir){
