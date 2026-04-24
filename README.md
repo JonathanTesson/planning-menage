@@ -56,7 +56,12 @@ L’**organisation par défaut** proposée à la connexion dépend de **`default
 - **Règles RTDB** : `{ ".read": "auth != null", ".write": "auth != null" }` — exception : **`/organizations`** en **`.read: true`** (noms des orgs publics).
 - **`needsPasswordChange`** : champ dans **`/accounts/{id}`** — si **`true`** au premier login → modale bloquante avant accès au calendrier.
 - **Scripts de migration** (one-shot, déjà exécutés) : **`migrate-to-firebase-auth.js`** + **`update-accounts-auth.js`**.
-- **Phase 2.5** (à venir) : Cloud Function pour synchroniser création/suppression Firebase Auth ↔ RTDB depuis l’UI admin.
+- **Corrections en session** (bugs identifiés après la mise en prod **v4.9.0**) :
+  - **Race `S.cleanerList`** : **`loaded.adminConfig = true`** est positionné **dans** le **`.then()`** de **`refreshCleanerList()`** dans le listener **`onValue(adminConfig)`** (évite un **`render()`** alors que la liste des intervenantes n’est pas encore à jour).
+  - **Snapshot `adminConfig` vide** : le listener ne force plus **`authEnabled: false`** ni **`accounts: []`** — on conserve l’objet **`S.adminConfig`** existant (**spread**), seul **`defaultOrgId`** est réaligné (y compris sur erreur de lecture).
+  - **`refreshCleanerList()`** : appels **`await`** ajoutés dans **`resolveSessionFromFirebaseUser()`**, **`checkAuth()`** et **`doLogin`** (fallback legacy) pour fiabiliser les **couleurs** et le **switch d’org** après connexion ; le listener **`adminConfig`** déclenche toujours **`refreshCleanerList()`** avec la séquence ci-dessus.
+  - **`onAuthStateChanged`** : garde pour **ne pas** rappeler **`resolveSessionFromFirebaseUser()`** quand la session est déjà établie pour le même **`uid`** (supprime le double rendu après **Google Sign-In**).
+- **Phase 2.5** (à venir) : Cloud Function pour synchroniser création/suppression **Firebase Auth** ↔ **RTDB** depuis l’UI admin. **Précision :** les comptes créés depuis **`superadmin.html`** ne sont **pas** provisionnés dans **Firebase Auth** ; le login **email / mot de passe** sur **`index.html`** ne fonctionne alors que via le **fallback legacy** (**SHA-256**, champ **`pwdHash`** sous **`/accounts`** en RTDB). La **Cloud Function** sera nécessaire pour **synchroniser** ces comptes (création / suppression / alignement) avec Firebase Auth.
 
 ---
 
