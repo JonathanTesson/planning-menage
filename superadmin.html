@@ -359,6 +359,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getDatabase, ref, get, set, update, onValue, remove, push } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { getStorage, ref as sRef, deleteObject, listAll } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup, reauthenticateWithCredential, reauthenticateWithPopup, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
 import { hashSimple, sha256Hex, accNormalizeEmail, accEntriesFromSnapshotVal, accFindIdentityMatch, calcMaxOrder, buildAccountPayload, buildAddAccountModalHTML, buildConfirmAssocModalHTML, buildEditAccountModalHTML } from './fonctions.js';
 
 document.body.insertAdjacentHTML('beforeend',
@@ -381,6 +382,8 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const storage = getStorage(app);
 const auth = getAuth(app);
+const functions = getFunctions(app, 'us-central1');
+const adminAuth = httpsCallable(functions, 'adminAuth');
 const googleAuthProvider = new GoogleAuthProvider();
 
 const APP_VERSION = '4.9.0';
@@ -396,6 +399,40 @@ function showToast(msg){
   t.textContent=msg;
   t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+/** Après création RTDB : Auth côté Cloud Function (échec non bloquant). */
+async function adminAuthAfterCreateAccount(newRefKey,email,pwd,prenom){
+  try{
+    const { data }=await adminAuth({ action:'createUser',email,password:pwd,displayName:prenom });
+    const uid=data&&data.uid;
+    if(uid){
+      await update(ref(db),{[`accounts/${newRefKey}/authUid`]:uid});
+    }
+  }catch(e){
+    console.warn(e);
+    showToast('Compte enregistré ; synchronisation Firebase Auth échouée — rattrapage manuel possible.');
+  }
+}
+
+/** Avant suppression complète du nœud global uniquement (échec non bloquant). */
+async function adminAuthBeforeDeleteUser(uid){
+  try{
+    await adminAuth({ action:'deleteUser',uid:String(uid) });
+  }catch(e){
+    console.warn(e);
+    showToast('Suppression Firebase Auth échouée ; suppression RTDB poursuivie tout de même.');
+  }
+}
+
+/** Mot de passe : Auth en plus du hash RTDB (échec non bloquant). */
+async function adminAuthTryUpdatePassword(uid,pwd){
+  try{
+    await adminAuth({ action:'updatePassword',uid:String(uid),password:pwd });
+  }catch(e){
+    console.warn(e);
+    showToast('Mot de passe RTDB enregistré ; mise à jour Firebase Auth échouée.');
+  }
 }
 
 function normalizeAccounts(raw){
@@ -1475,6 +1512,7 @@ el('shared-acc-submit').addEventListener('click', async ()=>{
       showToast('Erreur création compte global — réessayez');
       return;
     }
+    await adminAuthAfterCreateAccount(newRef.key, email, pwd, prenom);
     list = [...list, { name: prenom, nom, email: accNormalizeEmail(email), pseudo, tel: tel || '', pwdHash: hashSimple(pwd), menage, admin, sharedWith: [] }];
     await saveAccountsArray(oid, list);
     pendingAddAccountOrgId = '';
@@ -1521,6 +1559,9 @@ el('sa-modal-del-acc-ok').addEventListener('click', async ()=>{
       if(nOrg > 1){
         await update(ref(db), { [`accounts/${global.id}/orgs/${oid}`]: null });
       }else{
+        if(global.authUid != null && String(global.authUid).trim() !== ''){
+          await adminAuthBeforeDeleteUser(global.authUid);
+        }
         await remove(ref(db, `accounts/${global.id}`));
         const prenom = String(acc.name ?? '').trim();
         if(prenom){
@@ -1678,6 +1719,9 @@ el('shared-edit-save').addEventListener('click', async ()=>{
     showToast('Erreur synchronisation — réessayez');
     btn.disabled = false;
     return;
+  }
+  if(pwd && globalNow?.authUid != null && String(globalNow.authUid).trim() !== ''){
+    await adminAuthTryUpdatePassword(String(globalNow.authUid).trim(), pwd);
   }
   try{
     const list = await getAccountsForOrg(orgId);
