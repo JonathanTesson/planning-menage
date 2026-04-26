@@ -1786,7 +1786,6 @@ function renderControls(){
   }).join('');
   document.getElementById('controls-row').innerHTML=`
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-      <button class="chip" style="${!S.filterCleaner?'background:#555;color:#fff;border-color:#555;font-size:14px':'background:none;color:#aaa;border-color:transparent;font-size:14px'}" onclick="window._sf(null)">👥</button>
       ${chips}
     </div>`;
 }
@@ -2507,7 +2506,7 @@ window._cm=function(){
   document.getElementById('menage-suggest-root')?.remove();
   document.getElementById('modal-container').innerHTML='';
 };
-window._sf=n=>{ S.filterCleaner=n; render(); };
+window._sf=n=>{ S.filterCleaner=(n===S.filterCleaner?null:n); render(); };
 window._toggleType=t=>{
   if(S.filterType==='all') S.filterType=t==='arr'?'dep':'arr';
   else if(S.filterType===t) S.filterType='none';
