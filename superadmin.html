@@ -414,6 +414,24 @@ body.sa-nav-ready .admin-burger{display:flex}
   </div>
 </div>
 
+<div class="modal-overlay" id="sa-modal-send-invite" role="dialog" aria-modal="true" aria-labelledby="sa-modal-send-invite-title">
+  <div class="modal">
+    <h3 id="sa-modal-send-invite-title">Envoyer le lien d'invitation</h3>
+    <div class="modal-field">
+      <label for="sa-send-invite-firstname">À qui ? (prénom, optionnel)</label>
+      <input type="text" id="sa-send-invite-firstname" placeholder="Steve" autocomplete="off">
+    </div>
+    <div class="modal-field">
+      <label for="sa-send-invite-message">Message</label>
+      <textarea id="sa-send-invite-message" rows="10" autocomplete="off" style="width:100%;box-sizing:border-box;min-height:10rem;resize:vertical;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;line-height:1.45;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="sa-send-invite-close">Fermer</button>
+      <button type="button" class="btn-primary" id="sa-send-invite-copy">📋 Copier le texte</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="sa-modal-revoke-invite" role="dialog" aria-modal="true" aria-labelledby="sa-modal-revoke-invite-title">
   <div class="modal">
     <h3 id="sa-modal-revoke-invite-title">Révoquer le lien</h3>
@@ -1176,6 +1194,9 @@ let pendingDeleteOrgLabel = '';
 let pendingRenameOrgId = '';
 let saInviteToRevoke = '';
 let saInviteToDelete = '';
+let saInviteToSend = '';
+let saInviteSendExpiresAt = 0;
+let saInviteSendUserEdited = false;
 
 async function deleteStorageTree(rootRef){
   const page = await listAll(rootRef);
@@ -2101,6 +2122,19 @@ async function saCopyInviteUrlToClipboard(url){
   }
 }
 
+function buildDefaultInviteMessage(token, expiresAtMs, firstName){
+  const url = buildInvitationUrl(token);
+  const fn = String(firstName || '').trim();
+  const salutation = fn ? ('Salut '+fn+',') : 'Salut !';
+  const expN = Number(expiresAtMs);
+  const dateStr = Number.isFinite(expN) ? formatInviteDate(expN) : 'Date inconnue';
+  return salutation+'\n\n'+
+    "Je t'envoie un lien pour t'inscrire à mon application de planning ménage pour locations Airbnb. Elle te permet d'organiser tes studios, tes intervenantes de ménage et leur planning au même endroit.\n\n"+
+    "Clique ici pour créer ton organisation en quelques étapes :\n"+
+    url+'\n\n'+
+    "Le lien est valable jusqu'au "+dateStr+". À tout de suite !";
+}
+
 async function renderInvitesList(){
   const host = el('sa-invites-list');
   if(!host) return;
@@ -2158,6 +2192,9 @@ async function renderInvitesList(){
     if(st === 'used' && r.orgIdCreated){
       usedOrgHtml = `<button type="button" class="sa-invite-orglink" data-sa-invite-org="${escHtml(r.orgIdCreated)}">Org : ${escHtml(r.orgIdCreated)}</button>`;
     }
+    const sendBtn = canCopyRevoke
+      ? `<button type="button" class="btn-sm btn-primary" data-sa-invite-send="${escHtml(r.token)}" data-sa-invite-send-exp="${escHtml(String(exp))}">💬 Envoyer</button>`
+      : '';
     const copyBtn = canCopyRevoke
       ? `<button type="button" class="btn-sm" data-sa-invite-copy="${escHtml(r.token)}">📋 Copier le lien</button>`
       : '';
@@ -2177,7 +2214,7 @@ async function renderInvitesList(){
         ${createdLine}
         ${expLine}
       </div>
-      <div class="sa-invite-actions">${copyBtn}${revokeBtn}${deleteBtn}</div>
+      <div class="sa-invite-actions">${sendBtn}${copyBtn}${revokeBtn}${deleteBtn}</div>
     </div>`;
   }).join('');
   if(!host._saInvitesClickWired){
@@ -2187,6 +2224,21 @@ async function renderInvitesList(){
       if(orgBtn){
         e.preventDefault();
         setSaView('organisations');
+        return;
+      }
+      const snd = e.target.closest('[data-sa-invite-send]');
+      if(snd){
+        const tok = snd.getAttribute('data-sa-invite-send');
+        const expRaw = snd.getAttribute('data-sa-invite-send-exp');
+        const expNum = Number(expRaw);
+        if(tok){
+          saInviteToSend = tok;
+          saInviteSendExpiresAt = Number.isFinite(expNum) ? expNum : NaN;
+          saInviteSendUserEdited = false;
+          el('sa-send-invite-firstname').value = '';
+          el('sa-send-invite-message').value = buildDefaultInviteMessage(tok, saInviteSendExpiresAt, '');
+          openModal('sa-modal-send-invite');
+        }
         return;
       }
       const cpy = e.target.closest('[data-sa-invite-copy]');
@@ -2211,6 +2263,7 @@ async function renderInvitesList(){
           saInviteToDelete = tok;
           openModal('sa-modal-delete-invite');
         }
+        return;
       }
     });
   }
@@ -2525,6 +2578,32 @@ el('sa-modal-delete-invite-ok').addEventListener('click', async ()=>{
     console.warn(e);
     showToast('Erreur');
   }
+});
+el('sa-send-invite-close').addEventListener('click', ()=>{
+  closeModal('sa-modal-send-invite');
+});
+el('sa-send-invite-copy').addEventListener('click', async ()=>{
+  const ta = el('sa-send-invite-message');
+  const text = ta && 'value' in ta ? String(ta.value || '') : '';
+  if(!text){
+    showToast('Copie impossible');
+    return;
+  }
+  try{
+    await navigator.clipboard.writeText(text);
+    showToast('Texte copié');
+  }catch(e){
+    console.warn(e);
+    showToast('Copie impossible');
+  }
+});
+el('sa-send-invite-firstname').addEventListener('input', ()=>{
+  if(saInviteSendUserEdited) return;
+  const fn = el('sa-send-invite-firstname').value || '';
+  el('sa-send-invite-message').value = buildDefaultInviteMessage(saInviteToSend, saInviteSendExpiresAt, fn);
+});
+el('sa-send-invite-message').addEventListener('input', ()=>{
+  saInviteSendUserEdited = true;
 });
 
 el('sa-modal-rename-org-cancel').addEventListener('click', ()=>{
