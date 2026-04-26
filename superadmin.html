@@ -425,6 +425,17 @@ body.sa-nav-ready .admin-burger{display:flex}
   </div>
 </div>
 
+<div class="modal-overlay" id="sa-modal-delete-invite" role="dialog" aria-modal="true" aria-labelledby="sa-modal-delete-invite-title">
+  <div class="modal">
+    <h3 id="sa-modal-delete-invite-title">Supprimer le lien</h3>
+    <p class="empty-hint" style="color:#555;line-height:1.45">Supprimer définitivement ce lien d'invitation ? Cette action est irréversible.<br>Le compte et l'organisation éventuellement créés ne seront pas affectés.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="sa-modal-delete-invite-cancel">Annuler</button>
+      <button type="button" class="btn-danger" id="sa-modal-delete-invite-ok" style="border:1px solid #f0c0c0;padding:8px 16px">Supprimer</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="sa-toast"></div>
 
 <script type="module">
@@ -1164,6 +1175,7 @@ let pendingDeleteOrgId = '';
 let pendingDeleteOrgLabel = '';
 let pendingRenameOrgId = '';
 let saInviteToRevoke = '';
+let saInviteToDelete = '';
 
 async function deleteStorageTree(rootRef){
   const page = await listAll(rootRef);
@@ -2152,6 +2164,9 @@ async function renderInvitesList(){
     const revokeBtn = canCopyRevoke
       ? `<button type="button" class="btn-sm btn-danger" id="sa-invite-revoke-${r.token}" data-sa-invite-revoke="${escHtml(r.token)}">🗑️ Révoquer</button>`
       : '';
+    const deleteBtn = canCopyRevoke
+      ? ''
+      : `<button type="button" class="btn-sm btn-danger" data-sa-invite-delete="${escHtml(r.token)}">🗑️ Supprimer définitivement</button>`;
     return `<div class="sa-invite-row">
       <div class="sa-invite-main">
         <div class="sa-invite-head">
@@ -2162,7 +2177,7 @@ async function renderInvitesList(){
         ${createdLine}
         ${expLine}
       </div>
-      <div class="sa-invite-actions">${copyBtn}${revokeBtn}</div>
+      <div class="sa-invite-actions">${copyBtn}${revokeBtn}${deleteBtn}</div>
     </div>`;
   }).join('');
   if(!host._saInvitesClickWired){
@@ -2186,6 +2201,15 @@ async function renderInvitesList(){
         if(tok){
           saInviteToRevoke = tok;
           openModal('sa-modal-revoke-invite');
+        }
+        return;
+      }
+      const del = e.target.closest('[data-sa-invite-delete]');
+      if(del){
+        const tok = del.getAttribute('data-sa-invite-delete');
+        if(tok){
+          saInviteToDelete = tok;
+          openModal('sa-modal-delete-invite');
         }
       }
     });
@@ -2475,6 +2499,27 @@ el('sa-modal-revoke-invite-ok').addEventListener('click', async ()=>{
     saInviteToRevoke = '';
     closeModal('sa-modal-revoke-invite');
     showToast('Lien révoqué');
+    renderInvitesList();
+  }catch(e){
+    console.warn(e);
+    showToast('Erreur');
+  }
+});
+el('sa-modal-delete-invite-cancel').addEventListener('click', ()=>{
+  saInviteToDelete = '';
+  closeModal('sa-modal-delete-invite');
+});
+el('sa-modal-delete-invite-ok').addEventListener('click', async ()=>{
+  const tok = saInviteToDelete;
+  if(!tok){
+    closeModal('sa-modal-delete-invite');
+    return;
+  }
+  try{
+    await remove(ref(db, 'inviteTokens/'+tok));
+    saInviteToDelete = '';
+    closeModal('sa-modal-delete-invite');
+    showToast('Lien supprimé');
     renderInvitesList();
   }catch(e){
     console.warn(e);
