@@ -1744,11 +1744,15 @@ function renderKpi(){
   const firstDay=new Date(yr,mo,1), lastDay=new Date(yr,mo+1,0);
   const checkoutsMonth=S.reservations.filter(r=>{
     const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
+    return e>=firstDay && e<=lastDay;
+  });
+  const checkoutsFuture=S.reservations.filter(r=>{
+    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
     return e>=firstDay && e<=lastDay && e>=today;
   });
   const total=checkoutsMonth.length;
   const assigned=checkoutsMonth.filter(r=>{ const {c1,c2}=getAssignment(r); return c1||c2; }).length;
-  const unassigned=total-assigned;
+  const unassigned=checkoutsFuture.filter(r=>{ const {c1,c2}=getAssignment(r); return !c1&&!c2; }).length;
   let scoreColor=total===0||assigned===total?'green':assigned/total>=0.7?'orange':'red';
 
   const nextUnassigned=S.reservations
