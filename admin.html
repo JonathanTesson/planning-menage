@@ -176,6 +176,7 @@ body.admin-nav-ready .admin-burger{display:flex}
     <a href="#" class="admin-nav-link" data-admin-view="organisation">Organisation</a>
     <a href="#" class="admin-nav-link" data-admin-view="legend">Légende</a>
     <a href="#" class="admin-nav-link" data-admin-view="indisponibilites">Indisponibilités</a>
+    <a href="#" class="admin-nav-link" data-admin-view="reservations">Réservations</a>
   </div>
 </nav>
 
@@ -345,6 +346,22 @@ body.admin-nav-ready .admin-burger{display:flex}
         </div>
       </div>
       <div id="admin-unavail-future-summary" class="unavail-future-summary" style="display:none" aria-live="polite"></div>
+    </div>
+    </div>
+
+    <div id="admin-view-reservations" role="region" aria-label="Réservations du mois" style="display:none">
+    <div class="section" id="section-reservations">
+      <h3><span>📅</span> Réservations</h3>
+      <p style="font-size:11px;color:#aaa;margin-bottom:10px;line-height:1.5">Séjours qui chevauchent le mois affiché (même périmètre que le planning). Indiquez le nombre de voyageurs attendus ; la valeur est enregistrée sur l’assignation Firebase de la réservation.</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+        <h3 style="margin-bottom:0"><span>📅</span> <span id="admin-resa-month-title">…</span></h3>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button type="button" class="nav-btn" onclick="adminChangeMonth(-1)">&#8592;</button>
+          <button type="button" class="nav-btn" onclick="adminChangeMonth(0)" id="admin-resa-month-btn" style="min-width:55px">…</button>
+          <button type="button" class="nav-btn" onclick="adminChangeMonth(1)">&#8594;</button>
+        </div>
+      </div>
+      <div id="admin-reservations-list-host"></div>
     </div>
     </div>
   </div>
@@ -859,7 +876,13 @@ async function loadOrganizations(){
     if(A.unlocked&&studiosHost&&adminCurrentView==='organisation') renderStudioFields();
   });
 
-  onValue(ref(db,ob('assignments')), snap=>{ A.assignments=snap.val()||{}; if(A.unlocked) renderStats(); });
+  onValue(ref(db,ob('assignments')), snap=>{
+    A.assignments=snap.val()||{};
+    if(A.unlocked){
+      renderStats();
+      if(adminCurrentView==='reservations') renderAdminReservations();
+    }
+  });
 
   onValue(ref(db,ob('cleaningReports')), snap=>{
     A.cleaningReports=snap.val()||{};
@@ -869,7 +892,11 @@ async function loadOrganizations(){
   onValue(ref(db,ob('reservations')), snap=>{
     const data=snap.val()||{};
     A.reservations=Object.values(data).map(r=>({...r,start:new Date(r.start),end:new Date(r.end)}));
-    if(A.unlocked) { renderStats(); renderHisto(); }
+    if(A.unlocked){
+      renderStats();
+      renderHisto();
+      if(adminCurrentView==='reservations') renderAdminReservations();
+    }
   });
 
   onValue(ref(db,ob('adminConfig')), snap=>{
@@ -1001,8 +1028,8 @@ window.logout = function(){
   window.location.href='index.html';
 };
 
-/** Vues : dashboard (stats, export, historique, déco), procédures, comptes + journal, organisation (studios), légende, indisponibilités */
-const ADMIN_VIEW_IDS=['dashboard','procedures','comptes','organisation','legend','indisponibilites'];
+/** Vues : dashboard (stats, export, historique, déco), procédures, comptes + journal, organisation (studios), légende, indisponibilités, réservations */
+const ADMIN_VIEW_IDS=['dashboard','procedures','comptes','organisation','legend','indisponibilites','reservations'];
 
 /** Une seule fois : ouvrir la vue correspondant au hash (#comptes, #legend, #procedures, …) */
 let adminUiHashApplied=false;
@@ -1030,6 +1057,7 @@ window.setAdminUiView=function(view,opts){
     renderAdminUnavailCal();
     renderAdminUnavailFutureSummary();
   }
+  if(v==='reservations'&&A.unlocked) renderAdminReservations();
 };
 
 function setAdminNavOpen(open){
@@ -1099,6 +1127,7 @@ function renderAdminContent(){
       renderAdminUnavailCal();
       renderAdminUnavailFutureSummary();
     }
+    if(A.unlocked&&adminCurrentView==='reservations') renderAdminReservations();
     if(A.unlocked&&!adminUiHashApplied){
       adminUiHashApplied=true;
       let h=location.hash.slice(1);
@@ -1408,6 +1437,89 @@ function getAssignmentSlots(uid){
   if(typeof a==='string') return { c1:a,c2:null,note:'' };
   return { c1:a.cleaner||a.c1||null,c2:a.c2||null,note:a.note||'' };
 }
+
+function adminResaVoyageursCurrent(uid){
+  const a=A.assignments[uid];
+  if(!a||typeof a==='string') return null;
+  const v=a.voyageurs;
+  if(v==null||v==='') return null;
+  const n=Number(v);
+  return Number.isFinite(n)&&n>=1&&n<=8?n:null;
+}
+
+function renderAdminReservations(){
+  const title=document.getElementById('admin-resa-month-title');
+  const mid=document.getElementById('admin-resa-month-btn');
+  const host=document.getElementById('admin-reservations-list-host');
+  if(!title||!mid||!host) return;
+  if(!A.unlocked){ host.innerHTML=''; window._adminResaUids=[]; return; }
+  const mo=A.selectedMonth, yr=A.selectedYear;
+  title.textContent=MO_FR[mo]+' '+yr;
+  mid.textContent=MO_FR[mo];
+  const fd=new Date(yr, mo, 1);
+  const ld=new Date(yr, mo+1, 0);
+  const fdT=new Date(fd.getFullYear(), fd.getMonth(), fd.getDate()).getTime();
+  const ldT=new Date(ld.getFullYear(), ld.getMonth(), ld.getDate()).getTime();
+  const list=[...A.reservations].filter(r=>r&&r.uid).filter(r=>{
+    const rs=new Date(r.start.getFullYear(), r.start.getMonth(), r.start.getDate()).getTime();
+    const re=new Date(r.end.getFullYear(), r.end.getMonth(), r.end.getDate()).getTime();
+    return rs<=ldT&&re>=fdT;
+  }).sort((a,b)=>a.start-b.start);
+  if(!list.length){
+    host.innerHTML='<p style="color:#aaa;font-size:12px;padding:4px 0">Aucune réservation sur cette période.</p>';
+    window._adminResaUids=[];
+    return;
+  }
+  window._adminResaUids=list.map(r=>r.uid);
+  const rows=list.map((r,idx)=>{
+    const uid=r.uid;
+    const arrLabel=r.start.toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
+    const si=r.studio;
+    const sn=(A.studioNames&&A.studioNames[si]!=null)?String(A.studioNames[si]):String(si??'');
+    const v=adminResaVoyageursCurrent(uid);
+    const opts=['<option value=""></option>'].concat([1,2,3,4,5,6,7,8].map(n=>`<option value="${n}"${v===n?' selected':''}>${n}</option>`));
+    return `<tr>
+      <td style="white-space:nowrap">${escHtml(arrLabel)}</td>
+      <td>${escHtml(sn)}</td>
+      <td><select style="max-width:88px;padding:6px 8px;font-size:13px;border:1px solid #ddd;border-radius:8px;background:#fff" onchange="window.adminResaVoyageursChange(this,${idx})">${opts.join('')}</select></td>
+    </tr>`;
+  }).join('');
+  host.innerHTML=`<table class="histo-table"><thead><tr><th>Arrivée</th><th>Studio</th><th>Voyageurs</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+window.adminResaVoyageursChange=async function(sel, idx){
+  const uid=window._adminResaUids&&window._adminResaUids[idx];
+  if(!A.unlocked||uid==null||uid==='') return;
+  const raw=String(sel.value??'');
+  const val=raw===''?null:Number(raw);
+  if(raw!==''&&(!Number.isFinite(val)||val<1||val>8)){
+    renderAdminReservations();
+    return;
+  }
+  const prevV=adminResaVoyageursCurrent(uid);
+  if(val===null&&prevV===null){
+    renderAdminReservations();
+    return;
+  }
+  if(val!==null&&prevV===val){
+    renderAdminReservations();
+    return;
+  }
+  const prev=A.assignments[uid];
+  try{
+    if(typeof prev==='string'){
+      await set(ref(db, ob('assignments/'+uid)), val===null?{ cleaner: prev }:{ cleaner: prev, voyageurs: val });
+    }else{
+      await update(ref(db, ob('assignments/'+uid)), val===null?{ voyageurs: null }:{ voyageurs: val });
+    }
+    setSyncStatus('ok');
+  }catch(e){
+    console.warn(e);
+    setSyncStatus('err');
+    showToast('Erreur réseau — voyageurs non enregistrés');
+  }
+  renderAdminReservations();
+};
 
 function renderStats(){
   const mo=A.selectedMonth, yr=A.selectedYear;
@@ -2034,6 +2146,7 @@ window.adminChangeMonth = function(dir){
     if(A.selectedMonth<0){A.selectedMonth=11;A.selectedYear--;}
   }
   renderStats();
+  if(adminCurrentView==='reservations') renderAdminReservations();
 };
 
 // ─── Procédures ménage (RTDB + Storage) ───────────────────────────────────────
