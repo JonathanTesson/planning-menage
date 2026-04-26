@@ -1477,14 +1477,16 @@ function renderAdminReservations(){
     const si=r.studio;
     const sn=(A.studioNames&&A.studioNames[si]!=null)?String(A.studioNames[si]):String(si??'');
     const v=adminResaVoyageursCurrent(uid);
+    const nuites=Math.round((r.end-r.start)/86400000);
     const opts=['<option value=""></option>'].concat([1,2,3,4,5,6,7,8].map(n=>`<option value="${n}"${v===n?' selected':''}>${n}</option>`));
     return `<tr>
       <td style="white-space:nowrap">${escHtml(arrLabel)}</td>
+      <td>${nuites}</td>
       <td>${escHtml(sn)}</td>
       <td><select style="max-width:88px;padding:6px 8px;font-size:13px;border:1px solid #ddd;border-radius:8px;background:#fff" onchange="window.adminResaVoyageursChange(this,${idx})">${opts.join('')}</select></td>
     </tr>`;
   }).join('');
-  host.innerHTML=`<table class="histo-table"><thead><tr><th>Arrivée</th><th>Studio</th><th>Voyageurs</th></tr></thead><tbody>${rows}</tbody></table>`;
+  host.innerHTML=`<table class="histo-table"><thead><tr><th>Arrivée</th><th>Nuits</th><th>Studio</th><th>Voyageurs</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 window.adminResaVoyageursChange=async function(sel, idx){

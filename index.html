@@ -179,7 +179,13 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 .modal-btns--split .btn-primary{flex-shrink:0}
 .modal-btns--split .btn-danger{flex-shrink:0}
 .modal-meta{background:#f5f5f0;border-radius:8px;padding:0.75rem;margin-bottom:1rem;font-size:12px;color:#555;line-height:1.6}
+.modal-meta.modal-meta--has-voyageurs{padding-right:2.75rem}
 .modal-meta strong{color:#1a1a1a;font-weight:600}
+.voyageurs-pip{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;line-height:1;box-sizing:border-box}
+.voyageurs-pip--1{background:#1D9E75}
+.voyageurs-pip--2{background:#F59E0B}
+.voyageurs-pip--3{background:#E67E22}
+.voyageurs-pip--4{background:#E24B4A}
 .modal-section-title{font-size:11px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin:1rem 0 0.5rem}
 .cleaner-item{display:flex;gap:8px;align-items:center;margin-bottom:6px}
 .cleaner-item input{flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a}
@@ -1663,6 +1669,17 @@ function getAssignment(r){
   };
 }
 
+function voyageursPip(key){
+  const a=S.assignments[key];
+  if(!a||typeof a==='string') return '';
+  const v=a.voyageurs;
+  if(v==null||v==='') return '';
+  const n=Number(v);
+  if(!Number.isFinite(n)||n<1||n>8) return '';
+  const tier=n===1?1:n===2?2:n===3?3:4;
+  return `<span class="voyageurs-pip voyageurs-pip--${tier}" aria-hidden="true">${n}</span>`;
+}
+
 async function refreshCleanerList(){
   try{
     const snap=await get(ref(db,'accounts'));
@@ -2254,6 +2271,7 @@ window._oa = function(key){
   const isAdminOrNoAuth=!user||user.noAuth||user.admin;
   const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
   const n=Math.round((r.end-r.start)/86400000);
+  const voyPip=voyageursPip(key);
 
   if(!isAdminOrNoAuth && user?.menage){
     // Vue ménage : assignation + retours terrain (durée perso, commentaire & commande communs)
@@ -2278,7 +2296,8 @@ window._oa = function(key){
             </div>
             <button type="button" class="modal-close-x" onclick="window._cm()" aria-label="Fermer" title="Fermer">×</button>
           </div>
-          <div class="modal-meta">
+          <div class="modal-meta${voyPip?' modal-meta--has-voyageurs':''}" style="position:relative">
+            ${voyPip}
             <strong>${escHtml(S.studioNames[r.studio])}</strong><br>
             Arrivée : ${fmt(r.start)}<br>
             Départ : ${fmt(r.end)} (${n} nuit${n>1?'s':''})</div>
@@ -2357,7 +2376,8 @@ window._oa = function(key){
       <div class="modal-overlay" onclick="if(event.target===this)window._cm()">
         <div class="modal modal--wide">
           <h3>M'assigner</h3>
-          <div class="modal-meta">
+          <div class="modal-meta${voyPip?' modal-meta--has-voyageurs':''}" style="position:relative">
+            ${voyPip}
             <strong>${escHtml(S.studioNames[r.studio])}</strong><br>
             Arrivée : ${fmt(r.start)}<br>
             Départ : ${fmt(r.end)} (${n} nuit${n>1?'s':''})</div>
@@ -2380,7 +2400,8 @@ window._oa = function(key){
     <div class="modal-overlay" onclick="if(event.target===this)window._cm()">
       <div class="modal">
         <h3>Assigner les intervenantes</h3>
-        <div class="modal-meta">
+        <div class="modal-meta${voyPip?' modal-meta--has-voyageurs':''}" style="position:relative">
+          ${voyPip}
           <strong>${S.studioNames[r.studio]}</strong><br>
           Arrivée : ${fmt(r.start)}<br>
           Départ : ${fmt(r.end)} (${n} nuit${n>1?'s':''})<br>
