@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invitation — Planning Ménage</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f5f5f0;color:#1a1a1a;padding:0 0 2rem;min-height:100vh}
+.invite-container{max-width:440px;margin:0 auto;padding:1.25rem 1rem 2rem}
+.invite-progress{margin-bottom:1.5rem;padding:0 0.25rem}
+.invite-progress-track{display:flex;align-items:center;justify-content:center;width:100%;flex-wrap:nowrap;gap:0}
+.step-circle{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;font-size:11px;font-weight:700;flex-shrink:0;line-height:1}
+.step-circle.step--done{background:#1a1a1a;color:#fff;border:1px solid #1a1a1a}
+.step-circle.step--current{background:#1a1a1a;color:#fff;border:1px solid #1a1a1a}
+.step-circle.step--todo{background:#fff;color:#aaa;border:1px solid #ddd}
+.progress-line{flex:1;height:2px;min-width:6px;max-width:36px;border-radius:1px;flex-shrink:1}
+.progress-line--done{background:#1a1a1a}
+.progress-line--todo{background:#ddd}
+@media (max-width:380px){
+  .step-circle{width:24px;height:24px;font-size:10px}
+  .progress-line{max-width:22px;min-width:4px}
+}
+.invite-step{display:none;flex-direction:column;align-items:center;gap:1rem;padding:2rem 1.5rem;text-align:center}
+.invite-icon{font-size:56px;line-height:1;margin-bottom:8px}
+.invite-title{font-size:22px;font-weight:700;line-height:1.25;color:#1a1a1a}
+.invite-sub{font-size:14px;color:#666;line-height:1.5;max-width:320px;text-align:center}
+.invite-info{background:#fff;border:1px solid #e8e8e2;border-radius:10px;padding:12px 16px;font-size:13px;color:#555;text-align:center;width:100%;max-width:320px}
+.invite-error-card{background:#fafaf8;border:1px solid #e0e0d8;border-radius:10px;padding:1rem 1.25rem;max-width:320px;width:100%}
+.invite-error-card .invite-icon{font-size:40px;margin-bottom:4px}
+.invite-step-body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;min-height:52vh;padding:0.5rem 0}
+#step1-subs{width:100%;display:flex;flex-direction:column;align-items:center;gap:1rem}
+.step1-sub{display:none;width:100%;flex-direction:column;align-items:center;gap:1rem}
+.step1-sub.is-visible{display:flex}
+</style>
+</head>
+<body>
+
+<div class="invite-container">
+
+  <div class="invite-progress" id="invite-progress" aria-hidden="true">
+    <div class="invite-progress-track">
+      <span class="step-circle step--todo" data-step-idx="1">1</span>
+      <span class="progress-line progress-line--todo" data-line-idx="1"></span>
+      <span class="step-circle step--todo" data-step-idx="2">2</span>
+      <span class="progress-line progress-line--todo" data-line-idx="2"></span>
+      <span class="step-circle step--todo" data-step-idx="3">3</span>
+      <span class="progress-line progress-line--todo" data-line-idx="3"></span>
+      <span class="step-circle step--todo" data-step-idx="4">4</span>
+      <span class="progress-line progress-line--todo" data-line-idx="4"></span>
+      <span class="step-circle step--todo" data-step-idx="5">5</span>
+      <span class="progress-line progress-line--todo" data-line-idx="5"></span>
+      <span class="step-circle step--todo" data-step-idx="6">6</span>
+    </div>
+  </div>
+
+  <div id="invite-step-1" class="invite-step" style="display:none">
+    <div class="invite-step-body">
+      <div id="step1-subs" aria-live="polite">
+        <div id="step1-loading" class="step1-sub">
+          <div class="invite-icon">⏳</div>
+          <div class="invite-title">Validation du lien…</div>
+          <div class="invite-sub">Un instant, on vérifie votre invitation.</div>
+        </div>
+        <div id="step1-valid" class="step1-sub">
+          <div class="invite-icon">🏠</div>
+          <div class="invite-title">Bienvenue !</div>
+          <div class="invite-sub">Votre lien d'invitation est valide. Vous allez pouvoir créer votre organisation en quelques étapes simples.</div>
+          <div class="invite-info" role="status">Lien valable jusqu'au <strong id="invite-valid-until"></strong></div>
+          <button type="button" class="btn-primary" id="btn-commencer">Commencer</button>
+        </div>
+        <div id="step1-expired" class="step1-sub">
+          <div class="invite-icon">⏰</div>
+          <div class="invite-title">Lien expiré</div>
+          <div class="invite-sub">Ce lien d'invitation n'est plus valide. Demandez un nouveau lien à la personne qui vous l'a envoyé.</div>
+        </div>
+        <div id="step1-used" class="step1-sub">
+          <div class="invite-icon">✅</div>
+          <div class="invite-title">Lien déjà utilisé</div>
+          <div class="invite-sub">Ce lien d'invitation a déjà servi à créer une organisation. Si c'est vous, connectez-vous depuis la page d'accueil.</div>
+          <a class="btn-secondary" href="index.html" style="display:inline-block;text-decoration:none;margin-top:4px">Aller à la connexion</a>
+        </div>
+        <div id="step1-invalid" class="step1-sub">
+          <div class="invite-error-card">
+            <div class="invite-icon">❌</div>
+            <div class="invite-title">Lien invalide</div>
+            <div class="invite-sub">Ce lien d'invitation est invalide ou a été révoqué. Demandez un nouveau lien à la personne qui vous l'a envoyé.</div>
+          </div>
+        </div>
+        <div id="step1-error" class="step1-sub">
+          <div class="invite-icon">⚠️</div>
+          <div class="invite-title">Erreur de connexion</div>
+          <div class="invite-sub">Impossible de vérifier votre lien pour le moment. Vérifiez votre connexion internet et réessayez.</div>
+          <button type="button" class="btn-primary" id="btn-retry">Réessayer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="invite-step-2" class="invite-step" style="display:none">
+    <div class="invite-icon">👤</div>
+    <div class="invite-title">Étape 2 — bientôt disponible</div>
+    <div class="invite-sub">Cette étape sera implémentée dans la session suivante. Token validé : <span id="dbg-token"></span>.</div>
+  </div>
+
+  <div id="invite-step-3" class="invite-step" style="display:none">
+    <div class="invite-icon">🏢</div>
+    <div class="invite-title">Étape 3 — bientôt disponible</div>
+    <div class="invite-sub">Cette étape sera implémentée ultérieurement.</div>
+  </div>
+
+  <div id="invite-step-4" class="invite-step" style="display:none">
+    <div class="invite-icon">🛏️</div>
+    <div class="invite-title">Étape 4 — bientôt disponible</div>
+    <div class="invite-sub">Cette étape sera implémentée ultérieurement.</div>
+  </div>
+
+  <div id="invite-step-5" class="invite-step" style="display:none">
+    <div class="invite-icon">🔗</div>
+    <div class="invite-title">Étape 5 — bientôt disponible</div>
+    <div class="invite-sub">Cette étape sera implémentée ultérieurement.</div>
+  </div>
+
+  <div id="invite-step-6" class="invite-step" style="display:none">
+    <div class="invite-icon">🎉</div>
+    <div class="invite-title">Étape 6 — bientôt disponible</div>
+    <div class="invite-sub">Cette étape sera implémentée ultérieurement.</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
+
+const APP_VERSION = '4.9.4';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBCbn51DxRdhBta7ZKN2BF9ZsDXsrDdeG4",
+  authDomain: "planning-menage-18b09.firebaseapp.com",
+  databaseURL: "https://planning-menage-18b09-default-rtdb.firebaseio.com",
+  projectId: "planning-menage-18b09",
+  storageBucket: "planning-menage-18b09.firebasestorage.app",
+  messagingSenderId: "685094108459",
+  appId: "1:685094108459:web:b90ec9f136de34d699996e"
+};
+
+const app = initializeApp(firebaseConfig);
+const functions = getFunctions(app, 'us-central1');
+const inviteTokenCallable = httpsCallable(functions, 'inviteToken');
+
+let inviteToken = '';
+let inviteExpiresAt = 0;
+let inviteStep = 0;
+
+function el(id){ return document.getElementById(id); }
+
+function showToast(msg){
+  const t = el('toast');
+  if(!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 3200);
+}
+
+function fmtFRDate(ms){
+  if(ms == null || !Number.isFinite(Number(ms))) return '—';
+  return new Date(Number(ms)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function setStep(n){
+  if(n < 1 || n > 6) return;
+  inviteStep = n;
+  for(let i = 1; i <= 6; i++){
+    const node = el('invite-step-'+i);
+    if(node) node.style.display = i === n ? 'flex' : 'none';
+  }
+  for(let i = 1; i <= 6; i++){
+    const circle = document.querySelector('[data-step-idx="'+i+'"]');
+    if(!circle) continue;
+    circle.classList.remove('step--done','step--current','step--todo');
+    if(i < n){
+      circle.classList.add('step--done');
+      circle.textContent = '✓';
+    }else if(i === n){
+      circle.classList.add('step--current');
+      circle.textContent = String(i);
+    }else{
+      circle.classList.add('step--todo');
+      circle.textContent = String(i);
+    }
+  }
+  for(let L = 1; L <= 5; L++){
+    const line = document.querySelector('[data-line-idx="'+L+'"]');
+    if(!line) continue;
+    line.classList.remove('progress-line--done','progress-line--todo');
+    line.classList.add(L < n ? 'progress-line--done' : 'progress-line--todo');
+  }
+}
+
+const STEP1_SUBS = ['loading','valid','expired','used','invalid','error'];
+
+function showStep1Sub(state){
+  if(!STEP1_SUBS.includes(state)) return;
+  for(const s of STEP1_SUBS){
+    const node = el('step1-'+s);
+    if(!node) continue;
+    node.classList.toggle('is-visible', s === state);
+  }
+}
+
+async function runValidation(){
+  showStep1Sub('loading');
+  try{
+    const res = await inviteTokenCallable({ action: 'validate', token: inviteToken });
+    const d = res.data;
+    if(d && d.valid === true){
+      inviteExpiresAt = Number(d.expiresAt);
+      const until = el('invite-valid-until');
+      if(until) until.textContent = fmtFRDate(inviteExpiresAt);
+      showStep1Sub('valid');
+      return;
+    }
+    if(d && d.valid === false){
+      const r = d.reason;
+      if(r === 'expired') showStep1Sub('expired');
+      else if(r === 'used') showStep1Sub('used');
+      else if(r === 'revoked' || r === 'not_found') showStep1Sub('invalid');
+      else showStep1Sub('invalid');
+      return;
+    }
+    showStep1Sub('invalid');
+  }catch(e){
+    console.warn(e);
+    showStep1Sub('error');
+  }
+}
+
+function dbgTokenSuffix(){
+  const t = inviteToken;
+  if(!t || t.length < 4) return '—';
+  return t.slice(-4);
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.documentElement.dataset.appVersion = APP_VERSION;
+  inviteToken = (new URL(location.href).searchParams.get('t') || '').trim();
+
+  const btnCommencer = el('btn-commencer');
+  if(btnCommencer){
+    btnCommencer.addEventListener('click', ()=>{
+      const dbg = el('dbg-token');
+      if(dbg) dbg.textContent = dbgTokenSuffix();
+      setStep(2);
+    });
+  }
+  const btnRetry = el('btn-retry');
+  if(btnRetry) btnRetry.addEventListener('click', ()=>{ void runValidation(); });
+
+  setStep(1);
+  if(!inviteToken){
+    showStep1Sub('invalid');
+    return;
+  }
+  void runValidation();
+});
+</script>
+</body>
+</html>
