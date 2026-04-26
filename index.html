@@ -1271,10 +1271,12 @@ window.doGoogleLogin = async function(){
   errEl.style.display='none';
   try{
     const provider = new GoogleAuthProvider();
+    showAuthLoading();
     await signInWithPopup(auth, provider);
     if(!window.__menageFbInit) initFirebaseAndApp();
     await resolveSessionFromFirebaseUser(auth.currentUser);
   }catch(e){
+    showLogin();
     if(e && e.code === 'auth/popup-closed-by-user') return;
     errEl.style.display='';
     errEl.textContent = 'Connexion Google impossible. Utilisez votre email et mot de passe.';
