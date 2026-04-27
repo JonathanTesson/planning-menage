@@ -44,6 +44,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .invite-google-btn{display:flex;align-items:center;justify-content:center;gap:8px;max-width:320px;width:100%}
 .invite-back-btn{background:none;border:none;color:#888;font-size:12px;cursor:pointer;padding:8px;margin-top:4px;font:inherit}
 .invite-back-btn:hover{color:#1a1a1a}
+.step4-studios-list{display:flex;flex-direction:column;gap:8px;width:100%;max-width:320px}
+.step4-studio-row{display:flex;gap:8px;align-items:center}
+.step4-studio-row .invite-input{flex:1}
+.step4-remove-btn{background:none;border:1px solid #ddd;border-radius:8px;padding:8px 10px;cursor:pointer;color:#888;font-size:14px;flex-shrink:0;font:inherit}
+.step4-remove-btn:hover{border-color:#E24B4A;color:#E24B4A}
+#step4-add{max-width:320px;width:100%}
+.step5-ical-list{display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px}
+.step5-ical-row{display:flex;flex-direction:column;gap:4px}
+.step5-studio-label{font-weight:600;color:#555}
 </style>
 </head>
 <body>
@@ -116,13 +125,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
     <div class="invite-form" id="step2-form">
       <label for="step2-prenom" class="invite-label">Prénom</label>
-      <input type="text" id="step2-prenom" class="invite-input" autocomplete="given-name" placeholder="Steve">
+      <input type="text" id="step2-prenom" class="invite-input" autocomplete="given-name">
 
       <label for="step2-nom" class="invite-label">Nom</label>
-      <input type="text" id="step2-nom" class="invite-input" autocomplete="family-name" placeholder="Martin">
+      <input type="text" id="step2-nom" class="invite-input" autocomplete="family-name">
 
       <label for="step2-email" class="invite-label">Email</label>
-      <input type="email" id="step2-email" class="invite-input" autocomplete="email" placeholder="steve@exemple.com">
+      <input type="email" id="step2-email" class="invite-input" autocomplete="email">
 
       <label for="step2-pwd" class="invite-label">Mot de passe</label>
       <input type="password" id="step2-pwd" class="invite-input" autocomplete="new-password" placeholder="6 caractères minimum">
@@ -148,20 +157,35 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
   <div id="invite-step-3" class="invite-step" style="display:none">
     <div class="invite-icon">🏢</div>
-    <div class="invite-title">Étape 3 — bientôt disponible</div>
-    <div class="invite-sub">Cette étape sera implémentée ultérieurement. Token validé : <span id="dbg-token"></span>.</div>
+    <div class="invite-title">Mon organisation</div>
+    <div class="invite-sub">Le nom de votre structure.</div>
+    <div class="invite-form" id="step3-form">
+      <label for="step3-nom" class="invite-label">Nom de l'organisation</label>
+      <input type="text" id="step3-nom" class="invite-input" autocomplete="organization">
+      <div class="invite-error" id="step3-error" style="display:none"></div>
+      <button type="button" class="btn-primary" id="step3-continue">Continuer</button>
+    </div>
+    <button type="button" class="invite-back-btn" id="step3-back">← Retour</button>
   </div>
 
   <div id="invite-step-4" class="invite-step" style="display:none">
     <div class="invite-icon">🛏️</div>
-    <div class="invite-title">Étape 4 — bientôt disponible</div>
-    <div class="invite-sub">Cette étape sera implémentée ultérieurement.</div>
+    <div class="invite-title">Mes studios</div>
+    <div class="invite-sub">Ajoutez vos studios un par un.</div>
+    <div id="step4-studios-list" class="step4-studios-list"></div>
+    <div class="invite-error" id="step4-error" style="display:none"></div>
+    <button type="button" class="btn-secondary" id="step4-add">+ Ajouter un studio</button>
+    <button type="button" class="btn-primary" id="step4-continue">Continuer</button>
+    <button type="button" class="invite-back-btn" id="step4-back">← Retour</button>
   </div>
 
   <div id="invite-step-5" class="invite-step" style="display:none">
     <div class="invite-icon">🔗</div>
-    <div class="invite-title">Étape 5 — bientôt disponible</div>
-    <div class="invite-sub">Cette étape sera implémentée ultérieurement.</div>
+    <div class="invite-title">Mes URLs iCal</div>
+    <div class="invite-sub">Optionnel — vous pouvez configurer ça plus tard dans votre compte.</div>
+    <div id="step5-ical-list" class="step5-ical-list"></div>
+    <button type="button" class="btn-primary" id="step5-continue">Continuer</button>
+    <button type="button" class="invite-back-btn" id="step5-back">← Retour</button>
   </div>
 
   <div id="invite-step-6" class="invite-step" style="display:none">
@@ -207,6 +231,9 @@ let inviteAccount = {
   pwd: '',
   googleUid: '',
 };
+let inviteOrg = { nom: '', slug: '' };
+let inviteStudios = [];
+let inviteIcal = {};
 
 function el(id){ return document.getElementById(id); }
 
@@ -221,6 +248,15 @@ function showToast(msg){
 function fmtFRDate(ms){
   if(ms == null || !Number.isFinite(Number(ms))) return '—';
   return new Date(Number(ms)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function slugify(str){
+  return String(str || '').trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 function setStep(n){
@@ -277,6 +313,30 @@ function onEnterStep(n){
       if(e) e.classList.remove('is-error');
     });
   }
+  if(n === 3){
+    const inp = el('step3-nom');
+    if(inp){
+      inp.value = inviteOrg.nom || '';
+      inp.classList.remove('is-error');
+    }
+    const err3 = el('step3-error');
+    if(err3){
+      err3.style.display = 'none';
+      err3.textContent = '';
+    }
+  }
+  if(n === 4){
+    if(inviteStudios.length === 0) inviteStudios.push('');
+    const err4 = el('step4-error');
+    if(err4){
+      err4.style.display = 'none';
+      err4.textContent = '';
+    }
+    renderStudiosList();
+  }
+  if(n === 5){
+    renderIcalList();
+  }
 }
 
 function validateStep2Form(){
@@ -303,6 +363,132 @@ function validateStep2Form(){
     return null;
   }
   return { prenom, nom, email, pwd };
+}
+
+function validateStep3Form(){
+  const inp = el('step3-nom');
+  const v = inp.value.trim();
+  inp.classList.remove('is-error');
+  if(!v){
+    inp.classList.add('is-error');
+    const err = el('step3-error');
+    err.textContent = "Merci d'indiquer le nom de votre organisation.";
+    err.style.display = '';
+    return null;
+  }
+  el('step3-error').style.display = 'none';
+  return { nom: v };
+}
+
+function renderStudiosList(){
+  const host = el('step4-studios-list');
+  if(!host) return;
+  host.innerHTML = '';
+  inviteStudios.forEach((name, i)=>{
+    const row = document.createElement('div');
+    row.className = 'step4-studio-row';
+    row.dataset.studioIdx = String(i);
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'invite-input step4-studio-input';
+    inp.placeholder = '';
+    inp.value = name;
+    inp.addEventListener('input', ()=>{
+      inviteStudios[Number(row.dataset.studioIdx)] = inp.value;
+    });
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'step4-remove-btn';
+    btn.setAttribute('aria-label', 'Supprimer ce studio');
+    btn.textContent = '✕';
+    btn.addEventListener('click', ()=>{
+      const idx = Number(row.dataset.studioIdx);
+      const oldIcal = { ...inviteIcal };
+      inviteStudios.splice(idx, 1);
+      const next = {};
+      inviteStudios.forEach((_, j)=>{
+        const oldKey = j < idx ? String(j) : String(j + 1);
+        const u = oldIcal[oldKey];
+        if(u !== undefined && String(u).trim() !== '') next[String(j)] = String(u).trim();
+      });
+      inviteIcal = next;
+      renderStudiosList();
+    });
+    row.appendChild(inp);
+    row.appendChild(btn);
+    host.appendChild(row);
+  });
+}
+
+function readStudiosFromDOM(){
+  const host = el('step4-studios-list');
+  if(!host) return [];
+  const inputs = host.querySelectorAll('.step4-studio-input');
+  const arr = Array.from(inputs).map(x=>x.value.trim());
+  inviteStudios.splice(0, inviteStudios.length, ...arr);
+  return arr;
+}
+
+function validateStep4(){
+  readStudiosFromDOM();
+  const oldStudios = inviteStudios.slice();
+  const oldIcal = { ...inviteIcal };
+  const filtered = oldStudios.map(s=>String(s||'').trim()).filter(Boolean);
+  if(filtered.length === 0){
+    const err = el('step4-error');
+    err.textContent = 'Ajoutez au moins un studio.';
+    err.style.display = '';
+    return false;
+  }
+  const nextIcal = {};
+  let ni = 0;
+  for(let oi = 0; oi < oldStudios.length; oi++){
+    const nm = String(oldStudios[oi] || '').trim();
+    if(!nm) continue;
+    const u = oldIcal[String(oi)];
+    if(u !== undefined && String(u).trim() !== '') nextIcal[String(ni)] = String(u).trim();
+    ni++;
+  }
+  inviteStudios.splice(0, inviteStudios.length, ...filtered);
+  inviteIcal = nextIcal;
+  el('step4-error').style.display = 'none';
+  renderStudiosList();
+  return true;
+}
+
+function renderIcalList(){
+  const host = el('step5-ical-list');
+  if(!host) return;
+  host.innerHTML = '';
+  inviteStudios.forEach((studioName, i)=>{
+    const row = document.createElement('div');
+    row.className = 'step5-ical-row';
+    const lab = document.createElement('label');
+    lab.className = 'invite-label step5-studio-label';
+    lab.textContent = studioName || ('Studio '+(i+1));
+    const inp = document.createElement('input');
+    inp.type = 'url';
+    inp.className = 'invite-input step5-ical-input';
+    inp.dataset.studioIdx = String(i);
+    inp.placeholder = 'https://www.airbnb.fr/calendar/ical/...';
+    const val = inviteIcal[String(i)];
+    inp.value = val !== undefined && val != null ? String(val) : '';
+    inp.addEventListener('input', ()=>{
+      inviteIcal[inp.dataset.studioIdx] = inp.value.trim();
+    });
+    row.appendChild(lab);
+    row.appendChild(inp);
+    host.appendChild(row);
+  });
+}
+
+function readIcalFromDOM(){
+  const host = el('step5-ical-list');
+  if(!host) return;
+  host.querySelectorAll('.step5-ical-input').forEach(inp=>{
+    const idx = inp.getAttribute('data-studio-idx');
+    if(idx != null) inviteIcal[idx] = inp.value.trim();
+  });
 }
 
 const STEP1_SUBS = ['loading','valid','expired','used','invalid','error'];
@@ -343,23 +529,13 @@ async function runValidation(){
   }
 }
 
-function dbgTokenSuffix(){
-  const t = inviteToken;
-  if(!t || t.length < 4) return '—';
-  return t.slice(-4);
-}
-
 document.addEventListener('DOMContentLoaded', ()=>{
   document.documentElement.dataset.appVersion = APP_VERSION;
   inviteToken = (new URL(location.href).searchParams.get('t') || '').trim();
 
   const btnCommencer = el('btn-commencer');
   if(btnCommencer){
-    btnCommencer.addEventListener('click', ()=>{
-      const dbg = el('dbg-token');
-      if(dbg) dbg.textContent = dbgTokenSuffix();
-      setStep(2);
-    });
+    btnCommencer.addEventListener('click', ()=>{ setStep(2); });
   }
   const btnRetry = el('btn-retry');
   if(btnRetry) btnRetry.addEventListener('click', ()=>{ void runValidation(); });
@@ -415,6 +591,56 @@ document.addEventListener('DOMContentLoaded', ()=>{
     step2Back.addEventListener('click', ()=>{
       setStep(1);
       showStep1Sub('valid');
+    });
+  }
+
+  const step3Continue = el('step3-continue');
+  if(step3Continue){
+    step3Continue.addEventListener('click', ()=>{
+      const data = validateStep3Form();
+      if(!data) return;
+      inviteOrg = { nom: data.nom, slug: slugify(data.nom) };
+      setStep(4);
+    });
+  }
+  const step3Back = el('step3-back');
+  if(step3Back) step3Back.addEventListener('click', ()=>{ setStep(2); });
+
+  const step4Add = el('step4-add');
+  if(step4Add){
+    step4Add.addEventListener('click', ()=>{
+      readStudiosFromDOM();
+      inviteStudios.push('');
+      renderStudiosList();
+    });
+  }
+  const step4Continue = el('step4-continue');
+  if(step4Continue){
+    step4Continue.addEventListener('click', ()=>{
+      if(!validateStep4()) return;
+      setStep(5);
+    });
+  }
+  const step4Back = el('step4-back');
+  if(step4Back){
+    step4Back.addEventListener('click', ()=>{
+      readStudiosFromDOM();
+      setStep(3);
+    });
+  }
+
+  const step5Continue = el('step5-continue');
+  if(step5Continue){
+    step5Continue.addEventListener('click', ()=>{
+      readIcalFromDOM();
+      setStep(6);
+    });
+  }
+  const step5Back = el('step5-back');
+  if(step5Back){
+    step5Back.addEventListener('click', ()=>{
+      readIcalFromDOM();
+      setStep(4);
     });
   }
 
