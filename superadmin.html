@@ -48,6 +48,9 @@ body.sa-nav-ready .admin-burger{display:flex}
 #sa-modal-del-studio .sa-modal-del-studio-req-col{display:none;flex-direction:column;align-items:center;flex:0 1 auto;min-width:0}
 #sa-modal-del-studio .sa-modal-del-studio-req-col.is-visible{display:flex}
 #sa-modal-del-studio .sa-modal-del-studio-req-sub{font-size:10px;color:#aaa;text-align:center;margin-top:4px;line-height:1.3;max-width:140px}
+#shared-reauth-modal .shared-reauth-actions{align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px}
+#shared-reauth-modal .shared-reauth-google-wrap{display:inline-flex;align-items:center;flex-shrink:0}
+#shared-reauth-google.shared-reauth-google--validated{background:#1D9E75!important;border-color:#157a5a!important;color:#fff!important}
 .account-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #f5f5f0;flex-wrap:wrap}
 .account-row:last-child{border-bottom:none}
 .account-name{font-size:13px;font-weight:500;min-width:80px}
@@ -312,16 +315,9 @@ body.sa-nav-ready .admin-burger{display:flex}
   <div class="modal">
     <h3 id="sa-modal-del-org-title">Supprimer l’organisation</h3>
     <p class="empty-hint" id="sa-modal-del-org-intro" style="color:#555;line-height:1.45"></p>
-    <div class="modal-field">
+    <div class="modal-field" id="sa-modal-del-org-confirm-wrap">
       <label for="sa-modal-del-org-confirm">Tapez le libellé exact pour confirmer</label>
       <input type="text" id="sa-modal-del-org-confirm" autocomplete="off">
-    </div>
-    <div class="modal-field" id="sa-modal-del-org-reauth-pwd-wrap">
-      <label for="sa-modal-del-org-pwd">Mot de passe Super Admin</label>
-      <input type="password" id="sa-modal-del-org-pwd" autocomplete="current-password">
-    </div>
-    <div class="modal-field" id="sa-modal-del-org-reauth-google-wrap" style="display:none">
-      <button type="button" class="btn-primary" id="sa-modal-del-org-reauth-google">Confirmer avec Google</button>
     </div>
     <div class="login-error" id="sa-modal-del-org-error" style="display:none;margin-bottom:8px"></div>
     <div class="modal-actions">
@@ -336,13 +332,6 @@ body.sa-nav-ready .admin-burger{display:flex}
     <h3 id="sa-modal-del-studio-title">Supprimer le studio</h3>
     <p class="empty-hint" id="sa-modal-del-studio-studio" style="color:#555;line-height:1.45;font-weight:600"></p>
     <p class="empty-hint" style="color:#555;line-height:1.45">Les étapes et photos associées à ce studio seront définitivement supprimées (RTDB et Storage).</p>
-    <div class="modal-field" id="sa-modal-del-studio-reauth-pwd-wrap">
-      <label for="sa-modal-del-studio-pwd">Mot de passe Super Admin</label>
-      <input type="password" id="sa-modal-del-studio-pwd" autocomplete="current-password">
-    </div>
-    <div class="modal-field" id="sa-modal-del-studio-reauth-google-wrap" style="display:none">
-      <button type="button" class="btn-primary" id="sa-modal-del-studio-reauth-google">Confirmer avec Google</button>
-    </div>
     <div class="login-error" id="sa-modal-del-studio-error" style="display:none;margin-bottom:8px"></div>
     <div class="modal-actions sa-modal-del-studio-actions">
       <button type="button" class="btn-secondary" id="sa-modal-del-studio-cancel">Retour</button>
@@ -359,13 +348,6 @@ body.sa-nav-ready .admin-burger{display:flex}
   <div class="modal">
     <h3 id="sa-modal-edit-ical-title">Modifier l’URL iCal</h3>
     <p class="empty-hint" id="sa-modal-edit-ical-info" style="color:#555;line-height:1.45"></p>
-    <div class="modal-field" id="sa-modal-edit-ical-reauth-pwd-wrap">
-      <label for="sa-modal-edit-ical-pwd">Mot de passe Super Admin</label>
-      <input type="password" id="sa-modal-edit-ical-pwd" autocomplete="current-password">
-    </div>
-    <div class="modal-field" id="sa-modal-edit-ical-reauth-google-wrap" style="display:none">
-      <button type="button" class="btn-primary" id="sa-modal-edit-ical-reauth-google">Confirmer avec Google</button>
-    </div>
     <div class="modal-field">
       <label for="sa-modal-edit-ical-url">URL iCal</label>
       <input type="text" id="sa-modal-edit-ical-url" autocomplete="off">
@@ -462,7 +444,7 @@ import { getDatabase, ref, get, set, update, onValue, remove, push } from 'https
 import { getStorage, ref as sRef, deleteObject, listAll } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup, reauthenticateWithCredential, reauthenticateWithPopup, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
-import { hashSimple, sha256Hex, accNormalizeEmail, accEntriesFromSnapshotVal, accFindIdentityMatch, calcMaxOrder, buildAccountPayload, buildAddAccountModalHTML, buildConfirmAssocModalHTML, buildEditAccountModalHTML } from './fonctions.js';
+import { hashSimple, sha256Hex, accNormalizeEmail, accEntriesFromSnapshotVal, accFindIdentityMatch, calcMaxOrder, buildAccountPayload, buildAddAccountModalHTML, buildConfirmAssocModalHTML, buildEditAccountModalHTML, buildReauthModalHTML } from './fonctions.js';
 
 document.body.insertAdjacentHTML('beforeend',
   buildAddAccountModalHTML()
@@ -488,7 +470,7 @@ const functions = getFunctions(app, 'us-central1');
 const adminAuth = httpsCallable(functions, 'adminAuth');
 const googleAuthProvider = new GoogleAuthProvider();
 
-const APP_VERSION = '4.9.3';
+const APP_VERSION = '4.9.6';
 const SA_ALLOWED_EMAIL = 'tessonjonathan@gmail.com';
 const SA_VIEW_WHITELIST = ['comptes','organisations','invitations','parametres','securite'];
 
@@ -1061,6 +1043,16 @@ async function handleSaModalGoogleReauth(errId){
   try{
     await reauthenticateWithPopup(u, googleAuthProvider);
     saSensitiveModalGoogleReauthed = true;
+    const gBtn = el('shared-reauth-google');
+    if(gBtn){
+      gBtn.classList.add('shared-reauth-google--validated');
+      gBtn.textContent = '✓ Identité confirmée';
+    }
+    const cBtn = el('shared-reauth-confirm');
+    if(cBtn){
+      cBtn.textContent = 'Valider';
+      cBtn.style.display = '';
+    }
     showToast('Identité confirmée');
   }catch(e){
     console.warn(e);
@@ -1162,12 +1154,154 @@ async function logout(){
 }
 el('sa-logout-btn').addEventListener('click', logout);
 
-el('sa-modal-del-org-reauth-google').addEventListener('click', ()=>handleSaModalGoogleReauth('sa-modal-del-org-error'));
-el('sa-modal-del-studio-reauth-google').addEventListener('click', ()=>handleSaModalGoogleReauth('sa-modal-del-studio-error'));
-el('sa-modal-edit-ical-reauth-google').addEventListener('click', ()=>handleSaModalGoogleReauth('sa-modal-edit-ical-error'));
-
 function openModal(id){ el(id).classList.add('is-open'); }
 function closeModal(id){ el(id).classList.remove('is-open'); }
+
+let sharedReauthModalInitDone = false;
+let sharedReauthOnConfirm = null;
+let sharedReauthOnCancel = null;
+let sharedReauthConfirmBusy = false;
+
+function closeSharedReauthModal(){
+  closeModal('shared-reauth-modal');
+  const pwdEl = el('shared-reauth-pwd');
+  if(pwdEl) pwdEl.value = '';
+  sharedReauthOnConfirm = null;
+  sharedReauthOnCancel = null;
+  sharedReauthConfirmBusy = false;
+}
+
+function initSharedReauthModal(){
+  if(!el('shared-reauth-modal')){
+    document.body.insertAdjacentHTML('beforeend', buildReauthModalHTML());
+  }
+  if(sharedReauthModalInitDone) return;
+  sharedReauthModalInitDone = true;
+
+  const root = el('shared-reauth-modal');
+  const cancelBtn = el('shared-reauth-cancel');
+  const confirmBtn = el('shared-reauth-confirm');
+  const googleBtn = el('shared-reauth-google');
+
+  if(root){
+    root.addEventListener('click', (e)=>{
+      if(e.target !== root) return;
+      const onCancel = sharedReauthOnCancel;
+      closeSharedReauthModal();
+      if(typeof onCancel === 'function'){
+        try{ onCancel(); }catch(err){ console.warn(err); }
+      }
+    });
+  }
+
+  if(cancelBtn){
+    cancelBtn.addEventListener('click', ()=>{
+      const onCancel = sharedReauthOnCancel;
+      closeSharedReauthModal();
+      if(typeof onCancel === 'function'){
+        try{ onCancel(); }catch(err){ console.warn(err); }
+      }
+    });
+  }
+
+  if(googleBtn){
+    googleBtn.addEventListener('click', ()=>handleSaModalGoogleReauth('shared-reauth-error'));
+  }
+
+  if(confirmBtn){
+    confirmBtn.addEventListener('click', async ()=>{
+      if(sharedReauthConfirmBusy) return;
+      const errEl = el('shared-reauth-error');
+      if(errEl){
+        errEl.style.display = 'none';
+        errEl.textContent = '';
+      }
+      sharedReauthConfirmBusy = true;
+      confirmBtn.disabled = true;
+      try{
+        const pid = getSaPrimaryProviderId();
+        if(pid === 'google.com'){
+          try{
+            saEnsureGoogleReauthGateForAction(errEl);
+          }catch(re){
+            if(String(re.message) === 'sa-no-google-reauth') return;
+            throw re;
+          }
+        }else{
+          try{
+            await saEnsurePasswordReauthOrThrow('shared-reauth-pwd', errEl);
+          }catch(re){
+            if(String(re.message) === 'sa-no-pwd') return;
+            const code = re && re.code;
+            if(errEl){
+              errEl.textContent = code === 'auth/wrong-password' || code === 'auth/invalid-credential' ? 'Mot de passe incorrect.' : (re && re.message ? String(re.message) : 'Échec de la vérification.');
+              errEl.style.display = '';
+            }
+            return;
+          }
+        }
+        const onConfirm = sharedReauthOnConfirm;
+        if(typeof onConfirm === 'function'){
+          await onConfirm();
+        }
+        closeSharedReauthModal();
+      }catch(e){
+        console.warn(e);
+        if(errEl){
+          errEl.textContent = e && e.message ? String(e.message) : 'Erreur lors de la confirmation.';
+          errEl.style.display = '';
+        }
+      }finally{
+        sharedReauthConfirmBusy = false;
+        confirmBtn.disabled = false;
+      }
+    });
+  }
+}
+
+function resetSharedReauthModalUi(){
+  const gBtn = el('shared-reauth-google');
+  if(gBtn){
+    gBtn.classList.remove('shared-reauth-google--validated');
+    gBtn.textContent = 'Confirmer avec Google';
+  }
+  const cBtn = el('shared-reauth-confirm');
+  if(cBtn){
+    cBtn.textContent = 'Confirmer';
+    cBtn.style.display = '';
+  }
+}
+
+function openReauthModal({ description, onConfirm, onCancel } = {}){
+  initSharedReauthModal();
+  resetSharedReauthModalUi();
+  const descEl = el('shared-reauth-desc');
+  const errEl = el('shared-reauth-error');
+  const pwdEl = el('shared-reauth-pwd');
+  if(descEl) descEl.textContent = String(description || 'Confirmez votre identité pour continuer.');
+  if(errEl){
+    errEl.style.display = 'none';
+    errEl.textContent = '';
+  }
+  if(pwdEl) pwdEl.value = '';
+  sharedReauthOnConfirm = typeof onConfirm === 'function' ? onConfirm : null;
+  sharedReauthOnCancel = typeof onCancel === 'function' ? onCancel : null;
+  saSensitiveModalGoogleReauthed = false;
+  const pid = getSaPrimaryProviderId();
+  const pwdWrap = el('shared-reauth-pwd-wrap');
+  const googleWrap = el('shared-reauth-google-wrap');
+  const cBtn = el('shared-reauth-confirm');
+  if(pid === 'google.com'){
+    if(pwdWrap) pwdWrap.style.display = 'none';
+    if(googleWrap) googleWrap.style.display = '';
+    if(cBtn) cBtn.style.display = 'none';
+  }else{
+    if(pwdWrap) pwdWrap.style.display = '';
+    if(googleWrap) googleWrap.style.display = 'none';
+    if(cBtn) cBtn.style.display = '';
+  }
+  openModal('shared-reauth-modal');
+}
 
 function openSharedAddAccountModal(){
   const m = el('shared-acc-modal');
@@ -1217,6 +1351,13 @@ async function performOrgCascadeDelete(orgId){
         if(nOrg > 1){
           await update(ref(db), { [`accounts/${id}/orgs/${orgId}`]: null });
         }else{
+          if(row.authUid != null && String(row.authUid).trim() !== ''){
+            try{
+              await adminAuthBeforeDeleteUser(row.authUid);
+            }catch(e){
+              console.warn('[performOrgCascadeDelete] adminAuthBeforeDeleteUser failed:', e);
+            }
+          }
           await remove(ref(db, `accounts/${id}`));
         }
       }
@@ -1241,13 +1382,11 @@ function openDeleteOrgModal(orgId, label){
   pendingDeleteOrgId = orgId;
   pendingDeleteOrgLabel = label;
   el('sa-modal-del-org-confirm').value = '';
-  el('sa-modal-del-org-pwd').value = '';
   const err = el('sa-modal-del-org-error');
   err.style.display = 'none';
   err.textContent = '';
   el('sa-modal-del-org-intro').textContent =
     `Organisation « ${label} » (${orgId}). Les nœuds réservations, assignations et comptes rendus ne sont pas supprimés ici ; le reste de la configuration et les fichiers Storage sous orgs/${orgId}/ seront effacés.`;
-  prepareSensitiveModalReauth('sa-modal-del-org');
   openModal('sa-modal-del-org');
 }
 
@@ -1946,12 +2085,10 @@ function openEditIcalModal(orgId, studioIndex){
   el('sa-modal-edit-ical-info').textContent = `Organisation « ${orgId} » — studio « ${label} » (index ${studioIndex}).`;
   const url = getFeedUrlForStudio(icalCache[orgId], studioIndex);
   el('sa-modal-edit-ical-url').value = url;
-  el('sa-modal-edit-ical-pwd').value = '';
   const err = el('sa-modal-edit-ical-error');
   err.style.display = 'none';
   err.textContent = '';
   updateIcalLockButtonUi();
-  prepareSensitiveModalReauth('sa-modal-edit-ical');
   openModal('sa-modal-edit-ical');
 }
 
@@ -2047,11 +2184,9 @@ function wireStudiosPanel(panel, orgId){
       const errEl = el('sa-modal-del-studio-error');
       errEl.style.display = 'none';
       errEl.textContent = '';
-      el('sa-modal-del-studio-pwd').value = '';
       const nm = studioCache[orgId] && studioCache[orgId][i] != null ? String(studioCache[orgId][i]) : 'Studio ' + (i + 1);
       el('sa-modal-del-studio-studio').textContent = 'Studio concerné : « ' + nm + ' »';
       syncDelStudioModalRequestBanner(orgId, i);
-      prepareSensitiveModalReauth('sa-modal-del-studio');
       openModal('sa-modal-del-studio');
     });
   });
@@ -2641,7 +2776,6 @@ el('sa-modal-del-studio-cancel').addEventListener('click', ()=>{
   pendingDeleteStudioOrgId = '';
   pendingDeleteStudioIndex = -1;
   saSensitiveModalGoogleReauthed = false;
-  el('sa-modal-del-studio-pwd').value = '';
   const errC = el('sa-modal-del-studio-error');
   errC.style.display = 'none';
   errC.textContent = '';
@@ -2666,7 +2800,6 @@ el('sa-modal-del-studio-cancel-req').addEventListener('click', async ()=>{
     pendingDeleteStudioOrgId = '';
     pendingDeleteStudioIndex = -1;
     saSensitiveModalGoogleReauthed = false;
-    el('sa-modal-del-studio-pwd').value = '';
     const col = el('sa-modal-del-studio-req-col');
     const sub = el('sa-modal-del-studio-req-sub');
     if(sub) sub.textContent = '';
@@ -2685,69 +2818,47 @@ el('sa-modal-del-studio-ok').addEventListener('click', async ()=>{
   errEl.textContent = '';
   const orgId = pendingDeleteStudioOrgId;
   const i = pendingDeleteStudioIndex;
-  const pid = getSaPrimaryProviderId();
-  const pwd = el('sa-modal-del-studio-pwd').value || '';
   if(!orgId || i < 0) return;
-  if(pid !== 'google.com' && !pwd){
-    errEl.textContent = 'Saisissez le mot de passe Super Admin.';
-    errEl.style.display = '';
-    el('sa-modal-del-studio-pwd').value = '';
-    return;
-  }
   const okBtn = el('sa-modal-del-studio-ok');
   okBtn.disabled = true;
-  try{
-    if(pid === 'google.com'){
+  openReauthModal({
+    description: 'Confirmez votre identité pour supprimer définitivement ce studio.',
+    onConfirm: async ()=>{
       try{
-        saEnsureGoogleReauthGateForAction(errEl);
-      }catch(re){
-        if(String(re.message) === 'sa-no-google-reauth') return;
-        throw re;
-      }
-    }else{
-      try{
-        await saEnsurePasswordReauthOrThrow('sa-modal-del-studio-pwd', errEl);
-      }catch(re){
-        if(String(re.message) === 'sa-no-pwd') return;
-        const code = re && re.code;
-        errEl.textContent = code === 'auth/wrong-password' || code === 'auth/invalid-credential' ? 'Mot de passe incorrect.' : (re && re.message ? String(re.message) : 'Échec de la vérification.');
+        await set(ref(db, `orgs/${orgId}/procedures/${i}`), null);
+        await deleteStorageTree(sRef(storage, `orgs/${orgId}/procedures/${i}`));
+        const snap = await get(ref(db, `orgs/${orgId}/config/studioNames`));
+        const arr = normalizeStudioNames(snap.val());
+        if(i < 0 || i >= arr.length) return;
+        arr.splice(i, 1);
+        await set(ref(db, `orgs/${orgId}/config/studioNames`), arr);
+        delete studioCache[orgId];
+        try{ await remove(ref(db, `orgs/${orgId}/deletionRequests/studios/${i}`)); }catch(_){}
+        await recomputePendingDeletionRequestsRootSa();
+        try{
+          const snapDr = await get(ref(db, `orgs/${orgId}/deletionRequests/studios`));
+          const vDr = snapDr.val();
+          if(orgParamsCache[orgId]) orgParamsCache[orgId].deletionRequests = deletionRequestsHasEntries(vDr) ? vDr : null;
+          const listHost = el('sa-org-list');
+          if(listHost && orgParamsCache[orgId]) paintOrgRow(listHost, orgId, orgParamsCache[orgId]);
+        }catch(_){}
+        pendingDeleteStudioOrgId = '';
+        pendingDeleteStudioIndex = -1;
+        saSensitiveModalGoogleReauthed = false;
+        closeModal('sa-modal-del-studio');
+        await refreshStudiosPanelForOrg(orgId);
+        showToast('Studio supprimé');
+      }catch(e){
+        console.warn(e);
+        errEl.textContent = e && e.message ? String(e.message) : 'Erreur à la suppression.';
         errEl.style.display = '';
-        return;
+        showToast('Erreur à la suppression');
+      }finally{
+        okBtn.disabled = false;
       }
-    }
-    await set(ref(db, `orgs/${orgId}/procedures/${i}`), null);
-    await deleteStorageTree(sRef(storage, `orgs/${orgId}/procedures/${i}`));
-    const snap = await get(ref(db, `orgs/${orgId}/config/studioNames`));
-    const arr = normalizeStudioNames(snap.val());
-    if(i < 0 || i >= arr.length) return;
-    arr.splice(i, 1);
-    await set(ref(db, `orgs/${orgId}/config/studioNames`), arr);
-    delete studioCache[orgId];
-    try{ await remove(ref(db, `orgs/${orgId}/deletionRequests/studios/${i}`)); }catch(_){}
-    await recomputePendingDeletionRequestsRootSa();
-    try{
-      const snapDr = await get(ref(db, `orgs/${orgId}/deletionRequests/studios`));
-      const vDr = snapDr.val();
-      if(orgParamsCache[orgId]) orgParamsCache[orgId].deletionRequests = deletionRequestsHasEntries(vDr) ? vDr : null;
-      const listHost = el('sa-org-list');
-      if(listHost && orgParamsCache[orgId]) paintOrgRow(listHost, orgId, orgParamsCache[orgId]);
-    }catch(_){}
-    pendingDeleteStudioOrgId = '';
-    pendingDeleteStudioIndex = -1;
-    saSensitiveModalGoogleReauthed = false;
-    closeModal('sa-modal-del-studio');
-    el('sa-modal-del-studio-pwd').value = '';
-    await refreshStudiosPanelForOrg(orgId);
-    showToast('Studio supprimé');
-  }catch(e){
-    console.warn(e);
-    errEl.textContent = e && e.message ? String(e.message) : 'Erreur à la suppression.';
-    errEl.style.display = '';
-    el('sa-modal-del-studio-pwd').value = '';
-    showToast('Erreur à la suppression');
-  }finally{
-    okBtn.disabled = false;
-  }
+    },
+    onCancel: ()=>{ okBtn.disabled = false; }
+  });
 });
 
 el('sa-modal-edit-ical-cancel').addEventListener('click', ()=>{
@@ -2767,63 +2878,42 @@ el('sa-modal-edit-ical-ok').addEventListener('click', async ()=>{
   errEl.textContent = '';
   const orgId = pendingIcalOrgId;
   const studioIndex = pendingIcalStudioIndex;
-  const pid = getSaPrimaryProviderId();
-  const pwd = el('sa-modal-edit-ical-pwd').value || '';
   const urlVal = el('sa-modal-edit-ical-url').value || '';
   if(!orgId || studioIndex < 0){
     showToast('Erreur');
     return;
   }
-  if(pid !== 'google.com' && !pwd){
-    errEl.textContent = 'Saisissez le mot de passe Super Admin.';
-    errEl.style.display = '';
-    return;
-  }
   const okBtn = el('sa-modal-edit-ical-ok');
   okBtn.disabled = true;
-  try{
-    if(pid === 'google.com'){
+  openReauthModal({
+    description: 'Confirmez votre identité pour enregistrer l’URL iCal.',
+    onConfirm: async ()=>{
       try{
-        saEnsureGoogleReauthGateForAction(errEl);
-      }catch(re){
-        if(String(re.message) === 'sa-no-google-reauth') return;
-        throw re;
-      }
-    }else{
-      try{
-        await saEnsurePasswordReauthOrThrow('sa-modal-edit-ical-pwd', errEl);
-      }catch(re){
-        if(String(re.message) === 'sa-no-pwd') return;
-        const code = re && re.code;
-        errEl.textContent = code === 'auth/wrong-password' || code === 'auth/invalid-credential' ? 'Mot de passe incorrect.' : (re && re.message ? String(re.message) : 'Échec de la vérification.');
+        await saveIcalUrlForStudio(orgId, studioIndex, urlVal, pendingIcalLocked);
+        pendingIcalOrgId = '';
+        pendingIcalStudioIndex = -1;
+        pendingIcalLocked = false;
+        saSensitiveModalGoogleReauthed = false;
+        closeModal('sa-modal-edit-ical');
+        showToast('URL iCal enregistrée');
+        await refreshOpenIcalDisplaysForOrg(orgId);
+        await refreshStudiosPanelForOrg(orgId);
+      }catch(e){
+        console.warn(e);
+        errEl.textContent = e && e.message ? String(e.message) : 'Erreur d’enregistrement.';
         errEl.style.display = '';
-        return;
+      }finally{
+        okBtn.disabled = false;
       }
-    }
-    await saveIcalUrlForStudio(orgId, studioIndex, urlVal, pendingIcalLocked);
-    pendingIcalOrgId = '';
-    pendingIcalStudioIndex = -1;
-    pendingIcalLocked = false;
-    saSensitiveModalGoogleReauthed = false;
-    closeModal('sa-modal-edit-ical');
-    el('sa-modal-edit-ical-pwd').value = '';
-    showToast('URL iCal enregistrée');
-    await refreshOpenIcalDisplaysForOrg(orgId);
-    await refreshStudiosPanelForOrg(orgId);
-  }catch(e){
-    console.warn(e);
-    errEl.textContent = e && e.message ? String(e.message) : 'Erreur d’enregistrement.';
-    errEl.style.display = '';
-  }finally{
-    okBtn.disabled = false;
-  }
+    },
+    onCancel: ()=>{ okBtn.disabled = false; }
+  });
 });
 
 el('sa-modal-del-org-cancel').addEventListener('click', ()=>{
   pendingDeleteOrgId = '';
   pendingDeleteOrgLabel = '';
   saSensitiveModalGoogleReauthed = false;
-  el('sa-modal-del-org-pwd').value = '';
   closeModal('sa-modal-del-org');
 });
 el('sa-modal-del-org-ok').addEventListener('click', async ()=>{
@@ -2833,69 +2923,49 @@ el('sa-modal-del-org-ok').addEventListener('click', async ()=>{
   const orgId = pendingDeleteOrgId;
   const expectedLabel = pendingDeleteOrgLabel;
   const typed = String(el('sa-modal-del-org-confirm').value||'').trim();
-  const pid = getSaPrimaryProviderId();
-  const pwd = el('sa-modal-del-org-pwd').value||'';
-  if(!orgId){ showToast('Erreur : organisation inconnue'); return; }
   if(typed !== String(expectedLabel).trim()){
     errEl.textContent = 'Le libellé ne correspond pas exactement.';
     errEl.style.display = '';
     return;
   }
-  if(pid !== 'google.com' && !pwd){
-    errEl.textContent = 'Saisissez le mot de passe Super Admin.';
-    errEl.style.display = '';
-    return;
-  }
+  if(!orgId){ showToast('Erreur : organisation inconnue'); return; }
   const okBtn = el('sa-modal-del-org-ok');
   okBtn.disabled = true;
-  try{
-    setOrgListLoading(true);
-    if(pid === 'google.com'){
+  openReauthModal({
+    description: `Confirmez votre identité pour supprimer définitivement l'organisation « ${String(expectedLabel).trim()} ».`,
+    onConfirm: async ()=>{
       try{
-        saEnsureGoogleReauthGateForAction(errEl);
-      }catch(re){
-        if(String(re.message) === 'sa-no-google-reauth') return;
-        throw re;
-      }
-    }else{
-      try{
-        await saEnsurePasswordReauthOrThrow('sa-modal-del-org-pwd', errEl);
-      }catch(re){
-        if(String(re.message) === 'sa-no-pwd') return;
-        const code = re && re.code;
-        errEl.textContent = code === 'auth/wrong-password' || code === 'auth/invalid-credential' ? 'Mot de passe incorrect.' : (re && re.message ? String(re.message) : 'Échec de la vérification.');
+        setOrgListLoading(true);
+        await performOrgCascadeDelete(orgId);
+        delete orgParamsCache[orgId];
+        delete studiosOpen[orgId];
+        delete accountsOpen[orgId];
+        delete studiosHydrated[orgId];
+        delete lastAppliedStudiosOpen[orgId];
+        delete lastAppliedAccountsOpen[orgId];
+        pendingDeleteOrgId = '';
+        pendingDeleteOrgLabel = '';
+        saSensitiveModalGoogleReauthed = false;
+        closeModal('sa-modal-del-org');
+        showToast('Organisation supprimée (hors réservations / assignations / comptes rendus).');
+        await fetchOrganizations();
+        await recomputePendingDeletionRequestsRootSa();
+        renderAccountsForSelectedOrg();
+        renderParamsForSelectedOrg();
+      }catch(e){
+        console.warn(e);
+        errEl.textContent = e && e.message ? String(e.message) : 'Erreur lors de la suppression.';
         errEl.style.display = '';
-        return;
+        showToast('Échec partiel possible — voir la console ou Firebase.');
+      }finally{
+        fillOrgSelects();
+        renderOrgList();
+        setOrgListLoading(false);
+        okBtn.disabled = false;
       }
-    }
-    await performOrgCascadeDelete(orgId);
-    delete orgParamsCache[orgId];
-    delete studiosOpen[orgId];
-    delete accountsOpen[orgId];
-    delete studiosHydrated[orgId];
-    delete lastAppliedStudiosOpen[orgId];
-    delete lastAppliedAccountsOpen[orgId];
-    pendingDeleteOrgId = '';
-    pendingDeleteOrgLabel = '';
-    saSensitiveModalGoogleReauthed = false;
-    closeModal('sa-modal-del-org');
-    el('sa-modal-del-org-pwd').value = '';
-    showToast('Organisation supprimée (hors réservations / assignations / comptes rendus).');
-    await fetchOrganizations();
-    await recomputePendingDeletionRequestsRootSa();
-    renderAccountsForSelectedOrg();
-    renderParamsForSelectedOrg();
-  }catch(e){
-    console.warn(e);
-    errEl.textContent = e && e.message ? String(e.message) : 'Erreur lors de la suppression.';
-    errEl.style.display = '';
-    showToast('Échec partiel possible — voir la console ou Firebase.');
-  }finally{
-    fillOrgSelects();
-    renderOrgList();
-    setOrgListLoading(false);
-    okBtn.disabled = false;
-  }
+    },
+    onCancel: ()=>{ okBtn.disabled = false; }
+  });
 });
 
 function selectedParamsOrgId(){

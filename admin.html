@@ -443,9 +443,14 @@ const CLEANER_COLORS = ['#378ADD','#1D9E75','#D85A30','#9F3DBF','#C8860A','#2A8A
 const MO_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const SESSION_KEY = 'menage_session_v1';
 const ORG_STORAGE_KEY = 'menage_org_v1';
+/** Évite un second `location.replace('index.html')` quand Firebase émet `user=null` pendant une navigation volontaire vers le calendrier. */
+const ADMIN_NAV_INDEX_INTENT_KEY = 'menage_admin_nav_index_intent_v1';
+function setAdminNavigatingToCalendarIntent(){
+  try{ sessionStorage.setItem(ADMIN_NAV_INDEX_INTENT_KEY, '1'); }catch(_){}
+}
 let ORGANIZATIONS = [];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.9.2';
+const APP_VERSION = '4.9.6';
 const UNAVAIL_SHOWBY_KEY = 'menage_unavail_showby_v1';
 
 /** Studio sélectionné dans la section Procédures (persiste entre re-rendus). */
@@ -940,9 +945,21 @@ async function loadOrganizations(){
       hadFirebaseUser = true;
       return;
     }
-    if(hadFirebaseUser) window.location.replace('index.html');
+    if(hadFirebaseUser){
+      try{
+        if(sessionStorage.getItem(ADMIN_NAV_INDEX_INTENT_KEY) === '1'){
+          sessionStorage.removeItem(ADMIN_NAV_INDEX_INTENT_KEY);
+          return;
+        }
+      }catch(_){}
+      window.location.replace('index.html');
+    }
   });
 })();
+
+document.querySelector('a.back-btn[href="index.html"]')?.addEventListener('click', ()=>{
+  setAdminNavigatingToCalendarIntent();
+});
 
 // ─── Accès admin (session calendrier + rôle 👑) ────────────────────────────────
 
@@ -1024,6 +1041,7 @@ async function verifyAdminAccess(){
 }
 
 window.logout = function(){
+  setAdminNavigatingToCalendarIntent();
   void signOut(auth);
   window.location.href='index.html';
 };

@@ -443,7 +443,8 @@ onAuthStateChanged(auth, async (user) => {
   if(user){
     if(typeof resolveSessionFromFirebaseUser === 'function' && fbReady){
       if(!S.currentUser || user.uid !== __lastLoginUid){
-        await resolveSessionFromFirebaseUser(user);
+        const rs = await resolveSessionFromFirebaseUser(user);
+        if(rs && rs.ok && !rs.needsPasswordChange) showApp();
       }
     }
   }else{
@@ -492,7 +493,7 @@ const ORG_STORAGE_KEY = 'menage_org_v1';
 const ORG_CHANGE_GATE_KEY = 'menage_org_change_gate';
 let ORGANIZATIONS = [];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.9.2';
+const APP_VERSION = '4.9.6';
 
 let __lastLoginUid = null;
 let __lastLoginTs = 0;
@@ -785,10 +786,10 @@ function normalizeUnavailability(raw){
 
 /**
  * À partir d'un user Firebase Auth, retrouve le /accounts/{id} correspondant (via authUid puis email),
- * bascule l'org, alimente S.currentUser, et affiche l'app.
+ * bascule l'org, alimente S.currentUser. L'affichage (showApp / login) est laissé aux appelants pour éviter les courses avec routeAfterFirebaseReady (ex. switch d'org : planning → sablier → planning).
  */
 async function resolveSessionFromFirebaseUser(user){
-  if(!user){ showLogin(); return; }
+  if(!user){ showLogin(); return { ok:false }; }
   try{
     const snap = await get(ref(db,'accounts'));
     const val = snap.val();
@@ -820,7 +821,7 @@ async function resolveSessionFromFirebaseUser(user){
       try{ await signOut(auth); }catch(_){}
       if(errEl){ errEl.style.display=''; errEl.textContent='Compte inconnu dans le planning'; }
       showLogin();
-      return;
+      return { ok:false };
     }
     let storedOrgRaw = '';
     try{
@@ -848,7 +849,7 @@ async function resolveSessionFromFirebaseUser(user){
       setStoredOrgId(defOrg);
       __activeAuthUid = user.uid;
       location.reload();
-      return;
+      return { ok:false };
     }
     const roles = matched.orgs?.[defOrg]?.roles || [];
     const {menage, admin} = rolesToMenageAdmin(roles);
@@ -868,12 +869,13 @@ async function resolveSessionFromFirebaseUser(user){
     await refreshCleanerList();
     if(matched.needsPasswordChange === true){
       showChangePwdModal(sessionName, matchedId);
-    }else{
-      showApp();
+      return { ok:true, needsPasswordChange:true };
     }
+    return { ok:true, needsPasswordChange:false };
   }catch(e){
     console.error('[firebase-auth] resolveSessionFromFirebaseUser error:', e);
     showLogin();
+    return { ok:false };
   }
 }
 
@@ -888,7 +890,8 @@ async function checkAuth(){
   }
   const fbUser = auth.currentUser;
   if(fbUser){
-    await resolveSessionFromFirebaseUser(fbUser);
+    const rs = await resolveSessionFromFirebaseUser(fbUser);
+    if(rs && rs.ok && !rs.needsPasswordChange) showApp();
     return;
   }
   const session = loadSession();
@@ -1247,9 +1250,11 @@ window.doLogin = async function(){
   if(!pwd){ errEl.style.display=''; errEl.textContent='Saisissez votre mot de passe'; return; }
   errEl.style.display='none';
   try{
+    showAuthLoading();
     await signInWithEmailAndPassword(auth, email, pwd);
     if(!window.__menageFbInit) initFirebaseAndApp();
-    await resolveSessionFromFirebaseUser(auth.currentUser);
+    const rs = await resolveSessionFromFirebaseUser(auth.currentUser);
+    if(rs && rs.ok && !rs.needsPasswordChange && fbReady) showApp();
     return;
   }catch(e){
     const accSnap = await get(ref(db,'accounts')).catch(()=>null);
@@ -1273,7 +1278,7 @@ window.doLogin = async function(){
             if(!window.__menageFbInit) initFirebaseAndApp();
             logActivity({ type:'login', actor:sessionName, text:sessionName+' s\'est connectée au planning (legacy)' });
             await refreshCleanerList();
-            showApp();
+            if(fbReady) showApp();
             return;
           }
         }
@@ -1293,7 +1298,8 @@ window.doGoogleLogin = async function(){
     showAuthLoading();
     await signInWithPopup(auth, provider);
     if(!window.__menageFbInit) initFirebaseAndApp();
-    await resolveSessionFromFirebaseUser(auth.currentUser);
+    const rs = await resolveSessionFromFirebaseUser(auth.currentUser);
+    if(rs && rs.ok && !rs.needsPasswordChange && fbReady) showApp();
   }catch(e){
     showLogin();
     if(e && e.code === 'auth/popup-closed-by-user') return;
@@ -1397,7 +1403,7 @@ function showOrgUnconfigured(){
   void get(ref(db, 'pendingDeletionRequests')).then(s=>paintPendingDeletionPipFromVal(!!s.val())).catch(()=>paintPendingDeletionPipFromVal(false));
 }
 
-function routeAfterFirebaseReady(){
+async function routeAfterFirebaseReady(){
   if(!orgHasConfiguredAccounts()){
     showOrgUnconfigured();
     return;
@@ -1406,7 +1412,7 @@ function routeAfterFirebaseReady(){
   if(S.adminConfig?.authEnabled){
     showAuthLoading();
   }
-  checkAuth();
+  await checkAuth();
 }
 
 /** Après le premier chargement complet, réagit aux mises à jour (ex. premier compte créé depuis l’admin). */
@@ -1427,15 +1433,15 @@ function routeAfterFirebaseUpdate(){
 }
 
 function afterFbListener(){
-  if(!fbReady) checkReady();
+  if(!fbReady) void checkReady();
   else routeAfterFirebaseUpdate();
 }
 
-function checkReady(){
+async function checkReady(){
   if(!essentialDataLoaded() || fbReady) return;
   fbReady=true;
   setStatus('');
-  routeAfterFirebaseReady();
+  await routeAfterFirebaseReady();
 }
 
 function initFirebaseAndApp(){
@@ -1551,6 +1557,7 @@ async function bootstrap(){
   await auth.authStateReady();
   await loadOrganizations();
   if(auth.currentUser){
+    showAuthLoading();
     await resolveSessionFromFirebaseUser(auth.currentUser);
   }else{
     if(!getStoredOrgId()) setStoredOrgId(ORGANIZATIONS[0]?.id || 'tesson');
