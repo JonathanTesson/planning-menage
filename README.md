@@ -1,6 +1,6 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 4.9.3** — Avril 2026
+**Version : 4.9.5** — Avril 2026
 
 Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin. **v4.6.0** : **Super Administration** (`superadmin.html`) — page autonome, login **SHA-256** contre **`/superAdmin/credentials`** (`username`, `pwdHash`), menu **Comptes** / **Organisations** / **Paramètres** / **Sécurité** ; liste des organisations chargée depuis **`/organizations`** dans **`index.html`**, **`admin.html`**, **`compte.html`** (fallback tesson/nade si besoin) ; flux iCal lus depuis **`/orgs/{orgId}/icalFeeds`** (`[{ url, studio, locked? }]`) par **`sync-ical.js`** ; **`notify-departs.js`** et **`purge-unavailability.js`** parcourent les orgs via **`/organizations`** (fallback tesson/nade si erreur ou liste vide) ; scripts d’init **`init-superadmin.js`**, **`init-ical-feeds.js`**. **v4.6.1 (Phase 2 complète)** : suppression d’**organisation** (cascade RTDB ciblée + **Storage** `orgs/{orgId}/`, re-auth Super Admin) ; **N studios** — création / renommage / suppression (**Super Admin**), renommage seul (**admin.html** vue Organisation, champs **`#studios-fields`**) ; **URLs iCal** par studio depuis **Super Admin** (re-auth) ; **`index.html`** — calendrier **N** studios, palette **`STUDIO_COLORS`** (couleurs cycliques) ; **`admin.html`** — procédures et exports alignés sur **`A.studioNames`**. **v4.6.2** : refonte **Super Admin** vue **Organisations** (accordéon **studios** / **comptes**, toggles **🔐💬** et badge **👤** sur la ligne org, badge **étapes** par studio) ; entrées menu **Comptes** / **Paramètres** **masquées** (code conservé) ; **`admin.html`** — retrait des réglages **auth** / **Telegram** / **org. par défaut** (gérés côté Super Admin / Firebase). **v4.6.3** : demandes de **suppression de studio** (admin → Super Admin, nœud **`/pendingDeletionRequests`**), **pastilles orange** (accueil hors app, planning si suggestions procédure, halo menu **Procédure** admin), **iCal** côté **admin** + verrouillage **`locked`** côté **Super Admin**, **+ Ajouter un studio** (admin), correctifs **liste orgs** (hydratation accordéon, sablier ⏳), **`telegramEnabled: false`** par défaut à la création d’org, UX **Super Admin** (login smartphone, topbar, **✏️** libellé, slug retiré de la ligne) — détail § **Historique des versions — v4.6.3**. **v4.7.0** : registre global **`/accounts/{id}`** (identité **`name`** / **`prenom`**, **`pwdHash`** SHA-256, **`orgs.{orgId}.roles`**, **`defaultOrg`**, champs optionnels **`pseudo`**, **`tel`**) en complément du legacy **`/orgs/{orgId}/adminConfig/accounts`** ; connexion **`index.html`** : **`<select id="login-name">`** rempli dans **`showLogin()`** depuis **`get(ref(db,'accounts'))`** (libellés distincts **`name`** ou **`prenom`**, tri **`fr`**) puis **`doLogin`** : essai **global** (**SHA-256**) puis **legacy** (**`hashSimple`**) — tant que le select n’énumère que **`/accounts`**, un compte **uniquement** legacy sans homonyme global reste **non sélectionnable** (voir **`patch-legacy-accounts.js`** ou évolution UI) ; cold start **sans** écran org obligatoire (**`menage_org_v1`** = première org **`/organizations`** ou **`tesson`**) ; sélecteur **Organisation** sur l’écran connexion ; scripts **`init-accounts.js`**, **`check-accounts.js`**, **`patch-legacy-accounts.js`** ; **`init-accounts-migration.js`** retiré du dépôt (nom dans **`.gitignore`** pour éviter un re-commit) ; suppression **`login-test.html`** ; **Super Admin** : panneau comptes **`/accounts`**. **v4.5.5** : calendriers **indisponibilités** sur **`compte.html`** et **`admin.html`** — la grille peut **s’élargir** pour afficher **« par … »** lisiblement (**`minmax(min-content, 1fr)`**) ; la vue utilise **`.section.section--unavail`** (**fond et bordure retirés**, sans barre de défilement) pour éviter tout décalage visuel ; case à cocher **« Afficher le détail (par qui) »** (défaut décochée), préférence **`localStorage`** **`menage_unavail_showby_v1`** (partagée entre les deux pages). **v4.5.4** : traçabilité des **étapes** de procédure (admin + calendrier), **copie** d’étape avec report des métadonnées, **indicateur** des suggestions en attente dans la modale ménage (onglet Procédure), **animation** des pastilles **Indispo**. **Note d’assignation** côté calendrier (**`note`** + traçage **`noteBy`**, indicateur **point bleu pulsant** sur les départs, lecture seule pour les ménagères) — détail § **`/assignments`** et § **index.html** ci-dessous. **v4.5.x** : **indisponibilités** — saisie sur **`compte.html`**, pastilles + filtre **Indispo** sur **`index.html`**, **vue admin** **`#indisponibilites`** (édition par intervenante **v4.5.1**, résumé global **v4.5.2**, traçabilité **`by` v4.5.3**), clés **`YYYY-MM-DD` en date locale** ; la **purge automatique** compare les mêmes clés au **seuil UTC** (voir § **`/unavailability`**).
 
@@ -28,7 +28,7 @@ Page **autonome** (pas de session planning partagée) : accès depuis le **texte
   - Session gérée par **Firebase Auth** (plus de **`sessionStorage`** **`sa_session`**).
   - **Déconnexion** → retour écran login superadmin (pas de redirection vers **`index.html`**).
   - **Opérations sensibles** (suppression studio/org, iCal) → re-auth **`reauthenticateWithPopup`** (Google) ou **`reauthenticateWithCredential`** (email/mdp) selon le provider actif.
-- **Menu latéral** : **Organisations** (vue par défaut) — **accordéon** par org sur **`/organizations`** : **renommage du libellé** (**✏️**, modale, slug inchangé, écriture **`/organizations/{orgId}`** **`{ label }`**) ; **ID base de données (slug)** à la création d’org ; toggles **authentification** / **Telegram** sur la ligne d’org, badge **👤** ouvrant le panneau **comptes** (**v4.8.0** : lecture / édition sur **`/accounts`** pour l’identité et les rôles par org ; MDP **SHA-256**) ; **studios** (**N** noms, **+** ajout, enregistrement, suppression avec purge **`procedures/{i}`** RTDB + Storage) ; **badge étapes** par studio ; suppression d’**org** 🗑️ (re-auth, cascade partielle RTDB + Storage **`orgs/{orgId}/`**). Les entrées **Comptes** et **Paramètres** sont **masquées** depuis **v4.6.2** (`display:none` ; vues et JS inchangés, hash **`#comptes`** / **`#parametres`**). **Invitations** (**v4.9.3**) : génération de **liens uniques** (**`invitation.html?t=…`**, token **24** caractères base64url, **144** bits d’entropie), schéma RTDB **`/inviteTokens/{token}`**, modales (validité **7 / 30 / 90** jours, affichage du lien, **envoi guidé** avec message d'invitation pré-rédigé, révocation, **suppression définitive** pour les liens utilisés / révoqués / expirés), badges **Actif** / **Expiré** (affichage seul) / **Utilisé** / **Révoqué** — préparation **invitation par token** (**`invitation.html`** et consommation côté Cloud Function à venir). **Sécurité** : identifiants Super Admin.
+- **Menu latéral** : **Organisations** (vue par défaut) — **accordéon** par org sur **`/organizations`** : **renommage du libellé** (**✏️**, modale, slug inchangé, écriture **`/organizations/{orgId}`** **`{ label }`**) ; **ID base de données (slug)** à la création d’org ; toggles **authentification** / **Telegram** sur la ligne d’org, badge **👤** ouvrant le panneau **comptes** (**v4.8.0** : lecture / édition sur **`/accounts`** pour l’identité et les rôles par org ; MDP **SHA-256**) ; **studios** (**N** noms, **+** ajout, enregistrement, suppression avec purge **`procedures/{i}`** RTDB + Storage) ; **badge étapes** par studio ; suppression d’**org** 🗑️ (re-auth, cascade partielle RTDB + Storage **`orgs/{orgId}/`**). Les entrées **Comptes** et **Paramètres** sont **masquées** depuis **v4.6.2** (`display:none` ; vues et JS inchangés, hash **`#comptes`** / **`#parametres`**). **Invitations** (**v4.9.3**) : génération de **liens uniques** (**`invitation.html?t=…`**, token **24** caractères base64url, **144** bits d’entropie), schéma RTDB **`/inviteTokens/{token}`**, modales (validité **7 / 30 / 90** jours, affichage du lien, **envoi guidé** avec message d'invitation pré-rédigé, révocation, **suppression définitive** pour les liens utilisés / révoqués / expirés), badges **Actif** / **Expiré** (affichage seul) / **Utilisé** / **Révoqué** — feature invitation par token complète depuis v4.9.5 : page invitation.html (6 étapes : validation token, création compte Firebase Auth email/mdp ou Google, organisation, studios, URLs iCal optionnelles, confirmation), Cloud Functions inviteToken.validate (publique, pré-auth) et inviteToken.consume (création atomique org + compte + studios + iCal + marquage token used), correction session multi-org dans index.html (bootstrap + resolveSessionFromFirebaseUser). **Sécurité** : identifiants Super Admin.
 - **iCal** : bouton **🔗 URL iCal** par studio (affichage **🔑** atténué si **`locked: true`** côté base) → modale **re-auth** Super Admin + saisie URL + cadenas **verrou / déverrou** pour les admins du planning ; données **`/orgs/{orgId}/icalFeeds`** (champs **`url`**, **`studio`**, optionnel **`locked`**).
 - **Initialisation** : **`init-superadmin.js`** (one-shot) pour **`/superAdmin/credentials`** et **`/organizations/tesson`** & **`nade`** si absents.
 
@@ -73,6 +73,7 @@ planning-menage/
 ├── admin.html           → Back-office administration
 ├── compte.html          → Tableau de bord + compte (intervenantes, hors admin)
 ├── superadmin.html      → Super Administration (login, orgs, invitations v4.9.3, sécurité ; comptes/paramètres masqués au menu depuis v4.6.2)
+├── invitation.html      → Parcours d'inscription par token (v4.9.5 — 6 étapes : validation token → compte → org → studios → iCal → confirmation)
 ├── fonctions.js         → Utilitaires JS partagés (purs) et générateurs HTML des popups compte (`build*ModalHTML`)
 ├── styles.css           → Feuille de styles partagée (boutons, topbar, modales de base, popups `shared-*`)
 ├── storage-cors.example.json → Exemple CORS bucket Storage (optionnel, si uploads / SDK bloqués en local)
@@ -477,22 +478,65 @@ Sur **`index.html`**, le calendrier boucle sur **`S.studioNames.length`** ; les 
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 4.9.3
-Dernière version stable : v4.9.3
-Dernière étape complétée : Phase 2 — sécurité Firebase Auth (étapes 2.1 à 2.4)
-Prochaine étape : Phase 2.5 — Cloud Function création/suppression comptes Firebase Auth depuis UI admin
+Version : 4.9.5
+Dernière version stable : v4.9.5
+Dernière étape complétée : v4.9.5 — Feature "Invitation par token"
+  complète (invitation.html 6 étapes + CF inviteToken validate +
+  consume + correction session multi-org index.html)
+Prochaine étape : v4.10.0 — Sécurité (verrou rôle serveur sur CF
+  adminAuth, durcissement règles RTDB /inviteTokens, suppression
+  fallback SHA-256 login)
 GitHub : https://github.com/JonathanTesson/planning-menage
 App : https://jonathantesson.github.io/planning-menage/
 Admin : https://jonathantesson.github.io/planning-menage/admin.html
 Compte : https://jonathantesson.github.io/planning-menage/compte.html
 Super Admin : https://jonathantesson.github.io/planning-menage/superadmin.html
-Fichiers : index.html, admin.html, compte.html, superadmin.html, fonctions.js, styles.css, sync-ical.js, notify-departs.js, purge-unavailability.js, init-superadmin.js, init-ical-feeds.js, init-accounts.js, check-accounts.js, patch-legacy-accounts.js, migrate.js, cleanup-legacy-root.js, set-accounts-order.js (scripts one-shot, archivés après usage), .gitignore
+Invitation : https://jonathantesson.github.io/planning-menage/invitation.html
+Fichiers : index.html (v4.9.5), admin.html, compte.html,
+  superadmin.html (v4.9.3), invitation.html (v4.9.5),
+  fonctions.js, styles.css, functions/index.js (CF inviteToken
+  validate+consume + adminAuth)
 README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ```
 
 ---
 
 ## Historique des versions
+
+### v4.9.5 — Avril 2026
+
+- **`invitation.html`** — page d'inscription autonome par token
+  (6 étapes avec barre de progression) :
+    1. Validation du token (CF **`inviteToken.validate`**, 6 sous-états)
+    2. Création de compte (email / mot de passe ou **Google**)
+    3. Nom de l'organisation (slug généré automatiquement)
+    4. Studios (liste dynamique + / –, réalignement iCal à la suppression)
+    5. URLs iCal (optionnelles, une par studio)
+    6. Confirmation (CF **`inviteToken.consume`**, récap, redirection)
+- **Cloud Function `inviteToken`** — 2 actions déployées (Gen2,
+  us-central1) :
+    - **`validate`** : publique (pré-auth), vérifie statut + expiration,
+      renvoie `{ valid, reason? }` ou `{ valid: true, expiresAt }`
+      sans exposer les champs sensibles du token
+    - **`consume`** : écriture atomique (org + compte Firebase Auth +
+      studios + iCal + marquage token `used`) ; gestion mode
+      `password` (createUser) et mode `google` (getUser)
+- **Correction session multi-org `index.html`** — `bootstrap()` :
+  résolution utilisateur avant init listeners ; `__activeAuthUid` +
+  détection `switchedUser` / `switchedOrg` → `location.reload()`
+  contrôlé pour éviter tout mélange de données entre sessions dans
+  le même onglet
+- **`goToPlanning()`** (`invitation.html`) : `signOut` + reconnexion
+  automatique (mode password) avant redirection, `setItem` org slug
+  en localStorage pour garantir le bon boot d'`index.html`
+
+### v4.9.4 — Avril 2026
+
+- **`invitation.html`** — squelette et étapes 1 à 5 (validation token,
+  compte, organisation, studios, iCal)
+- Design mobile-first, barre de progression 6 étapes
+- Palette d'icônes : 🏠 👤 🏢 🛏️ 🔗 🎉
+- Collecte locale uniquement à ce stade (pas d'écriture en base)
 
 ### v4.9.3 — Avril 2026
 
