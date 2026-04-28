@@ -496,6 +496,7 @@ const APP_VERSION = '4.9.2';
 
 let __lastLoginUid = null;
 let __lastLoginTs = 0;
+let __activeAuthUid = null;
 
 const STUDIO_COLORS = [
   { bg: '#daeafe', text: '#1047a0' },
@@ -838,10 +839,22 @@ async function resolveSessionFromFirebaseUser(user){
     }else{
       defOrg = String(matched.defaultOrg||'').trim() || 'tesson';
     }
+    // Si l'onglet est déjà initialisé sur un autre user/org, on recharge
+    // pour reconstruire proprement les listeners Firebase sur le bon contexte.
+    const activeOrg = String(window.__menageActiveOrg || '').trim();
+    const switchedUser = !!(window.__menageFbInit && __activeAuthUid && __activeAuthUid !== user.uid);
+    const switchedOrg = !!(window.__menageFbInit && activeOrg && activeOrg !== defOrg);
+    if(switchedUser || switchedOrg){
+      setStoredOrgId(defOrg);
+      __activeAuthUid = user.uid;
+      location.reload();
+      return;
+    }
     const roles = matched.orgs?.[defOrg]?.roles || [];
     const {menage, admin} = rolesToMenageAdmin(roles);
     const sessionName = String(matched.name||matched.prenom||'').trim() || (user.email||'');
     setStoredOrgId(defOrg);
+    __activeAuthUid = user.uid;
     S.currentUser = { name: sessionName, menage, admin };
     saveSession({ name: sessionName });
     S.globalAccount = { id: matchedId, ...matched };
@@ -1537,10 +1550,10 @@ window.confirmOrgFirst=function(){
 async function bootstrap(){
   await auth.authStateReady();
   await loadOrganizations();
-  if(!getStoredOrgId()) setStoredOrgId(ORGANIZATIONS[0]?.id || 'tesson');
   if(auth.currentUser){
-    initFirebaseAndApp();
+    await resolveSessionFromFirebaseUser(auth.currentUser);
   }else{
+    if(!getStoredOrgId()) setStoredOrgId(ORGANIZATIONS[0]?.id || 'tesson');
     showLogin();
   }
 }
