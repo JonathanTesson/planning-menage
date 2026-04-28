@@ -310,6 +310,7 @@ exports.inviteToken = onCall(
           updates["orgs/" + slug + "/adminConfig"] = {
             defaultOrgId: slug,
             authEnabled: true,
+            telegramEnabled: false,
           };
           if (icalArray.length > 0) {
             updates["orgs/" + slug + "/icalFeeds"] = icalArray;

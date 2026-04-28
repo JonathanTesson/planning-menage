@@ -154,3 +154,25 @@ export function buildEditAccountModalHTML() {
   </div>
 </div>`;
 }
+
+/**
+ * Fragment HTML — modale générique de re-auth (IDs stables shared-reauth-*).
+ */
+export function buildReauthModalHTML() {
+  return `<div id="shared-reauth-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="shared-reauth-title">
+  <div class="modal">
+    <h3 id="shared-reauth-title">Confirmation requise</h3>
+    <p class="empty-hint" id="shared-reauth-desc" style="color:#555;line-height:1.45"></p>
+    <div class="modal-field" id="shared-reauth-pwd-wrap">
+      <label for="shared-reauth-pwd">Mot de passe Super Admin</label>
+      <input type="password" id="shared-reauth-pwd" autocomplete="current-password">
+    </div>
+    <div class="login-error" id="shared-reauth-error" style="display:none;margin-bottom:8px"></div>
+    <div class="modal-actions shared-reauth-actions">
+      <button type="button" class="btn-secondary" id="shared-reauth-cancel">Annuler</button>
+      <span id="shared-reauth-google-wrap" class="shared-reauth-google-wrap" style="display:none"><button type="button" class="btn-primary" id="shared-reauth-google">Confirmer avec Google</button></span>
+      <button type="button" class="btn-primary" id="shared-reauth-confirm">Confirmer</button>
+    </div>
+  </div>
+</div>`;
+}
