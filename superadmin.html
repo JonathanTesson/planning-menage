@@ -42,6 +42,13 @@ body.sa-nav-ready .admin-burger{display:flex}
 .login-input--pwd{text-align:center;letter-spacing:2px}
 .login-input:focus,.login-select:focus{outline:none;border-color:#378ADD}
 .login-error{color:#E24B4A;font-size:12px}
+/* Plein écran pendant connexion / restauration de session (aligné sur le sablier calendrier) */
+.sa-auth-loading{
+  position:fixed;inset:0;z-index:9998;background:#f5f5f0;
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  padding:2rem;
+}
+.sa-auth-loading .login-screen{min-height:auto;padding:0}
 .modal-field select{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;box-sizing:border-box}
 .modal-field select:focus{outline:none;border-color:#378ADD}
 #sa-modal-del-studio .modal-actions.sa-modal-del-studio-actions{justify-content:space-between;align-items:flex-start;flex-wrap:nowrap;gap:6px}
@@ -179,6 +186,14 @@ body.sa-nav-ready .admin-burger{display:flex}
     <button type="button" class="btn-secondary" style="max-width:260px;width:100%" onclick="window._saDoLogin()">Connexion</button>
     <p style="font-size:11px;color:#bbb;text-align:center;margin-top:4px">L'interface Super Administration n'est pas prévue pour un smartphone</p>
     <a href="index.html" style="font-size:12px;color:#aaa;text-decoration:none;margin-top:4px">← Retour au planning</a>
+  </div>
+</div>
+
+<div id="sa-auth-loading" class="sa-auth-loading" style="display:none" aria-busy="true" aria-live="polite">
+  <div class="login-screen">
+    <div class="login-icon">⏳</div>
+    <div class="login-title">Chargement…</div>
+    <div class="login-sub">Connexion à la Super Administration</div>
   </div>
 </div>
 
@@ -1062,6 +1077,15 @@ async function handleSaModalGoogleReauth(errId){
   }
 }
 
+function showSaAuthLoading(){
+  const L = el('sa-auth-loading');
+  if(L) L.style.display = 'flex';
+}
+function hideSaAuthLoading(){
+  const L = el('sa-auth-loading');
+  if(L) L.style.display = 'none';
+}
+
 async function loadSaAppAfterAuth(fromBootHash){
   await fetchOrganizations();
   fillOrgSelects();
@@ -1099,6 +1123,7 @@ async function doLogin(){
     err.style.display = '';
     return;
   }
+  showSaAuthLoading();
   try{
     const cred = await signInWithEmailAndPassword(auth, email, pwd);
     if(!isSaEmailAllowed(cred.user)){
@@ -1107,8 +1132,8 @@ async function doLogin(){
       err.style.display = '';
       return;
     }
-    showAppShell();
     await loadSaAppAfterAuth(false);
+    showAppShell();
   }catch(e){
     console.warn(e);
     const code = e && e.code;
@@ -1117,6 +1142,8 @@ async function doLogin(){
         ? 'E-mail ou mot de passe incorrect.'
         : 'Connexion impossible.';
     err.style.display = '';
+  }finally{
+    hideSaAuthLoading();
   }
 }
 
@@ -1132,8 +1159,17 @@ async function doLoginGoogle(){
       err.style.display = '';
       return;
     }
-    showAppShell();
-    await loadSaAppAfterAuth(false);
+    showSaAuthLoading();
+    try{
+      await loadSaAppAfterAuth(false);
+      showAppShell();
+    }catch(loadErr){
+      console.warn(loadErr);
+      err.textContent = 'Chargement impossible. Réessayez.';
+      err.style.display = '';
+    }finally{
+      hideSaAuthLoading();
+    }
   }catch(e){
     console.warn(e);
     if(e && e.code === 'auth/popup-closed-by-user') return;
@@ -3042,8 +3078,13 @@ async function boot(){
     await auth.authStateReady();
     const u = auth.currentUser;
     if(u && isSaEmailAllowed(u)){
-      showAppShell();
-      await loadSaAppAfterAuth(true);
+      showSaAuthLoading();
+      try{
+        await loadSaAppAfterAuth(true);
+        showAppShell();
+      }finally{
+        hideSaAuthLoading();
+      }
     }
   }catch(e){
     console.warn(e);
