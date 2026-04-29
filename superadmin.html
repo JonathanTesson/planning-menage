@@ -159,6 +159,17 @@ body.sa-nav-ready .admin-burger{display:flex}
 </style>
 </head>
 <body>
+<noscript>
+  <style>
+    #sa-auth-loading{display:none!important}
+    #sa-login{display:block!important}
+    #sa-app,#sa-nav-overlay,#sa-nav-panel{display:none!important}
+  </style>
+  <div style="padding:2rem;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:440px;margin:2rem auto;line-height:1.5">
+    <p><strong>JavaScript est requis</strong> pour la Super Administration.</p>
+    <p><a href="index.html">← Retour au planning</a></p>
+  </div>
+</noscript>
 
 <div id="sa-nav-overlay" class="admin-nav-overlay" aria-hidden="true"></div>
 <nav id="sa-nav-panel" class="admin-nav-panel" aria-label="Super administration" aria-hidden="true">
@@ -171,7 +182,7 @@ body.sa-nav-ready .admin-burger{display:flex}
   </div>
 </nav>
 
-<div id="sa-login">
+<div id="sa-login" style="display:none">
   <div class="login-screen">
     <div class="login-icon">🔐</div>
     <div class="login-title">Super Administration</div>
@@ -189,11 +200,11 @@ body.sa-nav-ready .admin-burger{display:flex}
   </div>
 </div>
 
-<div id="sa-auth-loading" class="sa-auth-loading" style="display:none" aria-busy="true" aria-live="polite">
+<div id="sa-auth-loading" class="sa-auth-loading" style="display:flex" aria-busy="true" aria-live="polite">
   <div class="login-screen">
     <div class="login-icon">⏳</div>
     <div class="login-title">Chargement…</div>
-    <div class="login-sub">Connexion à la Super Administration</div>
+    <div class="login-sub">Vérification de la session</div>
   </div>
 </div>
 
@@ -490,6 +501,31 @@ const SA_ALLOWED_EMAIL = 'tessonjonathan@gmail.com';
 const SA_VIEW_WHITELIST = ['comptes','organisations','invitations','parametres','securite'];
 
 let hadFirebaseUser = false;
+/** Watchdog démarrage : évite sablier infini si Firebase / réseau bloque. */
+let __saBootWatchdogId = null;
+const SA_BOOT_WATCHDOG_MS = 28000;
+function clearSaBootWatchdog(){
+  if(__saBootWatchdogId != null){
+    clearTimeout(__saBootWatchdogId);
+    __saBootWatchdogId = null;
+  }
+}
+function scheduleSaBootWatchdog(){
+  clearSaBootWatchdog();
+  __saBootWatchdogId = setTimeout(()=>{
+    __saBootWatchdogId = null;
+    const app = el('sa-app');
+    if(app && app.style.display !== 'none') return;
+    hideSaAuthLoading();
+    const login = el('sa-login');
+    if(login) login.style.display = '';
+    const err = el('sa-login-error');
+    if(err){
+      err.textContent = 'Chargement trop long ou erreur réseau. Réessayez ou rechargez la page.';
+      err.style.display = '';
+    }
+  }, SA_BOOT_WATCHDOG_MS);
+}
 let saSensitiveModalGoogleReauthed = false;
 
 function el(id){ return document.getElementById(id); }
@@ -1079,11 +1115,17 @@ async function handleSaModalGoogleReauth(errId){
 
 function showSaAuthLoading(){
   const L = el('sa-auth-loading');
-  if(L) L.style.display = 'flex';
+  if(L){
+    L.style.display = 'flex';
+    L.setAttribute('aria-busy','true');
+  }
 }
 function hideSaAuthLoading(){
   const L = el('sa-auth-loading');
-  if(L) L.style.display = 'none';
+  if(L){
+    L.style.display = 'none';
+    L.setAttribute('aria-busy','false');
+  }
 }
 
 async function loadSaAppAfterAuth(fromBootHash){
@@ -1184,6 +1226,7 @@ async function logout(){
   try{
     await signOut(auth);
   }catch(_){}
+  hideSaAuthLoading();
   document.body.classList.remove('sa-nav-ready');
   el('sa-app').style.display = 'none';
   el('sa-login').style.display = '';
@@ -3078,21 +3121,35 @@ async function boot(){
     await auth.authStateReady();
     const u = auth.currentUser;
     if(u && isSaEmailAllowed(u)){
-      showSaAuthLoading();
       try{
         await loadSaAppAfterAuth(true);
         showAppShell();
       }finally{
         hideSaAuthLoading();
       }
+    }else{
+      hideSaAuthLoading();
+      el('sa-login').style.display = '';
     }
   }catch(e){
     console.warn(e);
+    hideSaAuthLoading();
+    el('sa-login').style.display = '';
+    const err = el('sa-login-error');
+    if(err){
+      err.textContent = 'Impossible de démarrer. Vérifiez la connexion puis rechargez.';
+      err.style.display = '';
+    }
   }
 }
 
 (async function(){
-  await boot();
+  scheduleSaBootWatchdog();
+  try{
+    await boot();
+  }finally{
+    clearSaBootWatchdog();
+  }
   onAuthStateChanged(auth, (user)=>{
     if(user){
       if(isSaEmailAllowed(user)){
@@ -3100,6 +3157,7 @@ async function boot(){
       }else{
         document.body.classList.remove('sa-nav-ready');
         el('sa-app').style.display = 'none';
+        hideSaAuthLoading();
         el('sa-login').style.display = '';
         const err = el('sa-login-error');
         if(err){
@@ -3111,6 +3169,7 @@ async function boot(){
     }else if(hadFirebaseUser){
       document.body.classList.remove('sa-nav-ready');
       el('sa-app').style.display = 'none';
+      hideSaAuthLoading();
       el('sa-login').style.display = '';
     }
   });

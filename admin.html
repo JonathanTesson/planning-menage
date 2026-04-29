@@ -49,6 +49,18 @@ body.admin-nav-ready .admin-burger{display:flex}
 .btn-sm:hover{background:#f5f5f0}
 .section{background:#fff;border:1px solid #e8e8e2;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
 .section h3{font-size:14px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+#section-studios .section-studios-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;gap:8px;flex-wrap:wrap}
+#section-studios .section-studios-head h3{margin-bottom:0;flex:1;min-width:0}
+#ical-help-btn{
+  width:22px;height:22px;padding:0;border-radius:50%;border:1px solid #ddd;background:#fff;
+  color:#888;font-size:12px;font-weight:600;line-height:1;cursor:pointer;flex-shrink:0;
+  display:inline-flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;
+}
+#ical-help-btn:hover{border-color:#999;color:#555}
+#ical-help-btn:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
+#modal-ical-help .modal-ical-help-ol{margin:0 0 0 1.1rem;padding:0;font-size:13px;color:#333;line-height:1.55}
+#modal-ical-help .modal-ical-help-ol li{margin:0.5rem 0}
+#modal-ical-help .modal-ical-help-note{font-size:11px;color:#888;line-height:1.45;margin-top:12px}
 .toggle{position:relative;width:44px;height:24px;flex-shrink:0}
 .toggle input{opacity:0;width:0;height:0}
 .toggle-slider{position:absolute;inset:0;background:#ddd;border-radius:24px;cursor:pointer;transition:0.2s}
@@ -289,7 +301,10 @@ body.admin-nav-ready .admin-burger{display:flex}
     <div id="admin-view-organisation" role="region" aria-label="Organisation — studios" style="display:none">
     <!-- Studios -->
     <div class="section" id="section-studios">
-      <h3><span>🏠</span> Studios</h3>
+      <div class="section-studios-head">
+        <h3><span>🏠</span> Studios</h3>
+        <button type="button" id="ical-help-btn" title="Où trouver l’URL iCal sur Airbnb ?" aria-label="Aide URL iCal Airbnb">?</button>
+      </div>
       <div id="studios-fields"></div>
       <div style="margin-top:10px">
         <button class="btn-primary" onclick="saveNames()">Enregistrer</button>
@@ -378,6 +393,24 @@ body.admin-nav-ready .admin-burger{display:flex}
     <div class="modal-btns">
       <button type="button" class="btn-cancel" id="sa-modal-ical-admin-cancel">Retour</button>
       <button type="button" class="btn-primary" id="sa-modal-ical-admin-ok">Enregistrer</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="modal-ical-help" role="dialog" aria-modal="true" aria-labelledby="modal-ical-help-title">
+  <div class="modal">
+    <h3 id="modal-ical-help-title">Trouver votre URL iCal sur Airbnb</h3>
+    <ol class="modal-ical-help-ol">
+      <li>Connectez-vous sur airbnb.fr et passez en mode hôte</li>
+      <li>Cliquez sur &quot;Calendrier&quot; dans le menu</li>
+      <li>Sélectionnez le studio concerné</li>
+      <li>Dans le panneau de droite, cliquez sur &quot;Paramètres de disponibilité&quot;</li>
+      <li>Faites défiler jusqu'en bas → cliquez sur &quot;Associer un autre calendrier&quot;</li>
+      <li>Cliquez sur &quot;Me connecter à un autre site web&quot;</li>
+      <li>Votre URL iCal se trouve dans la section &quot;Étape 1&quot; — copiez-la en entier</li>
+    </ol>
+    <p class="modal-ical-help-note">⚠️ Chaque studio a sa propre URL iCal. Répétez l’opération pour chaque studio.</p>
+    <div class="modal-btns">
+      <button type="button" class="btn-secondary" id="modal-ical-help-close">Fermer</button>
     </div>
   </div>
 </div>
@@ -1299,6 +1332,28 @@ function closeSaModalIcalAdmin(){
   adminIcalSaveStudioIndex=-1;
 }
 
+let modalIcalHelpBound=false;
+function openModalIcalHelp(){
+  const overlay=document.getElementById('modal-ical-help');
+  if(overlay) overlay.classList.add('is-open');
+}
+function closeModalIcalHelp(){
+  const overlay=document.getElementById('modal-ical-help');
+  if(overlay) overlay.classList.remove('is-open');
+}
+function bindModalIcalHelpOnce(){
+  if(modalIcalHelpBound) return;
+  modalIcalHelpBound=true;
+  document.getElementById('ical-help-btn')?.addEventListener('click',()=>openModalIcalHelp());
+  document.getElementById('modal-ical-help-close')?.addEventListener('click',()=>closeModalIcalHelp());
+  const helpOverlay=document.getElementById('modal-ical-help');
+  if(helpOverlay){
+    helpOverlay.addEventListener('click',e=>{
+      if(e.target===helpOverlay) closeModalIcalHelp();
+    });
+  }
+}
+
 function bindSaModalIcalAdminOnce(){
   if(adminIcalModalBound) return;
   adminIcalModalBound=true;
@@ -1327,6 +1382,7 @@ function bindStudioFieldsDelegationOnce(){
   if(!host) return;
   studioFieldsClickBound=true;
   bindSaModalIcalAdminOnce();
+  bindModalIcalHelpOnce();
   host.addEventListener('click', e=>{ void studioFieldsClickHandler(e); });
   host.addEventListener('click', e=>{
     const b=e.target.closest('[data-ical-admin-studio]');

@@ -53,6 +53,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .step5-ical-list{display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px}
 .step5-ical-row{display:flex;flex-direction:column;gap:4px}
 .step5-studio-label{font-weight:600;color:#555}
+#invite-step-5 .invite-step5-title-row{display:flex;align-items:center;gap:8px;width:100%;max-width:320px;justify-content:space-between}
+#invite-step-5 .invite-step5-title-row .invite-title{margin:0;text-align:left;flex:1;min-width:0}
+#invite-ical-help-btn{
+  width:22px;height:22px;padding:0;border-radius:50%;border:1px solid #ddd;background:#fff;
+  color:#888;font-size:12px;font-weight:600;line-height:1;cursor:pointer;flex-shrink:0;
+  display:inline-flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;font:inherit;
+}
+#invite-ical-help-btn:hover{border-color:#999;color:#555}
+#invite-ical-help-btn:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
+.invite-help-overlay{
+  position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.45);
+  display:none;align-items:center;justify-content:center;padding:1rem;box-sizing:border-box;
+}
+.invite-help-overlay.is-visible{display:flex}
+.invite-help-panel{
+  background:#fff;border-radius:14px;padding:1.5rem;max-width:340px;width:100%;
+  box-shadow:0 8px 32px rgba(0,0,0,.12);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+.invite-help-title{font-size:16px;font-weight:700;color:#1a1a1a;margin:0 0 12px;line-height:1.3}
+.invite-help-ol{margin:0 0 0 1.1rem;padding:0;font-size:13px;color:#333;line-height:1.55}
+.invite-help-ol li{margin:0.45rem 0}
+.invite-help-note{font-size:11px;color:#888;line-height:1.45;margin:12px 0 0}
+#modal-invite-ical-help-close{margin-top:14px;width:100%}
 .step6-sub{display:none;flex-direction:column;align-items:center;gap:1rem;width:100%;text-align:center}
 .step6-sub.is-visible{display:flex}
 #step6-subs{width:100%;display:flex;flex-direction:column;align-items:center;gap:1rem}
@@ -184,7 +208,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
   <div id="invite-step-5" class="invite-step" style="display:none">
     <div class="invite-icon">🔗</div>
-    <div class="invite-title">Mes URLs iCal</div>
+    <div class="invite-step5-title-row">
+      <div class="invite-title">Mes URLs iCal</div>
+      <button type="button" id="invite-ical-help-btn" title="Où trouver l’URL iCal sur Airbnb ?" aria-label="Aide URL iCal Airbnb">?</button>
+    </div>
     <div class="invite-sub">Optionnel — vous pouvez configurer ça plus tard dans votre compte.</div>
     <div id="step5-ical-list" class="step5-ical-list"></div>
     <button type="button" class="btn-primary" id="step5-continue">Continuer</button>
@@ -214,6 +241,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
           <button type="button" class="btn-primary" id="step6-retry-btn" style="display:none">Réessayer</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div id="modal-invite-ical-help" class="invite-help-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-invite-ical-help-title">
+    <div class="invite-help-panel">
+      <h2 class="invite-help-title" id="modal-invite-ical-help-title">Trouver votre URL iCal sur Airbnb</h2>
+      <ol class="invite-help-ol">
+        <li>Connectez-vous sur airbnb.fr et passez en mode hôte</li>
+        <li>Cliquez sur &quot;Calendrier&quot; dans le menu</li>
+        <li>Sélectionnez le studio concerné</li>
+        <li>Dans le panneau de droite, cliquez sur &quot;Paramètres de disponibilité&quot;</li>
+        <li>Faites défiler jusqu'en bas → cliquez sur &quot;Associer un autre calendrier&quot;</li>
+        <li>Cliquez sur &quot;Me connecter à un autre site web&quot;</li>
+        <li>Votre URL iCal se trouve dans la section &quot;Étape 1&quot; — copiez-la en entier</li>
+      </ol>
+      <p class="invite-help-note">⚠️ Chaque studio a sa propre URL iCal. Répétez l’opération pour chaque studio.</p>
+      <button type="button" class="btn-secondary" id="modal-invite-ical-help-close">Fermer</button>
     </div>
   </div>
 
@@ -258,8 +302,30 @@ let inviteOrg = { nom: '', slug: '' };
 let inviteStudios = [];
 let inviteIcal = {};
 let step6BackFn = null;
+let inviteIcalHelpBound = false;
 
 function el(id){ return document.getElementById(id); }
+
+function openInviteIcalHelpModal(){
+  const m = el('modal-invite-ical-help');
+  if(m) m.classList.add('is-visible');
+}
+function closeInviteIcalHelpModal(){
+  const m = el('modal-invite-ical-help');
+  if(m) m.classList.remove('is-visible');
+}
+function bindInviteIcalHelpOnce(){
+  if(inviteIcalHelpBound) return;
+  inviteIcalHelpBound = true;
+  el('invite-ical-help-btn')?.addEventListener('click', ()=>openInviteIcalHelpModal());
+  el('modal-invite-ical-help-close')?.addEventListener('click', ()=>closeInviteIcalHelpModal());
+  const ov = el('modal-invite-ical-help');
+  if(ov){
+    ov.addEventListener('click', e=>{
+      if(e.target === ov) closeInviteIcalHelpModal();
+    });
+  }
+}
 
 function showToast(msg){
   const t = el('toast');
@@ -788,6 +854,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
       setStep(4);
     });
   }
+  bindInviteIcalHelpOnce();
 
   const step6BackBtn = el('step6-back-btn');
   if(step6BackBtn){
