@@ -61,6 +61,24 @@ body.admin-nav-ready .admin-burger{display:flex}
 #modal-ical-help .modal-ical-help-ol{margin:0 0 0 1.1rem;padding:0;font-size:13px;color:#333;line-height:1.55}
 #modal-ical-help .modal-ical-help-ol li{margin:0.5rem 0}
 #modal-ical-help .modal-ical-help-note{font-size:11px;color:#888;line-height:1.45;margin-top:12px}
+.studio-card{
+  display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid #e8e8e2;border-radius:10px;
+  background:#fafaf8;margin-bottom:10px;
+}
+.studio-card-label{
+  font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.04em;
+}
+.studio-card-input{
+  width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #ddd;border-radius:8px;
+  font-size:13px;color:#1a1a1a;background:#fff;
+}
+.studio-card-input:focus{outline:none;border-color:#378ADD}
+.studio-card-actions{display:flex;gap:8px;flex-wrap:wrap}
+.studio-card-actions button{flex:1;min-width:120px;white-space:nowrap}
+.studio-card-actions .btn-danger{
+  font-size:12px;padding:6px 10px;border:1px solid #f0c0c0;border-radius:8px;background:#fff;
+}
+.studio-card-actions .btn-secondary:disabled{opacity:0.45;cursor:not-allowed}
 .toggle{position:relative;width:44px;height:24px;flex-shrink:0}
 .toggle input{opacity:0;width:0;height:0}
 .toggle-slider{position:absolute;inset:0;background:#ddd;border-radius:24px;cursor:pointer;transition:0.2s}
@@ -1427,16 +1445,16 @@ async function renderStudioFields(){
   host.innerHTML=A.studioNames.map((name,i)=>{
     const hasReq=!!pendingByIndex[i];
     const btn=hasReq
-      ? `<button type="button" class="btn-danger" data-cancel-del-req-studio="${i}" style="font-size:12px;padding:6px 10px;border:1px solid #f0c0c0;border-radius:8px;background:#fff;white-space:nowrap">Annuler la demande</button>`
-      : `<button type="button" class="btn-secondary" data-del-req-studio="${i}" style="white-space:nowrap">Demande de suppression</button>`;
+      ? `<button type="button" class="btn-danger" data-cancel-del-req-studio="${i}">Annuler la demande</button>`
+      : `<button type="button" class="btn-secondary" data-del-req-studio="${i}">Demande de suppression</button>`;
     const ic=adminIcalByStudioCache[i]||{ locked:false, url:'' };
     const icalBtn=ic.locked
-      ? `<button type="button" class="btn-secondary" disabled style="opacity:0.45;cursor:not-allowed" title="URL verrouillée par le Super Admin" data-ical-admin-studio="${i}">🔗 URL iCal</button>`
+      ? `<button type="button" class="btn-secondary" disabled title="URL verrouillée par le Super Admin" data-ical-admin-studio="${i}">🔗 URL iCal</button>`
       : `<button type="button" class="btn-secondary" data-ical-admin-studio="${i}">🔗 URL iCal</button>`;
-    return `<div class="field-row" style="align-items:center">
-      <label>Studio ${i+1}</label>
-      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;flex-wrap:wrap">
-        <input type="text" id="name-s${i}" value="${escHtml(name)}" style="flex:1;min-width:140px">
+    return `<div class="studio-card">
+      <div class="studio-card-label">Studio ${i+1}</div>
+      <input type="text" id="name-s${i}" class="studio-card-input" value="${escHtml(name)}">
+      <div class="studio-card-actions">
         ${icalBtn}
         ${btn}
       </div>
