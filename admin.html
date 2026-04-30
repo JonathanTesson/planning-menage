@@ -117,6 +117,29 @@ body.admin-nav-ready .admin-burger{display:flex}
 .histo-table th{text-align:left;padding:5px 8px;color:#aaa;font-weight:500;border-bottom:1px solid #e8e8e2;font-size:11px}
 .histo-table td{padding:5px 8px;border-bottom:1px solid #f0f0eb;color:#555}
 .histo-table tr:last-child td{border-bottom:none}
+.histo-th-studio{white-space:nowrap;vertical-align:middle}
+.histo-th-studio-inner{display:inline-flex;align-items:center;gap:6px}
+.admin-resa-filter-trigger{
+  flex-shrink:0;width:26px;height:26px;padding:0;border:1px solid #e0e0da;border-radius:8px;background:#fafaf8;
+  color:#888;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
+  -webkit-tap-highlight-color:transparent;line-height:0;
+}
+.admin-resa-filter-trigger:hover{border-color:#ccc;color:#555;background:#f3f3ef}
+.admin-resa-filter-trigger:focus-visible{outline:2px solid #378ADD;outline-offset:2px}
+.admin-resa-filter-trigger--active{border-color:#c8d8ee;background:#eef4fb;color:#378ADD}
+.admin-resa-studio-filter-pop{
+  position:fixed;z-index:400;min-width:240px;max-width:min(92vw,320px);padding:12px 14px;
+  background:#fff;border:1px solid #e8e8e2;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,0.12);
+  font-size:13px;color:#333;
+}
+.admin-resa-studio-filter-pop[hidden]{display:none!important}
+.admin-resa-studio-filter-pop-title{font-weight:600;font-size:12px;color:#555;margin-bottom:10px}
+.admin-resa-studio-filter-rows{display:flex;flex-direction:column;gap:8px}
+.admin-resa-studio-filter-row{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#444;line-height:1.35}
+.admin-resa-studio-filter-row input{flex-shrink:0;width:16px;height:16px;accent-color:#378ADD;cursor:pointer}
+.admin-resa-studio-filter-hint{margin-top:10px;font-size:11px;color:#999;line-height:1.45}
+#section-reservations .admin-resa-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1rem}
+#section-reservations .admin-resa-head h3{margin-bottom:0;flex:1;min-width:0}
 .activity-log-wrap{background:#f5f5f0;border-radius:8px;padding:0.5rem 0.75rem;margin-top:0.5rem;max-height:280px;overflow-y:auto;font-size:12px;line-height:1.45}
 .activity-log-wrap .histo-table{margin-top:0}
 .activity-type{font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:0.04em}
@@ -388,15 +411,18 @@ body.admin-nav-ready .admin-burger{display:flex}
 
     <div id="admin-view-reservations" role="region" aria-label="Réservations du mois" style="display:none">
     <div class="section" id="section-reservations">
-      <h3><span>📅</span> Réservations</h3>
-      <p style="font-size:11px;color:#aaa;margin-bottom:10px;line-height:1.5">Séjours qui chevauchent le mois affiché (même périmètre que le planning). Indiquez le nombre de voyageurs attendus ; la valeur est enregistrée sur l’assignation Firebase de la réservation.</p>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
-        <h3 style="margin-bottom:0"><span>📅</span> <span id="admin-resa-month-title">…</span></h3>
-        <div style="display:flex;align-items:center;gap:6px">
+      <div class="admin-resa-head">
+        <h3><span>📅</span> Réservations</h3>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
           <button type="button" class="nav-btn" onclick="adminChangeMonth(-1)">&#8592;</button>
-          <button type="button" class="nav-btn" onclick="adminChangeMonth(0)" id="admin-resa-month-btn" style="min-width:55px">…</button>
+          <button type="button" class="nav-btn" onclick="adminChangeMonth(0)" id="admin-resa-month-btn" style="min-width:88px">…</button>
           <button type="button" class="nav-btn" onclick="adminChangeMonth(1)">&#8594;</button>
         </div>
+      </div>
+      <div id="admin-resa-studio-filter-pop" class="admin-resa-studio-filter-pop" hidden role="dialog" aria-modal="true" aria-labelledby="admin-resa-studio-filter-title">
+        <div id="admin-resa-studio-filter-title" class="admin-resa-studio-filter-pop-title">Studios visibles dans le tableau</div>
+        <div id="admin-resa-studio-filter-rows" class="admin-resa-studio-filter-rows"></div>
+        <p class="admin-resa-studio-filter-hint">Décochez pour masquer des lignes (affichage seul, rien n’est supprimé en base).</p>
       </div>
       <div id="admin-reservations-list-host"></div>
     </div>
@@ -505,7 +531,7 @@ function setAdminNavigatingToCalendarIntent(){
 }
 let ORGANIZATIONS = [];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.9.6';
+const APP_VERSION = '4.9.7';
 const UNAVAIL_SHOWBY_KEY = 'menage_unavail_showby_v1';
 
 /** Studio sélectionné dans la section Procédures (persiste entre re-rendus). */
@@ -520,6 +546,10 @@ let procSuggestionsRenderSig=null;
 let adminIcalByStudioCache={};
 let adminIcalSaveStudioIndex=-1;
 let adminIcalModalBound=false;
+/** Indices studio (chaînes « 0 », « 1 », …) masqués dans le tableau Réservations (affichage seul). */
+let adminResaHiddenStudios=new Set();
+let adminResaFilterPrefsLoaded=false;
+let adminResaStudioFilterDocBound=false;
 
 function procAttrEsc(s){
   return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
@@ -1217,6 +1247,9 @@ const ACTIVITY_TYPE_LABEL={ login:'Connexion', logout:'Déconnexion', assign:'As
 function escHtml(s){
   return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+function escAttr(s){
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 
 function normalizeConfigStudioNames(raw){
   if(raw==null) return [];
@@ -1543,15 +1576,187 @@ function adminResaVoyageursCurrent(uid){
   return Number.isFinite(n)&&n>=1&&n<=8?n:null;
 }
 
+function adminResaFilterStorageKey(){
+  return `menage_admin_resa_studio_hidden_v1__${orgId}`;
+}
+function adminResaEnsureFilterPrefs(){
+  if(adminResaFilterPrefsLoaded) return;
+  adminResaFilterPrefsLoaded=true;
+  adminResaHiddenStudios=new Set();
+  try{
+    const raw=sessionStorage.getItem(adminResaFilterStorageKey());
+    if(!raw) return;
+    const arr=JSON.parse(raw);
+    if(Array.isArray(arr)) for(const x of arr) adminResaHiddenStudios.add(String(x));
+  }catch(_){ adminResaHiddenStudios=new Set(); }
+}
+function adminResaPersistHiddenStudios(){
+  try{
+    sessionStorage.setItem(adminResaFilterStorageKey(), JSON.stringify([...adminResaHiddenStudios]));
+  }catch(_){}
+}
+function adminResaMaxConfiguredStudioIndex(){
+  const names=normalizeConfigStudioNames(A.studioNames);
+  let m=names.length?names.length-1:-1;
+  for(const r of A.reservations){
+    if(!r||r.studio==null) continue;
+    const si=Number(r.studio);
+    if(Number.isFinite(si)) m=Math.max(m,si);
+  }
+  return m;
+}
+function adminResaSanitizeHiddenStudios(){
+  const maxI=adminResaMaxConfiguredStudioIndex();
+  if(maxI<0){ adminResaHiddenStudios=new Set(); return; }
+  const next=new Set();
+  for(const x of adminResaHiddenStudios){
+    const i=Number(x);
+    if(Number.isFinite(i)&&i>=0&&i<=maxI) next.add(String(i));
+  }
+  adminResaHiddenStudios=next;
+}
+function adminResaStudioIndicesForFilterRows(list){
+  const names=normalizeConfigStudioNames(A.studioNames);
+  const set=new Set();
+  if(names.length) for(let i=0;i<names.length;i++) set.add(String(i));
+  for(const r of list) if(r&&r.studio!=null) set.add(String(r.studio));
+  return[...set].sort((a,b)=>Number(a)-Number(b));
+}
+function adminResaRowStudioLabel(si){
+  const raw=A.studioNames&&A.studioNames[si];
+  if(raw!=null&&String(raw).trim()!=='') return String(raw).trim();
+  const n=Number(si);
+  return Number.isFinite(n)?('Studio '+(n+1)):String(si??'');
+}
+function adminResaFilterTriggerUpdate(){
+  const btn=document.querySelector('.admin-resa-filter-trigger');
+  if(!btn) return;
+  btn.classList.toggle('admin-resa-filter-trigger--active', adminResaHiddenStudios.size>0);
+}
+function adminResaApplyRowFilter(){
+  const host=document.getElementById('admin-reservations-list-host');
+  if(!host) return;
+  const table=host.querySelector('table.histo-table');
+  if(!table) return;
+  for(const tr of table.querySelectorAll('tbody tr[data-resa-studio]')){
+    const si=String(tr.getAttribute('data-resa-studio')??'');
+    tr.hidden=adminResaHiddenStudios.has(si);
+  }
+}
+function adminResaPositionFilterPop(btn){
+  const pop=document.getElementById('admin-resa-studio-filter-pop');
+  if(!pop||!btn) return;
+  const r=btn.getBoundingClientRect();
+  const w=280;
+  const left=Math.max(8,Math.min(r.left,window.innerWidth-w-8));
+  pop.style.top=`${Math.round(r.bottom+6)}px`;
+  pop.style.left=`${Math.round(left)}px`;
+}
+function adminResaCloseFilterPop(){
+  const pop=document.getElementById('admin-resa-studio-filter-pop');
+  const btn=document.querySelector('.admin-resa-filter-trigger');
+  if(pop){ pop.hidden=true; pop.removeAttribute('data-open'); }
+  if(btn){ btn.setAttribute('aria-expanded','false'); }
+}
+function adminResaOpenFilterPop(btn, list){
+  const pop=document.getElementById('admin-resa-studio-filter-pop');
+  const rowsHost=document.getElementById('admin-resa-studio-filter-rows');
+  if(!pop||!rowsHost||!btn) return;
+  adminResaSanitizeHiddenStudios();
+  const indices=adminResaStudioIndicesForFilterRows(list);
+  if(!indices.length){
+    showToast('Aucun studio à filtrer');
+    return;
+  }
+  rowsHost.innerHTML=indices.map(si=>{
+    const lab=adminResaRowStudioLabel(si);
+    const checked=!adminResaHiddenStudios.has(si);
+    return `<label class="admin-resa-studio-filter-row"><input type="checkbox" data-resa-filter-idx="${escAttr(si)}" ${checked?'checked':''}><span>${escHtml(lab)}</span></label>`;
+  }).join('');
+  pop.hidden=false;
+  pop.setAttribute('data-open','1');
+  btn.setAttribute('aria-expanded','true');
+  adminResaPositionFilterPop(btn);
+  const first=rowsHost.querySelector('input');
+  if(first) first.focus();
+}
+function adminResaToggleFilterPop(btn, list){
+  const pop=document.getElementById('admin-resa-studio-filter-pop');
+  if(pop&&!pop.hidden&&pop.getAttribute('data-open')) adminResaCloseFilterPop();
+  else adminResaOpenFilterPop(btn, list);
+}
+function adminResaOnFilterCheckboxChange(inp){
+  const si=inp.getAttribute('data-resa-filter-idx');
+  if(si==null) return;
+  const wrap=document.getElementById('admin-resa-studio-filter-rows');
+  if(!wrap) return;
+  const all=wrap.querySelectorAll('input[data-resa-filter-idx]');
+  let nChecked=0;
+  for(const el of all) if(el.checked) nChecked++;
+  if(!inp.checked&&nChecked===0){
+    inp.checked=true;
+    showToast('Gardez au moins un studio visible');
+    return;
+  }
+  if(inp.checked) adminResaHiddenStudios.delete(si);
+  else adminResaHiddenStudios.add(si);
+  adminResaPersistHiddenStudios();
+  adminResaApplyRowFilter();
+  adminResaFilterTriggerUpdate();
+}
+function adminResaBindStudioFilterOnce(){
+  const section=document.getElementById('section-reservations');
+  if(!section||section.dataset.resaFilterUiBound) return;
+  section.dataset.resaFilterUiBound='1';
+  section.addEventListener('click',e=>{
+    const btn=e.target.closest('.admin-resa-filter-trigger');
+    if(!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const list=window._adminResaFilterListRef;
+    if(!list) return;
+    adminResaToggleFilterPop(btn, list);
+  });
+  section.addEventListener('change',e=>{
+    const t=e.target;
+    if(!(t instanceof HTMLInputElement)||!t.matches('input[data-resa-filter-idx]')) return;
+    adminResaOnFilterCheckboxChange(t);
+  });
+}
+function adminResaBindStudioFilterDocOnce(){
+  if(adminResaStudioFilterDocBound) return;
+  adminResaStudioFilterDocBound=true;
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='Escape') return;
+    const pop=document.getElementById('admin-resa-studio-filter-pop');
+    if(!pop||pop.hidden) return;
+    adminResaCloseFilterPop();
+  });
+  document.addEventListener('mousedown',e=>{
+    const pop=document.getElementById('admin-resa-studio-filter-pop');
+    if(!pop||pop.hidden) return;
+    if(pop.contains(e.target)) return;
+    if(e.target.closest('.admin-resa-filter-trigger')) return;
+    adminResaCloseFilterPop();
+  }, true);
+  window.addEventListener('resize',()=>{
+    const pop=document.getElementById('admin-resa-studio-filter-pop');
+    const btn=document.querySelector('.admin-resa-filter-trigger');
+    if(!pop||pop.hidden||!btn) return;
+    adminResaPositionFilterPop(btn);
+  });
+}
+
 function renderAdminReservations(){
-  const title=document.getElementById('admin-resa-month-title');
   const mid=document.getElementById('admin-resa-month-btn');
   const host=document.getElementById('admin-reservations-list-host');
-  if(!title||!mid||!host) return;
-  if(!A.unlocked){ host.innerHTML=''; window._adminResaUids=[]; return; }
+  if(!mid||!host) return;
+  if(!A.unlocked){ host.innerHTML=''; window._adminResaFilterListRef=null; adminResaCloseFilterPop(); return; }
+  adminResaEnsureFilterPrefs();
+  adminResaBindStudioFilterOnce();
+  adminResaBindStudioFilterDocOnce();
   const mo=A.selectedMonth, yr=A.selectedYear;
-  title.textContent=MO_FR[mo]+' '+yr;
-  mid.textContent=MO_FR[mo];
+  mid.textContent=MO_FR[mo]+' '+yr;
   const fd=new Date(yr, mo, 1);
   const ld=new Date(yr, mo+1, 0);
   const fdT=new Date(fd.getFullYear(), fd.getMonth(), fd.getDate()).getTime();
@@ -1561,13 +1766,16 @@ function renderAdminReservations(){
     const re=new Date(r.end.getFullYear(), r.end.getMonth(), r.end.getDate()).getTime();
     return rs<=ldT&&re>=fdT;
   }).sort((a,b)=>a.start-b.start);
+  window._adminResaFilterListRef=list;
   if(!list.length){
+    adminResaCloseFilterPop();
     host.innerHTML='<p style="color:#aaa;font-size:12px;padding:4px 0">Aucune réservation sur cette période.</p>';
-    window._adminResaUids=[];
     return;
   }
-  window._adminResaUids=list.map(r=>r.uid);
-  const rows=list.map((r,idx)=>{
+  adminResaSanitizeHiddenStudios();
+  const filterIcon='<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5h16M7 12h10M10 19h4"/></svg>';
+  const studioTh=`<th class="histo-th-studio"><span class="histo-th-studio-inner"><span>Studio</span><button type="button" class="admin-resa-filter-trigger" title="Filtrer les lignes par studio" aria-label="Filtrer les lignes par studio" aria-expanded="false" aria-haspopup="true">${filterIcon}</button></span></th>`;
+  const rows=list.map((r)=>{
     const uid=r.uid;
     const arrLabel=r.start.toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
     const si=r.studio;
@@ -1575,19 +1783,25 @@ function renderAdminReservations(){
     const v=adminResaVoyageursCurrent(uid);
     const nuites=Math.round((r.end-r.start)/86400000);
     const opts=['<option value=""></option>'].concat([1,2,3,4,5,6,7,8].map(n=>`<option value="${n}"${v===n?' selected':''}>${n}</option>`));
-    return `<tr>
+    const siAttr=escAttr(String(si??''));
+    const uidAttr=escAttr(uid);
+    return `<tr data-resa-studio="${siAttr}" data-resa-uid="${uidAttr}">
       <td style="white-space:nowrap">${escHtml(arrLabel)}</td>
       <td>${nuites}</td>
       <td>${escHtml(sn)}</td>
-      <td><select style="max-width:88px;padding:6px 8px;font-size:13px;border:1px solid #ddd;border-radius:8px;background:#fff" onchange="window.adminResaVoyageursChange(this,${idx})">${opts.join('')}</select></td>
+      <td><select style="max-width:88px;padding:6px 8px;font-size:13px;border:1px solid #ddd;border-radius:8px;background:#fff" onchange="window.adminResaVoyageursChange(this)">${opts.join('')}</select></td>
     </tr>`;
   }).join('');
-  host.innerHTML=`<table class="histo-table"><thead><tr><th>Arrivée</th><th>Nuits</th><th>Studio</th><th>Voyageurs</th></tr></thead><tbody>${rows}</tbody></table>`;
+  adminResaCloseFilterPop();
+  host.innerHTML=`<table class="histo-table"><thead><tr><th>Arrivée</th><th>Nuits</th>${studioTh}<th>Voyageurs</th></tr></thead><tbody>${rows}</tbody></table>`;
+  adminResaApplyRowFilter();
+  adminResaFilterTriggerUpdate();
 }
 
-window.adminResaVoyageursChange=async function(sel, idx){
-  const uid=window._adminResaUids&&window._adminResaUids[idx];
-  if(!A.unlocked||uid==null||uid==='') return;
+window.adminResaVoyageursChange=async function(sel){
+  const tr=sel&&sel.closest&&sel.closest('tr');
+  const uid=tr&&tr.dataset&&tr.dataset.resaUid!=null?String(tr.dataset.resaUid):'';
+  if(!A.unlocked||uid==='') return;
   const raw=String(sel.value??'');
   const val=raw===''?null:Number(raw);
   if(raw!==''&&(!Number.isFinite(val)||val<1||val>8)){
