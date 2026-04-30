@@ -531,7 +531,7 @@ function setAdminNavigatingToCalendarIntent(){
 }
 let ORGANIZATIONS = [];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.9.7';
+const APP_VERSION = '4.9.9';
 const UNAVAIL_SHOWBY_KEY = 'menage_unavail_showby_v1';
 
 /** Studio sélectionné dans la section Procédures (persiste entre re-rendus). */
@@ -546,6 +546,8 @@ let procSuggestionsRenderSig=null;
 let adminIcalByStudioCache={};
 let adminIcalSaveStudioIndex=-1;
 let adminIcalModalBound=false;
+/** Nombre de studios déjà enregistrés sous config/studioNames (Firebase). Les indices ≥ valeur sont « brouillon » jusqu’à Enregistrer. */
+let adminPersistedStudioCount=0;
 /** Indices studio (chaînes « 0 », « 1 », …) masqués dans le tableau Réservations (affichage seul). */
 let adminResaHiddenStudios=new Set();
 let adminResaFilterPrefsLoaded=false;
@@ -959,7 +961,12 @@ async function loadOrganizations(){
 
   onValue(ref(db,ob('config')), snap=>{
     const d=snap.val();
-    if(d){ A.studioNames=d.studioNames||A.studioNames; }
+    if(d){
+      A.studioNames=d.studioNames||A.studioNames;
+      if(Object.prototype.hasOwnProperty.call(d,'studioNames')){
+        adminPersistedStudioCount=normalizeConfigStudioNames(d.studioNames).length;
+      }
+    }
     setSyncStatus('ok');
     if(A.unlocked) renderAdminContent();
     const studiosHost=document.getElementById('studios-fields');
@@ -1299,11 +1306,18 @@ async function studioFieldsClickHandler(e){
   if(addEl){
     e.preventDefault();
     try{
-      const snap=await get(ref(db, ob('config/studioNames')));
-      const arr=normalizeConfigStudioNames(snap.val());
-      const n=arr.length+1;
-      arr.push(`Studio ${n}`);
-      A.studioNames=arr;
+      const cur=[];
+      const base=normalizeConfigStudioNames(A.studioNames);
+      for(let i=0;i<base.length;i++){
+        const inp=document.getElementById('name-s'+i);
+        let label='';
+        if(inp&&String(inp.value).trim()) label=String(inp.value).trim();
+        else if(base[i]!=null&&String(base[i]).trim()!=='') label=String(base[i]).trim();
+        else label='Studio '+(i+1);
+        cur.push(label);
+      }
+      cur.push('Studio '+(cur.length+1));
+      A.studioNames=cur;
       showToast('Studio ajouté');
       await renderStudioFields();
     }catch(err){
@@ -1315,6 +1329,7 @@ async function studioFieldsClickHandler(e){
   const delEl=e.target.closest('[data-del-req-studio]');
   if(delEl){
     e.preventDefault();
+    if(delEl.disabled) return;
     const i=Number(delEl.getAttribute('data-del-req-studio'));
     if(A.studioNames.length<=1){
       showToast('Impossible de demander la suppression du dernier studio.');
@@ -1481,9 +1496,12 @@ async function renderStudioFields(){
 
   host.innerHTML=A.studioNames.map((name,i)=>{
     const hasReq=!!pendingByIndex[i];
+    const isDraft=i>=adminPersistedStudioCount;
     const btn=hasReq
       ? `<button type="button" class="btn-danger" data-cancel-del-req-studio="${i}">Annuler la demande</button>`
-      : `<button type="button" class="btn-secondary" data-del-req-studio="${i}">Demande de suppression</button>`;
+      : isDraft
+        ? `<button type="button" class="btn-secondary" disabled title="Enregistrez les studios avant une demande de suppression">Demande de suppression</button>`
+        : `<button type="button" class="btn-secondary" data-del-req-studio="${i}">Demande de suppression</button>`;
     const ic=adminIcalByStudioCache[i]||{ locked:false, url:'' };
     const icalBtn=ic.locked
       ? `<button type="button" class="btn-secondary" disabled title="URL verrouillée par le Super Admin" data-ical-admin-studio="${i}">🔗 URL iCal</button>`
@@ -2446,7 +2464,10 @@ window.saveNames = function(){
     const inp=document.getElementById('name-s'+i);
     return (inp&&inp.value.trim())?inp.value.trim():('Studio '+(i+1));
   });
-  set(ref(db,ob('config')),{ studioNames:A.studioNames }).then(()=>setSyncStatus('ok')).catch(()=>setSyncStatus('err'));
+  set(ref(db,ob('config')),{ studioNames:A.studioNames }).then(()=>{
+    adminPersistedStudioCount=A.studioNames.length;
+    setSyncStatus('ok');
+  }).catch(()=>setSyncStatus('err'));
   showToast('Studios enregistrés ✓');
 };
 
