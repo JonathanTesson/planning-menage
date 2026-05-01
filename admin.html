@@ -27,7 +27,16 @@ body.admin-nav-ready .admin-burger{display:flex}
   0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,0.5);}
   50%{box-shadow:0 0 0 5px rgba(245,158,11,0);}
 }
-.admin-nav-link.has-pending-suggestions{
+.admin-nav-link.has-pending-suggestions,
+.admin-nav-link.has-pending-voyageurs{
+  animation:nav-pending-pulse 1.8s ease-in-out infinite;
+  border-radius:8px;
+}
+/* Vue Réservations : halo sur la date d’Arrivée seule si mois affiché = mois civil courant et voyageurs manquant (voir renderAdminReservations). */
+.admin-resa-pending-voyageurs{
+  display:inline-block;
+  vertical-align:middle;
+  padding:3px 8px;
   animation:nav-pending-pulse 1.8s ease-in-out infinite;
   border-radius:8px;
 }
@@ -531,7 +540,7 @@ function setAdminNavigatingToCalendarIntent(){
 }
 let ORGANIZATIONS = [];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.9.9';
+const APP_VERSION = '4.9.10';
 const UNAVAIL_SHOWBY_KEY = 'menage_unavail_showby_v1';
 
 /** Studio sélectionné dans la section Procédures (persiste entre re-rendus). */
@@ -975,6 +984,7 @@ async function loadOrganizations(){
 
   onValue(ref(db,ob('assignments')), snap=>{
     A.assignments=snap.val()||{};
+    paintReservationsVoyageursNav();
     if(A.unlocked){
       renderStats();
       if(adminCurrentView==='reservations') renderAdminReservations();
@@ -989,6 +999,7 @@ async function loadOrganizations(){
   onValue(ref(db,ob('reservations')), snap=>{
     const data=snap.val()||{};
     A.reservations=Object.values(data).map(r=>({...r,start:new Date(r.start),end:new Date(r.end)}));
+    paintReservationsVoyageursNav();
     if(A.unlocked){
       renderStats();
       renderHisto();
@@ -1216,6 +1227,31 @@ function paintProcedureSuggestionsNav(){
   link.classList.toggle('has-pending-suggestions',has);
 }
 
+/** Halo menu Réservations : au moins une résa du mois civil courant sans nombre de voyageurs (1–8) renseigné. */
+function paintReservationsVoyageursNav(){
+  const link=document.querySelector('.admin-nav-link[data-admin-view="reservations"]');
+  if(!link) return;
+  const now=new Date();
+  const yr=now.getFullYear();
+  const mo=now.getMonth();
+  const fd=new Date(yr,mo,1);
+  const ld=new Date(yr,mo+1,0);
+  const fdT=new Date(fd.getFullYear(),fd.getMonth(),fd.getDate()).getTime();
+  const ldT=new Date(ld.getFullYear(),ld.getMonth(),ld.getDate()).getTime();
+  let pending=false;
+  for(const r of A.reservations){
+    if(!r||!r.uid) continue;
+    const rs=new Date(r.start.getFullYear(),r.start.getMonth(),r.start.getDate()).getTime();
+    const re=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate()).getTime();
+    if(rs>ldT||re<fdT) continue;
+    if(adminResaVoyageursCurrent(r.uid)==null){
+      pending=true;
+      break;
+    }
+  }
+  link.classList.toggle('has-pending-voyageurs',pending);
+}
+
 // ─── Render ───────────────────────────────────────────────────────────────────
 
 function renderAdminContent(){
@@ -1246,6 +1282,7 @@ function renderAdminContent(){
       if(ADMIN_VIEW_IDS.includes(h)&&h!=='dashboard') window.setAdminUiView(h,{noScroll:true});
     }
     paintProcedureSuggestionsNav();
+    paintReservationsVoyageursNav();
   })();
 }
 
@@ -1793,18 +1830,22 @@ function renderAdminReservations(){
   adminResaSanitizeHiddenStudios();
   const filterIcon='<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5h16M7 12h10M10 19h4"/></svg>';
   const studioTh=`<th class="histo-th-studio"><span class="histo-th-studio-inner"><span>Studio</span><button type="button" class="admin-resa-filter-trigger" title="Filtrer les lignes par studio" aria-label="Filtrer les lignes par studio" aria-expanded="false" aria-haspopup="true">${filterIcon}</button></span></th>`;
+  const nowMo=new Date();
+  const viewingRealCurrentMonth=A.selectedMonth===nowMo.getMonth()&&A.selectedYear===nowMo.getFullYear();
   const rows=list.map((r)=>{
     const uid=r.uid;
     const arrLabel=r.start.toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
     const si=r.studio;
     const sn=(A.studioNames&&A.studioNames[si]!=null)?String(A.studioNames[si]):String(si??'');
     const v=adminResaVoyageursCurrent(uid);
+    const needsPulse=viewingRealCurrentMonth&&v==null;
+    const arrCell=needsPulse?`<span class="admin-resa-pending-voyageurs">${escHtml(arrLabel)}</span>`:escHtml(arrLabel);
     const nuites=Math.round((r.end-r.start)/86400000);
     const opts=['<option value=""></option>'].concat([1,2,3,4,5,6,7,8].map(n=>`<option value="${n}"${v===n?' selected':''}>${n}</option>`));
     const siAttr=escAttr(String(si??''));
     const uidAttr=escAttr(uid);
     return `<tr data-resa-studio="${siAttr}" data-resa-uid="${uidAttr}">
-      <td style="white-space:nowrap">${escHtml(arrLabel)}</td>
+      <td style="white-space:nowrap">${arrCell}</td>
       <td>${nuites}</td>
       <td>${escHtml(sn)}</td>
       <td><select style="max-width:88px;padding:6px 8px;font-size:13px;border:1px solid #ddd;border-radius:8px;background:#fff" onchange="window.adminResaVoyageursChange(this)">${opts.join('')}</select></td>
