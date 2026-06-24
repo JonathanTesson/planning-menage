@@ -476,7 +476,17 @@ Sur **`index.html`**, le calendrier boucle sur **`S.studioNames.length`** ; les 
 9. ~~**Factorisation UI des modales compte (admin / super admin)**~~ — **fait en v4.8.2** : HTML commun via **`fonctions.js`** (`buildAddAccountModalHTML`, `buildConfirmAssocModalHTML`, `buildEditAccountModalHTML`), styles dans **`styles.css`**, IDs **`shared-acc-*`** / **`shared-edit-*`**. Reste pour **Phase 3** (optionnel) : **factoriser la logique métier** dupliquée (validation, écritures Firebase) dans un module commun.
 
 ---
+## Maintien des workflows GitHub Actions
 
+L'application étant terminée, le repo ne reçoit plus de commits réguliers.
+Or GitHub désactive automatiquement les workflows programmés après 60 jours sans activité.
+
+Pour éviter cela, un workflow `keepalive.yml` tourne le 1er de chaque mois et effectue
+un commit automatique vide. Cela réinitialise le compteur d'inactivité et maintient
+tous les workflows actifs indéfiniment, notamment `sync-ical.yml` qui synchronise
+les calendriers Airbnb vers Firebase.
+
+Ne pas supprimer `keepalive.yml` sous peine de perdre la synchronisation iCal.
 ## Comment reprendre le développement avec Claude
 
 ```
