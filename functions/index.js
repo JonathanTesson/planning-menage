@@ -1,4 +1,4 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 
 if (!admin.apps.length) {
@@ -349,6 +349,101 @@ exports.inviteToken = onCall(
             ? `Unknown action: ${action}`
             : "Missing or invalid action."
         );
+    }
+  }
+);
+
+/**
+ * GET /nextIntervenante?studio=1&key=...
+ * Renvoie qui fait le prochain ménage d'un studio (org "tesson" par défaut),
+ * pour affichage externe (Home Assistant / Jeedom). Lecture seule,
+ * n'écrit rien et n'a aucun effet sur le reste de l'app.
+ *
+ * Réponse : { studio, date, intervenantes }
+ *   - date : jour (YYYY-MM-DD) du départ/ménage précédant la prochaine arrivée,
+ *            ou null si aucune arrivée à venir n'est prévue.
+ *   - intervenantes : tableau des prénoms assignés (c1/c2), vide si aucun.
+ */
+exports.nextIntervenante = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (req.method !== "GET") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const expectedKey = process.env.NEXT_INTERVENANTE_KEY;
+    if (!expectedKey) {
+      console.error(
+        "[nextIntervenante] NEXT_INTERVENANTE_KEY manquant côté serveur."
+      );
+      res.status(500).json({ error: "Server misconfigured" });
+      return;
+    }
+    if (req.query.key !== expectedKey) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    const studioParam = Number(req.query.studio);
+    if (!Number.isInteger(studioParam) || studioParam < 1) {
+      res
+        .status(400)
+        .json({ error: "studio must be a positive integer (1, 2, ...)" });
+      return;
+    }
+    const studioIdx = studioParam - 1;
+    const orgId =
+      typeof req.query.org === "string" && req.query.org.trim()
+        ? req.query.org.trim()
+        : "tesson";
+
+    try {
+      const base = `orgs/${orgId}`;
+      const [reservationsSnap, assignmentsSnap] = await Promise.all([
+        admin.database().ref(`${base}/reservations`).get(),
+        admin.database().ref(`${base}/assignments`).get(),
+      ]);
+      const reservations = reservationsSnap.val() || {};
+      const assignments = assignmentsSnap.val() || {};
+
+      const today = new Date().toISOString().split("T")[0];
+
+      const prochaines = Object.values(reservations)
+        .filter((r) => r && r.studio === studioIdx && r.start >= today)
+        .sort((a, b) => a.start.localeCompare(b.start));
+      const nextArrival = prochaines[0] || null;
+
+      if (!nextArrival) {
+        res
+          .status(200)
+          .json({ studio: studioParam, date: null, intervenantes: [] });
+        return;
+      }
+
+      const departsAvant = Object.values(reservations)
+        .filter((r) => r && r.studio === studioIdx && r.end <= nextArrival.start)
+        .sort((a, b) => b.end.localeCompare(a.end));
+      const departureBefore = departsAvant[0] || null;
+
+      if (!departureBefore) {
+        res
+          .status(200)
+          .json({ studio: studioParam, date: null, intervenantes: [] });
+        return;
+      }
+
+      const assignment = assignments[departureBefore.uid] || {};
+      const intervenantes = [assignment.c1, assignment.c2].filter(Boolean);
+
+      res.status(200).json({
+        studio: studioParam,
+        date: departureBefore.end,
+        intervenantes,
+      });
+    } catch (e) {
+      console.error("[nextIntervenante]", e);
+      res.status(500).json({ error: "Internal error" });
     }
   }
 );
