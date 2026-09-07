@@ -360,8 +360,9 @@ exports.inviteToken = onCall(
  * n'écrit rien et n'a aucun effet sur le reste de l'app.
  *
  * Réponse : { studio, date, intervenantes }
- *   - date : jour (YYYY-MM-DD) du départ/ménage précédant la prochaine arrivée,
- *            ou null si aucune arrivée à venir n'est prévue.
+ *   - date : jour (YYYY-MM-DD) du prochain départ (= ménage) à venir pour
+ *            ce studio, aujourd'hui ou plus tard, ou null si aucun départ
+ *            à venir n'est prévu.
  *   - intervenantes : tableau des prénoms assignés (c1/c2), vide si aucun.
  */
 exports.nextIntervenante = onRequest(
@@ -409,36 +410,28 @@ exports.nextIntervenante = onRequest(
 
       const today = new Date().toISOString().split("T")[0];
 
-      const prochaines = Object.values(reservations)
-        .filter((r) => r && r.studio === studioIdx && r.start >= today)
-        .sort((a, b) => a.start.localeCompare(b.start));
-      const nextArrival = prochaines[0] || null;
+      // Le "prochain ménage" pour ce studio, c'est simplement le prochain
+      // départ (aujourd'hui ou plus tard) — peu importe la prochaine
+      // arrivée. (Avant : on cherchait le départ juste avant la prochaine
+      // arrivée, ce qui retombait sur un départ déjà passé quand le studio
+      // était vide depuis un moment.)
+      const prochainDepart = Object.values(reservations)
+        .filter((r) => r && r.studio === studioIdx && r.end >= today)
+        .sort((a, b) => a.end.localeCompare(b.end))[0] || null;
 
-      if (!nextArrival) {
+      if (!prochainDepart) {
         res
           .status(200)
           .json({ studio: studioParam, date: null, intervenantes: [] });
         return;
       }
 
-      const departsAvant = Object.values(reservations)
-        .filter((r) => r && r.studio === studioIdx && r.end <= nextArrival.start)
-        .sort((a, b) => b.end.localeCompare(a.end));
-      const departureBefore = departsAvant[0] || null;
-
-      if (!departureBefore) {
-        res
-          .status(200)
-          .json({ studio: studioParam, date: null, intervenantes: [] });
-        return;
-      }
-
-      const assignment = assignments[departureBefore.uid] || {};
+      const assignment = assignments[prochainDepart.uid] || {};
       const intervenantes = [assignment.c1, assignment.c2].filter(Boolean);
 
       res.status(200).json({
         studio: studioParam,
-        date: departureBefore.end,
+        date: prochainDepart.end,
         intervenantes,
       });
     } catch (e) {
