@@ -360,15 +360,16 @@ exports.inviteToken = onCall(
  * n'écrit rien et n'a aucun effet sur le reste de l'app.
  *
  * Réponse : { studio, date, intervenantes }
- *   - date : jour (YYYY-MM-DD) du ménage à venir pour ce studio, aujourd'hui
- *            ou plus tard, ou null si aucun départ à venir n'est prévu.
- *            Si l'assignation porte une `menageDate` (ménage décalé depuis
- *            le calendrier), c'est cette date qui est renvoyée plutôt que
- *            la date de départ réelle — le tri "prochain départ" reste
- *            valable tel quel : un décalage ne peut jamais dépasser la
- *            prochaine arrivée du studio (avertissement côté calendrier),
- *            donc l'ordre chronologique des départs n'est jamais changé
- *            par un décalage.
+ *   - date : jour (YYYY-MM-DD) du prochain ménage à venir pour ce studio
+ *            (aujourd'hui ou plus tard), ou null si aucun n'est prévu.
+ *            Calculée à partir de la **date effective** de chaque
+ *            réservation du studio (la `menageDate` de son assignation si
+ *            un décalage existe, sinon sa date de départ réelle) — on
+ *            prend la date effective future la plus proche, toutes
+ *            réservations du studio confondues. Nécessaire car un départ
+ *            déjà passé peut avoir un ménage décalé pas encore effectué :
+ *            se baser uniquement sur la date de départ le ferait passer
+ *            inaperçu (bug corrigé en Septembre 2026).
  *   - intervenantes : tableau des prénoms assignés (c1/c2), vide si aucun.
  */
 exports.nextIntervenante = onRequest(
@@ -416,14 +417,34 @@ exports.nextIntervenante = onRequest(
 
       const today = new Date().toISOString().split("T")[0];
 
-      // Le "prochain ménage" pour ce studio, c'est simplement le prochain
-      // départ (aujourd'hui ou plus tard) — peu importe la prochaine
-      // arrivée. (Avant : on cherchait le départ juste avant la prochaine
-      // arrivée, ce qui retombait sur un départ déjà passé quand le studio
-      // était vide depuis un moment.)
-      const prochainDepart = Object.values(reservations)
-        .filter((r) => r && r.studio === studioIdx && r.end >= today)
-        .sort((a, b) => a.end.localeCompare(b.end))[0] || null;
+      // "Prochain ménage" = la date effective (menageDate si décalage,
+      // sinon date de départ) la plus proche parmi toutes les réservations
+      // de ce studio, en ne retenant que celles dont la date effective est
+      // aujourd'hui ou plus tard. Un simple filtre/tri sur la date de
+      // départ (r.end) ferait ignorer un départ déjà passé dont le ménage
+      // décalé n'a pas encore eu lieu.
+      const studioReservations = Object.values(reservations).filter(
+        (r) => r && r.studio === studioIdx
+      );
+
+      let prochainDepart = null;
+      let prochainAssignment = null;
+      let prochainDate = null;
+
+      for (const r of studioReservations) {
+        const assignment = assignments[r.uid] || {};
+        const menageDate =
+          assignment && typeof assignment === "object" && assignment.menageDate
+            ? assignment.menageDate
+            : null;
+        const effectiveDate = menageDate || r.end;
+        if (!effectiveDate || effectiveDate < today) continue;
+        if (prochainDate === null || effectiveDate < prochainDate) {
+          prochainDate = effectiveDate;
+          prochainDepart = r;
+          prochainAssignment = assignment;
+        }
+      }
 
       if (!prochainDepart) {
         res
@@ -432,16 +453,13 @@ exports.nextIntervenante = onRequest(
         return;
       }
 
-      const assignment = assignments[prochainDepart.uid] || {};
-      const intervenantes = [assignment.c1, assignment.c2].filter(Boolean);
-      const menageDate =
-        assignment && typeof assignment === "object" && assignment.menageDate
-          ? assignment.menageDate
-          : null;
+      const intervenantes = [prochainAssignment.c1, prochainAssignment.c2].filter(
+        Boolean
+      );
 
       res.status(200).json({
         studio: studioParam,
-        date: menageDate || prochainDepart.end,
+        date: prochainDate,
         intervenantes,
       });
     } catch (e) {
