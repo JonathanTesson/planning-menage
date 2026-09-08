@@ -25,8 +25,17 @@
 .modal-field label{font-size:12px;color:#888;display:block;margin-bottom:4px;font-weight:500}
 .modal-field input[type=text]{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;box-sizing:border-box}
 .modal-field input[type=password]{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;color:#1a1a1a;background:#fff;box-sizing:border-box}
+.modal-field input[type=date]{width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;color:#1a1a1a;background:#fff;box-sizing:border-box;color-scheme:light}
+.modal-field input[type=date]::-webkit-datetime-edit{font-family:inherit;font-size:13px;color:#1a1a1a;padding:0}
+.modal-field input[type=date]::-webkit-datetime-edit-fields-wrapper{padding:0}
+.modal-field input[type=date]::-webkit-datetime-edit-text,
+.modal-field input[type=date]::-webkit-datetime-edit-day-field,
+.modal-field input[type=date]::-webkit-datetime-edit-month-field,
+.modal-field input[type=date]::-webkit-datetime-edit-year-field{font-family:inherit;color:#1a1a1a}
+.modal-field input[type=date]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:0.55;padding:2px}
 .modal-field input[type=text]:focus{outline:none;border-color:#378ADD}
 .modal-field input[type=password]:focus{outline:none;border-color:#378ADD}
+.modal-field input[type=date]:focus{outline:none;border-color:#378ADD}
 
 .modal-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:1rem;justify-content:flex-end}
 

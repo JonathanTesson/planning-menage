@@ -125,7 +125,7 @@ body.compte-nav-ready .admin-burger{display:flex}
         </div>
         <div class="stat-grid">
           <div class="stat-card"><div class="stat-val" id="kpi-interventions">—</div><div class="stat-lbl">Interventions<br>ce mois</div></div>
-          <div class="stat-card"><div class="stat-val sm" id="kpi-next">—</div><div class="stat-lbl">Prochain<br>départ</div></div>
+          <div class="stat-card"><div class="stat-val sm" id="kpi-next">—</div><div class="stat-lbl">Prochaine<br>intervention</div></div>
           <div class="stat-card"><div class="stat-val" id="kpi-hours">—</div><div class="stat-lbl">Heures totales<br>ce mois</div></div>
         </div>
       </div>
@@ -211,7 +211,7 @@ const MAX_ACTIVITY_LOG_ENTRIES = 450;
 const SESSION_KEY = 'menage_session_v1';
 const ORG_STORAGE_KEY = 'menage_org_v1';
 let ORGANIZATIONS = [];
-const APP_VERSION = '4.9.6';
+const APP_VERSION = '4.10.0';
 const UNAVAIL_SHOWBY_KEY = 'menage_unavail_showby_v1';
 const MO_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const COMPTE_VIEW_IDS = ['dashboard','compte','indisponibilites'];
@@ -350,12 +350,25 @@ function getAssignSig(c1,c2){
 
 function getAssignment(r){
   const a=C.assignments[r.uid];
-  if(!a) return {c1:null,c2:null};
-  if(typeof a==='string') return {c1:a,c2:null};
+  if(!a) return {c1:null,c2:null,menageDate:null};
+  if(typeof a==='string') return {c1:a,c2:null,menageDate:null};
   return {
     c1:a.cleaner||a.c1||null,
-    c2:a.c2||null
+    c2:a.c2||null,
+    menageDate:a.menageDate||null
   };
+}
+
+/** Date normalisée (minuit local) réellement utilisée pour l'intervention : menageDate si décalage renseigné, sinon date de départ. */
+function menageEffectiveDate(r){
+  const {menageDate}=getAssignment(r);
+  if(menageDate){
+    const parts=menageDate.split('-').map(Number);
+    if(parts.length===3&&parts.every(n=>!Number.isNaN(n))){
+      return new Date(parts[0],parts[1]-1,parts[2]);
+    }
+  }
+  return new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
 }
 
 function isAssignedToMe(r){
@@ -389,7 +402,7 @@ function totalMinutesInMonth(){
   const mo=C.selectedMonth, yr=C.selectedYear;
   let total=0;
   for(const r of C.reservations){
-    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
+    const e=menageEffectiveDate(r);
     if(e.getMonth()!==mo||e.getFullYear()!==yr) continue;
     if(!isAssignedToMe(r)) continue;
     const slot=hoursSlotForReservation(r);
@@ -723,7 +736,7 @@ function renderCompteDashboard(){
   el('compte-month-btn').textContent=MO_FR[mo];
 
   const interventions=C.reservations.filter(r=>{
-    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
+    const e=menageEffectiveDate(r);
     return e.getMonth()===mo&&e.getFullYear()===yr&&isAssignedToMe(r);
   });
   el('kpi-interventions').textContent=String(interventions.length);
@@ -731,17 +744,17 @@ function renderCompteDashboard(){
   const today=new Date(); today.setHours(0,0,0,0);
   const nextMine=C.reservations
     .filter(r=>{
-      const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
+      const e=menageEffectiveDate(r);
       return e>=today&&isAssignedToMe(r);
     })
-    .sort((a,b)=>a.end-b.end)[0];
+    .sort((a,b)=>menageEffectiveDate(a)-menageEffectiveDate(b))[0];
 
   const kpiNext=el('kpi-next');
   if(!nextMine){
     kpiNext.textContent='Aucun';
     kpiNext.className='stat-val sm green';
   }else{
-    const endD=new Date(nextMine.end.getFullYear(),nextMine.end.getMonth(),nextMine.end.getDate());
+    const endD=menageEffectiveDate(nextMine);
     const diff=Math.round((endD-today)/86400000);
     const label=diff===0?'Aujourd\'hui':diff===1?'Demain':`J-${diff}`;
     kpiNext.textContent=label;
@@ -750,7 +763,7 @@ function renderCompteDashboard(){
 
   el('kpi-hours').textContent=formatTotalMinutes(totalMinutesInMonth());
 
-  const sorted=[...interventions].sort((a,b)=>b.end-a.end);
+  const sorted=[...interventions].sort((a,b)=>menageEffectiveDate(b)-menageEffectiveDate(a));
   const host=el('compte-histo-host');
   if(!sorted.length){
     host.innerHTML='<p class="empty-hint">Aucune intervention ce mois</p>';
@@ -758,9 +771,9 @@ function renderCompteDashboard(){
   }
   const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   host.innerHTML=`<table class="histo-table">
-    <thead><tr><th>Date départ</th><th>Studio</th><th>Heures</th></tr></thead>
+    <thead><tr><th>Date ménage</th><th>Studio</th><th>Heures</th></tr></thead>
     <tbody>${sorted.map(r=>{
-      const d=r.end;
+      const d=menageEffectiveDate(r);
       const dateStr=d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'2-digit'});
       const studioLabel=`S${(r.studio|0)+1}`;
       const slot=hoursSlotForReservation(r);

@@ -540,7 +540,7 @@ function setAdminNavigatingToCalendarIntent(){
 }
 let ORGANIZATIONS = [];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.9.10';
+const APP_VERSION = '4.10.0';
 const UNAVAIL_SHOWBY_KEY = 'menage_unavail_showby_v1';
 
 /** Studio sélectionné dans la section Procédures (persiste entre re-rendus). */
@@ -1617,9 +1617,21 @@ window.clearActivityLog = function(){
 
 function getAssignmentSlots(uid){
   const a=A.assignments[uid];
-  if(!a) return { c1:null,c2:null,note:'' };
-  if(typeof a==='string') return { c1:a,c2:null,note:'' };
-  return { c1:a.cleaner||a.c1||null,c2:a.c2||null,note:a.note||'' };
+  if(!a) return { c1:null,c2:null,note:'',menageDate:null };
+  if(typeof a==='string') return { c1:a,c2:null,note:'',menageDate:null };
+  return { c1:a.cleaner||a.c1||null,c2:a.c2||null,note:a.note||'',menageDate:a.menageDate||null };
+}
+
+/** Date normalisée (minuit local) réellement utilisée pour l'intervention : menageDate si décalage renseigné, sinon date de départ. */
+function menageEffectiveDate(r){
+  const {menageDate}=getAssignmentSlots(r.uid);
+  if(menageDate){
+    const parts=menageDate.split('-').map(Number);
+    if(parts.length===3&&parts.every(n=>!Number.isNaN(n))){
+      return new Date(parts[0],parts[1]-1,parts[2]);
+    }
+  }
+  return new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
 }
 
 function adminResaVoyageursCurrent(uid){
@@ -1897,7 +1909,7 @@ function renderStats(){
   document.getElementById('admin-month-title').textContent=MO_FR[mo]+' '+yr;
   document.getElementById('admin-month-btn').textContent=MO_FR[mo];
   const checkouts=A.reservations.filter(r=>{
-    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
+    const e=menageEffectiveDate(r);
     return e.getMonth()===mo && e.getFullYear()===yr;
   });
   const assigned=checkouts.filter(r=>{ const sl=getAssignmentSlots(r.uid); return sl.c1||sl.c2; });
@@ -2034,23 +2046,24 @@ function formatHistoDepartureHours(r){
 
 function renderHisto(){
   const today=new Date(); today.setHours(0,0,0,0);
-  const past=A.reservations.filter(r=>new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate())<today)
-    .sort((a,b)=>b.end-a.end);
+  const past=A.reservations.filter(r=>menageEffectiveDate(r)<today)
+    .sort((a,b)=>menageEffectiveDate(b)-menageEffectiveDate(a));
   if(!past.length){
     document.getElementById('histo-content').innerHTML='<p style="color:#aaa;font-size:13px">Aucun historique disponible.</p>';
     return;
   }
   const byMonth={};
   for(const r of past){
-    const key=`${r.end.getFullYear()}-${r.end.getMonth()}`;
-    if(!byMonth[key]) byMonth[key]={label:`${MO_FR[r.end.getMonth()]} ${r.end.getFullYear()}`,resas:[]};
+    const ed=menageEffectiveDate(r);
+    const key=`${ed.getFullYear()}-${ed.getMonth()}`;
+    if(!byMonth[key]) byMonth[key]={label:`${MO_FR[ed.getMonth()]} ${ed.getFullYear()}`,resas:[]};
     byMonth[key].resas.push(r);
   }
   let html='';
   for(const k of Object.keys(byMonth)){
     const {label,resas}=byMonth[k];
     html+=`<div style="margin-bottom:1rem">
-      <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:6px">${label} — ${resas.length} départ(s)</div>
+      <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:6px">${label} — ${resas.length} intervention(s)</div>
       <table class="histo-table">
         <thead><tr><th>Date</th><th>Studio</th><th>Intervenante(s)</th><th style="text-align:right;white-space:nowrap">Heures</th></tr></thead>
         <tbody>${resas.map(r=>{
@@ -2058,7 +2071,7 @@ function renderHisto(){
           const names=[sl.c1,sl.c2].filter(Boolean);
           const dur=formatHistoDepartureHours(r);
           return `<tr>
-            <td style="white-space:nowrap">${fmtHistoDateShort(r.end)}</td>
+            <td style="white-space:nowrap">${fmtHistoDateShort(menageEffectiveDate(r))}</td>
             <td style="white-space:nowrap">S${(Number(r.studio)||0)+1}</td>
             <td>${names.length?names.map(n=>`<span style="color:${cleanerColor(n)};font-weight:500">${escHtml(n)}</span>`).join(' + '):'<span style="color:#E24B4A">Non assigné</span>'}</td>
             <td style="text-align:right;white-space:nowrap;color:#555;font-weight:500">${dur?escHtml(dur):''}</td>
@@ -3204,8 +3217,8 @@ function loadXlsx(){
 function buildExcel(reservations, label){
   const XLSX=window.XLSX;
   const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
-  const sorted=[...reservations].sort((a,b)=>a.end-b.end);
-  const detail=[['Date départ','Studio','Intervenante 1','Intervenante 2','Intervenante 1 durée','Intervenante 2 durée','Commande','Commentaire']];
+  const sorted=[...reservations].sort((a,b)=>menageEffectiveDate(a)-menageEffectiveDate(b));
+  const detail=[['Date ménage','Studio','Intervenante 1','Intervenante 2','Intervenante 1 durée','Intervenante 2 durée','Commande','Commentaire']];
   for(const r of sorted){
     const a=getAssignmentSlots(r.uid);
     const c1=a.c1,c2=a.c2;
@@ -3216,7 +3229,7 @@ function buildExcel(reservations, label){
     const ord=rep?(rep.order||''):'';
     const d1=c1&&rep?.hours?.[c1]!=null?durationToExcelSerial(rep.hours[c1]):'';
     const d2=c2&&rep?.hours?.[c2]!=null?durationToExcelSerial(rep.hours[c2]):'';
-    detail.push([fmt(r.end),A.studioNames[r.studio],c1||'',c2||'',d1,d2,ord,comm]);
+    detail.push([fmt(menageEffectiveDate(r)),A.studioNames[r.studio],c1||'',c2||'',d1,d2,ord,comm]);
   }
   const counts={};
   for(const r of sorted){
@@ -3277,7 +3290,7 @@ window.exportSelected = async function(){
   const mo=A.selectedMonth, yr=A.selectedYear;
   const label=`${MO_FR[mo]} ${yr}`;
   const resas=A.reservations.filter(r=>{
-    const e=new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate());
+    const e=menageEffectiveDate(r);
     return e.getMonth()===mo && e.getFullYear()===yr;
   });
   if(!resas.length){ showToast(`Aucune intervention en ${label}`); return; }
@@ -3290,9 +3303,9 @@ window.exportSelected = async function(){
   }
   const cleaners=menageAccountNamesForStats();
   const recap=cleaners.filter(c=>counts[c]).map(c=>`  ${c} : ${counts[c]} intervention(s)`).join('\n');
-  const detail=resas.sort((a,b)=>a.end-b.end).map(r=>{
+  const detail=resas.sort((a,b)=>menageEffectiveDate(a)-menageEffectiveDate(b)).map(r=>{
     const sl=getAssignmentSlots(r.uid);
-    return `${fmt(r.end)} — ${A.studioNames[r.studio]} — ${[sl.c1,sl.c2].filter(Boolean).join(' + ')||'Non assigné'}`;
+    return `${fmt(menageEffectiveDate(r))} — ${A.studioNames[r.studio]} — ${[sl.c1,sl.c2].filter(Boolean).join(' + ')||'Non assigné'}`;
   }).join('\n');
   const prev=document.getElementById('export-preview');
   prev.style.display='';
@@ -3309,7 +3322,7 @@ window.exportSelected = async function(){
 
 window.exportAll = async function(){
   const today=new Date(); today.setHours(0,0,0,0);
-  const past=A.reservations.filter(r=>new Date(r.end.getFullYear(),r.end.getMonth(),r.end.getDate())<today);
+  const past=A.reservations.filter(r=>menageEffectiveDate(r)<today);
   if(!past.length){ showToast('Aucun historique'); return; }
   try{
     await loadXlsx();

@@ -360,9 +360,15 @@ exports.inviteToken = onCall(
  * n'écrit rien et n'a aucun effet sur le reste de l'app.
  *
  * Réponse : { studio, date, intervenantes }
- *   - date : jour (YYYY-MM-DD) du prochain départ (= ménage) à venir pour
- *            ce studio, aujourd'hui ou plus tard, ou null si aucun départ
- *            à venir n'est prévu.
+ *   - date : jour (YYYY-MM-DD) du ménage à venir pour ce studio, aujourd'hui
+ *            ou plus tard, ou null si aucun départ à venir n'est prévu.
+ *            Si l'assignation porte une `menageDate` (ménage décalé depuis
+ *            le calendrier), c'est cette date qui est renvoyée plutôt que
+ *            la date de départ réelle — le tri "prochain départ" reste
+ *            valable tel quel : un décalage ne peut jamais dépasser la
+ *            prochaine arrivée du studio (avertissement côté calendrier),
+ *            donc l'ordre chronologique des départs n'est jamais changé
+ *            par un décalage.
  *   - intervenantes : tableau des prénoms assignés (c1/c2), vide si aucun.
  */
 exports.nextIntervenante = onRequest(
@@ -428,10 +434,14 @@ exports.nextIntervenante = onRequest(
 
       const assignment = assignments[prochainDepart.uid] || {};
       const intervenantes = [assignment.c1, assignment.c2].filter(Boolean);
+      const menageDate =
+        assignment && typeof assignment === "object" && assignment.menageDate
+          ? assignment.menageDate
+          : null;
 
       res.status(200).json({
         studio: studioParam,
-        date: prochainDepart.end,
+        date: menageDate || prochainDepart.end,
         intervenantes,
       });
     } catch (e) {

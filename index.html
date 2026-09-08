@@ -75,6 +75,10 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 .resa-block{border-radius:4px;font-size:10px;padding:2px 5px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;user-select:none;line-height:1.3}
 .resa-block:active{opacity:0.75}
 .resa-block.checkout{background:#fde8b0;color:#7a4a00}
+.resa-block.checkout--decaled{background:#f3e6c9}
+.resa-block.menage{background:#dcecf5;color:#1c5b7a}
+.menage-decal-pip{margin-left:3px;font-size:9px;vertical-align:middle}
+.menage-decal-hint{font-size:11px;color:#888;margin-top:4px;line-height:1.4}
 .depart-note-pip{width:6px;height:6px;border-radius:50%;display:inline-block;background:#378ADD;margin-left:3px;vertical-align:middle;animation:depart-note-pulse 1.5s ease-in-out infinite}
 @keyframes depart-note-pulse{0%,100%{opacity:1}50%{opacity:0.3}}
 @keyframes unavail-pip-inset-pulse{0%,100%{box-shadow:inset 0 0 0 1px rgba(232,168,168,1)}50%{box-shadow:inset 0 0 0 1px rgba(232,168,168,0)}}
@@ -529,7 +533,7 @@ const ORG_STORAGE_KEY = 'menage_org_v1';
 const ORG_CHANGE_GATE_KEY = 'menage_org_change_gate';
 let ORGANIZATIONS = [];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.9.10';
+const APP_VERSION = '4.10.0';
 
 let __lastLoginUid = null;
 let __lastLoginTs = 0;
@@ -1718,14 +1722,50 @@ function assignNoteTrimmed(note){
 }
 function getAssignment(r){
   const a=S.assignments[getKey(r)];
-  if(!a) return {c1:null,c2:null,note:'',noteBy:null};
-  if(typeof a==='string') return {c1:a,c2:null,note:'',noteBy:null};
+  if(!a) return {c1:null,c2:null,note:'',noteBy:null,menageDate:null,menageDateBy:null};
+  if(typeof a==='string') return {c1:a,c2:null,note:'',noteBy:null,menageDate:null,menageDateBy:null};
   return {
     c1:a.cleaner||a.c1||null,
     c2:a.c2||null,
     note:a.note||'',
-    noteBy:a.noteBy!=null&&a.noteBy!==''?a.noteBy:null
+    noteBy:a.noteBy!=null&&a.noteBy!==''?a.noteBy:null,
+    menageDate:a.menageDate!=null&&a.menageDate!==''?a.menageDate:null,
+    menageDateBy:a.menageDateBy!=null&&a.menageDateBy!==''?a.menageDateBy:null
   };
+}
+
+/** Objet brut de l’assignation (pour fusion — préserve tous les champs, y compris ceux inconnus comme `voyageurs`). */
+function rawAssignmentObj(key){
+  const a=S.assignments[key];
+  if(!a) return {};
+  if(typeof a==='string') return {c1:a};
+  return {...a};
+}
+
+/** Ménage décalé sur un studio donné : réservations dont l’assignation porte une `menageDate` tombant ce jour-là. */
+function getMenageDecalsForDay(d,si){
+  const dk=localDateKey(d);
+  const out=[];
+  for(const r of S.reservations){
+    if(r.studio!==si) continue;
+    const {menageDate}=getAssignment(r);
+    if(menageDate===dk) out.push(r);
+  }
+  return out;
+}
+
+function fmtShortDate(dateStr){
+  if(!dateStr) return '';
+  const [y,m,d]=dateStr.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+/** Prochaine réservation (arrivée) sur ce studio, après la date donnée. */
+function nextArrivalAfter(studio,afterDate){
+  const t=dayTime(afterDate);
+  const cands=S.reservations.filter(x=>x.studio===studio && dayTime(x.start)>t);
+  cands.sort((a,b)=>a.start-b.start);
+  return cands[0]||null;
 }
 
 function voyageursPip(key){
@@ -1807,6 +1847,14 @@ function departDayHasAssignIndispoConflict(d){
   const fc=S.filterCleaner||null;
   for(let si=0; si<S.studioNames.length; si++){
     for(const r of getCheckouts(d,si)){
+      const {c1,c2,menageDate}=getAssignment(r);
+      if(menageDate) continue; // ménage décalé : le conflit se vérifie sur le nouveau jour, pas sur le jour de départ
+      if(fc && c1!==fc && c2!==fc) continue;
+      for(const nm of [c1,c2]){
+        if(nm && unavailLocalPresent(S.unavailability[nm]?.[dateKey])) return true;
+      }
+    }
+    for(const r of getMenageDecalsForDay(d,si)){
       const {c1,c2}=getAssignment(r);
       if(fc && c1!==fc && c2!==fc) continue;
       for(const nm of [c1,c2]){
@@ -1928,10 +1976,28 @@ function renderCalendar(){
       const studioLabel = S.studioNames[si] || 'S' + (si + 1);
       if(showDep){
         for(const r of getCheckouts(d,si)){
-          const {c1,c2,note}=getAssignment(r);
+          const {c1,c2,note,menageDate}=getAssignment(r);
           if(S.filterCleaner && c1!==S.filterCleaner && c2!==S.filterCleaner) continue;
-          inner+=`<div class="resa-block checkout" onclick="window._oa('${getKey(r)}')" title="Départ — ${escHtml(studioLabel)}">Départ ${escHtml(studioLabel)}${assignNoteTrimmed(note)?'<span class="depart-note-pip" aria-hidden="true"></span>':''}</div>`;
-          // Tout le monde voit les noms assignés
+          const isDecaled=!!menageDate;
+          const departPip=isDecaled
+            ? `<span class="menage-decal-pip" aria-hidden="true" title="Ménage décalé au ${fmtShortDate(menageDate)}">🧹</span>`
+            : (assignNoteTrimmed(note)?'<span class="depart-note-pip" aria-hidden="true"></span>':'');
+          inner+=`<div class="resa-block checkout${isDecaled?' checkout--decaled':''}" onclick="window._oa('${getKey(r)}')" title="Départ — ${escHtml(studioLabel)}${isDecaled?' — ménage décalé au '+fmtShortDate(menageDate):''}">Départ ${escHtml(studioLabel)}${departPip}</div>`;
+          // Tout le monde voit les noms assignés — sauf si le ménage est décalé : les noms n’apparaissent alors que sur le nouveau jour.
+          if((c1||c2) && !isDecaled){
+            const rk=getKey(r);
+            const h1=c1&&cleanerHasHoursForResa(rk,c1,c2,c1);
+            const h2=c2&&cleanerHasHoursForResa(rk,c1,c2,c2);
+            inner+=`<div class="assign-wrap">`;
+            if(c1) inner+=`<span class="assign-badge${h1?' assign-badge-hours':''}" style="color:${cleanerColor(c1)}"${h1?' title="Heures renseignées"':''}>${c1}</span> `;
+            if(c2) inner+=`<span class="assign-badge${h2?' assign-badge-hours':''}" style="color:${cleanerColor(c2)}"${h2?' title="Heures renseignées"':''}>${c2}</span>`;
+            inner+=`</div>`;
+          }
+        }
+        for(const r of getMenageDecalsForDay(d,si)){
+          const {c1,c2}=getAssignment(r);
+          if(S.filterCleaner && c1!==S.filterCleaner && c2!==S.filterCleaner) continue;
+          inner+=`<div class="resa-block menage" onclick="window._oa('${getKey(r)}')" title="Ménage décalé — ${escHtml(studioLabel)}">🧹 Ménage ${escHtml(studioLabel)}</div>`;
           if(c1||c2){
             const rk=getKey(r);
             const h1=c1&&cleanerHasHoursForResa(rk,c1,c2,c1);
@@ -1978,6 +2044,7 @@ function renderLegend(){
   document.getElementById('legend-bar').innerHTML=`
     ${S.studioNames.map((name, i) => `<div class="legend-item"><div class="legend-dot" style="background:${studioColor(i).bg}"></div>${escHtml(name)}</div>`).join('')}
     <div class="legend-item"><div class="legend-dot" style="background:#fde8b0"></div>Départ</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#dcecf5"></div>🧹 Ménage décalé</div>
     <div class="legend-item"><span class="legend-pip" style="background:#E24B4A"></span>Non assigné</div>
     <div class="legend-item"><span class="legend-pip" style="background:#F59E0B"></span>Partiel</div>`;
 }
@@ -2320,7 +2387,7 @@ window._submitMenageSuggest=async function(){
 
 window._oa = function(key){
   const r=findResa(key); if(!r) return;
-  const {c1,c2,note,noteBy}=getAssignment(r);
+  const {c1,c2,note,noteBy,menageDate}=getAssignment(r);
   const hasAssignNote=!!assignNoteTrimmed(note);
   const assignNoteAuthorHtml=(noteBy&&String(noteBy).trim())
     ? escHtml(String(noteBy).trim())
@@ -2348,6 +2415,9 @@ window._oa = function(key){
   const fmt=d=>d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
   const n=Math.round((r.end-r.start)/86400000);
   const voyPip=voyageursPip(key);
+  const menageDateInfoHtml=menageDate?`<br><span style="color:#1c5b7a">🧹 Ménage prévu le ${fmt(new Date(menageDate+'T00:00:00'))}</span>`:'';
+  const nextArr=nextArrivalAfter(r.studio,r.end);
+  const menageMaxDate=nextArr?localDateKey(new Date(nextArr.start.getFullYear(),nextArr.start.getMonth(),nextArr.start.getDate()-1)):'';
 
   if(!isAdminOrNoAuth && user?.menage){
     // Vue ménage : assignation + retours terrain (durée perso, commentaire & commande communs)
@@ -2376,7 +2446,7 @@ window._oa = function(key){
             ${voyPip}
             <strong>${escHtml(S.studioNames[r.studio])}</strong><br>
             Arrivée : ${fmt(r.start)}<br>
-            Départ : ${fmt(r.end)} (${n} nuit${n>1?'s':''})</div>
+            Départ : ${fmt(r.end)} (${n} nuit${n>1?'s':''})${menageDateInfoHtml}</div>
           <div id="menage-panel-i">
             <p class="modal-shared-hint" style="margin-top:0.75rem">Vous êtes assignée à ce départ.</p>
             <div class="modal-section-title">Ma durée de travail <span style="font-weight:400;color:#bbb">(personnel)</span></div>
@@ -2481,7 +2551,7 @@ window._oa = function(key){
           <strong>${S.studioNames[r.studio]}</strong><br>
           Arrivée : ${fmt(r.start)}<br>
           Départ : ${fmt(r.end)} (${n} nuit${n>1?'s':''})<br>
-          ${r.summary&&r.summary!=='Réservation'?'Voyageur : '+r.summary:''}
+          ${r.summary&&r.summary!=='Réservation'?'Voyageur : '+r.summary:''}${menageDateInfoHtml}
         </div>
         <div class="modal-section-title">Intervenante 1</div>
         <div class="modal-field"><select id="mc1">${opts(c1)}</select></div>
@@ -2490,6 +2560,16 @@ window._oa = function(key){
         <div class="modal-field" style="margin-top:0.5rem">
           <label>Note</label>
           <input type="text" id="mn" placeholder="Ex: clé boîte..." value="${note}">
+        </div>
+        <div class="modal-section-title">Ménage</div>
+        <div class="modal-field">
+          <button type="button" class="btn-secondary" id="menage-decal-toggle" onclick="window._toggleMenageDecal('${key}')">${menageDate?'🧹 Modifier le décalage':'🧹 Décaler l’intervention de ménage'}</button>
+          <div id="menage-decal-panel" style="${menageDate?'':'display:none'};margin-top:0.6rem">
+            <label for="mmd">Nouvelle date de ménage</label>
+            <input type="date" id="mmd" value="${menageDate||''}" min="${localDateKey(r.end)}"${menageMaxDate?` max="${menageMaxDate}"`:''}>
+            ${nextArr?`<div class="menage-decal-hint">Doit être avant le ${fmt(nextArr.start)} (prochaine arrivée sur ce studio).</div>`:''}
+            <button type="button" class="btn-danger" id="mmd-clear-btn" style="margin-top:0.5rem;${menageDate?'':'display:none'}" onclick="window._clearMenageDecal()">✕ Annuler le décalage</button>
+          </div>
         </div>
         <div class="modal-btns">
           <button class="btn-cancel" onclick="window._cm()">Annuler</button>
@@ -2508,7 +2588,9 @@ window._assignSelf = function(key){
   else if(!n2) n2=user.name;
   else { showToast('2 intervenantes déjà assignées'); window._cm(); return; }
   syncCleaningReportAfterAssignmentChange(key,c1,c2,n1,n2);
-  const selfAsg={c1:n1,c2:n2,note};
+  const selfAsg={...rawAssignmentObj(key)};
+  delete selfAsg.cleaner;
+  selfAsg.c1=n1; selfAsg.c2=n2; selfAsg.note=note;
   if(noteBy!=null) selfAsg.noteBy=noteBy;
   S.assignments[key]=selfAsg;
   const st=r?S.studioNames[r.studio]:'';
@@ -2529,7 +2611,9 @@ window._removeSelf = function(key){
   syncCleaningReportAfterAssignmentChange(key,c1,c2,n1,n2);
   if(!n1&&!n2) delete S.assignments[key];
   else{
-    const rest={c1:n1,c2:n2,note};
+    const rest={...rawAssignmentObj(key)};
+    delete rest.cleaner;
+    rest.c1=n1; rest.c2=n2; rest.note=note;
     if(noteBy!=null) rest.noteBy=noteBy;
     S.assignments[key]=rest;
   }
@@ -2574,6 +2658,15 @@ window._sa = function(key){
   const c1=document.getElementById('mc1').value;
   const c2=document.getElementById('mc2').value;
   const note=document.getElementById('mn').value;
+  const mmdEl=document.getElementById('mmd');
+  const mmdRaw=mmdEl?String(mmdEl.value||'').trim():'';
+  if(mmdRaw && r){
+    const next=nextArrivalAfter(r.studio,r.end);
+    if(next && mmdRaw>=localDateKey(next.start)){
+      showToast(`Date de ménage invalide — doit être avant le ${next.start.toLocaleDateString('fr-FR')} (prochaine arrivée)`);
+      return;
+    }
+  }
   const nc1=c1||null, nc2=c2||null;
   syncCleaningReportAfterAssignmentChange(key,prev.c1,prev.c2,nc1,nc2);
   const who=assignActorLabel();
@@ -2588,14 +2681,47 @@ window._sa = function(key){
   }
   logActivity({ type:'assign_admin', actor:who, uid:key, text });
   if(c1||c2){
-    const admAsg={c1:nc1,c2:nc2,note};
+    const admAsg={...rawAssignmentObj(key)};
+    delete admAsg.cleaner;
+    admAsg.c1=nc1; admAsg.c2=nc2; admAsg.note=note;
     if(assignNoteTrimmed(note)) admAsg.noteBy=who;
     else admAsg.noteBy=null;
+
+    // Ménage décalé : une date égale au départ réel équivaut à "pas de décalage".
+    const newMenageDate=(mmdRaw && r && mmdRaw!==localDateKey(r.end))?mmdRaw:null;
+    if(newMenageDate!==(prev.menageDate||null)){
+      if(newMenageDate){
+        admAsg.menageDate=newMenageDate;
+        admAsg.menageDateBy=who;
+        logActivity({ type:'assign_admin', actor:who, uid:key, text: prev.menageDate
+          ? `${who} a modifié la date de ménage décalé : ${newMenageDate} (avant : ${prev.menageDate}) — ${st} — départ ${dep}`
+          : `${who} a décalé le ménage au ${newMenageDate} — ${st} — départ ${dep}` });
+      }else{
+        admAsg.menageDate=null;
+        admAsg.menageDateBy=null;
+        logActivity({ type:'assign_admin', actor:who, uid:key, text:`${who} a annulé le décalage du ménage (était au ${prev.menageDate}) — ${st} — départ ${dep}` });
+      }
+    }else{
+      admAsg.menageDate=prev.menageDate;
+      admAsg.menageDateBy=prev.menageDateBy;
+    }
+
     S.assignments[key]=admAsg;
   }else delete S.assignments[key];
   saveAssignments();
   showToast([c1,c2].filter(Boolean).join(' + ')||'Assignation supprimée');
   window._cm(); render();
+};
+
+window._toggleMenageDecal=function(key){
+  const p=document.getElementById('menage-decal-panel'); if(!p) return;
+  const opening=p.style.display==='none';
+  p.style.display=opening?'':'none';
+};
+
+window._clearMenageDecal=function(){
+  const el=document.getElementById('mmd'); if(el) el.value='';
+  const btn=document.getElementById('mmd-clear-btn'); if(btn) btn.style.display='none';
 };
 
 window._cm=function(){

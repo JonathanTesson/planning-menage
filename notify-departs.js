@@ -136,6 +136,8 @@ async function notifyOrg(org, token, today) {
     const c1 = assignment.c1 || null;
     const c2 = assignment.c2 || null;
     const note = assignment.note || '';
+    const menageDate = assignment.menageDate || null;
+    const isDecal = !!(menageDate && menageDate !== r.end);
     const sn = studioNames[r.studio] || STUDIO_NAMES_FALLBACK[r.studio] || `S${r.studio + 1}`;
 
     const prochainesResas = Object.values(reservations)
@@ -158,6 +160,7 @@ async function notifyOrg(org, token, today) {
 
     if (intervenantes.length > 0) {
       msg += `\n🧹 Intervenante${intervenantes.length > 1 ? 's' : ''} : <b>${intervenantes.join(' + ')}</b>`;
+      if (isDecal) msg += ` (décalé au ${formatDate(menageDate)})`;
     } else msg += `\n⚠️ <b>Aucune intervenante assignée !</b>`;
     if (note) msg += `\n📝 Note : ${note}`;
 
