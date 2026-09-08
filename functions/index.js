@@ -1,3 +1,4 @@
+// Runtime Node.js 22 depuis Septembre 2026 (voir firebase.json / functions/package.json).
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 

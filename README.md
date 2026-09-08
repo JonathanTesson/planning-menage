@@ -389,6 +389,10 @@ Les workflows (`.github/workflows/*.yml`) lisent les valeurs sensibles **uniquem
 
 Depuis l'ajout de **`nextIntervenante`** (Septembre 2026), certaines Cloud Functions ont besoin d'un secret **au moment du déploiement**, indépendamment des Actions GitHub : fichier **`functions/.env`** (non commité, **`functions/.gitignore`** dédié — `node_modules/`, `.env`, `.env.*`), chargé **automatiquement** par Firebase Functions v2 lors de `firebase deploy`. Exemple : `NEXT_INTERVENANTE_KEY=...`. Ce mécanisme est **distinct** des secrets GitHub Actions ci-dessus (qui servent aux scripts Node exécutés en CI, pas aux Cloud Functions elles-mêmes).
 
+### Runtime des Cloud Functions
+
+**Node.js 22** (2nd Gen), pour les 3 fonctions (`adminAuth`, `inviteToken`, `nextIntervenante`) — migré depuis Node 20 en **Septembre 2026** (Node 20 déprécié depuis le 30/04/2026, décommission au 30/10/2026 ; Node 22 supporté jusqu'à fin 2027). Version fixée à **deux endroits qui doivent rester synchronisés** : `firebase.json` (`functions.runtime`) **et** `functions/package.json` (`engines.node`) — `firebase.json` a priorité s'ils divergent. **Piège de déploiement observé** : Firebase CLI compare le **code source** pour décider si une fonction doit être redéployée (`Skipping the deploy of unchanged functions`) ; un changement de runtime seul (sans toucher `functions/index.js`) n'est **pas** détecté comme un changement, `--force` ne suffit pas non plus — il faut modifier le code source (même un simple commentaire) pour forcer un vrai redéploiement. Dépendances (`firebase-admin ^12`, `firebase-functions ^5`) **non mises à jour** lors de cette migration — restent fonctionnelles sur Node 22, mais `npm` signale des versions plus récentes disponibles à chaque déploiement (`firebase-admin` v14+ exige Node 22 et supprime le namespace legacy `require("firebase-admin")` en faveur d'imports modulaires — mise à jour non triviale, reportée).
+
 ### Telegram
 
 - Bot : @TessonLocationbot  
@@ -541,8 +545,17 @@ Ajout hors cycle de version (Septembre 2026, sans impact sur les 4 HTML) :
   lieu de la date de départ brute — un départ passé avec ménage décalé pas
   encore fait était sinon ignoré (mauvaise date + mauvaise intervenante
   renvoyées à Home Assistant). Déployée et vérifiée en production.
-Prochaine étape : migration runtime Cloud Functions Node.js 20 → 22
-  (décommission Node 20 le 30/10/2026) + mise à jour firebase-functions ;
+  Runtime des 3 Cloud Functions migré Node.js 20 → 22 (Septembre 2026,
+  avant décommission Node 20 le 30/10/2026) — firebase.json
+  (functions.runtime) + functions/package.json (engines.node), voir §
+  Runtime des Cloud Functions ci-dessus pour le piège de déploiement
+  rencontré (redéploiement "skippé" tant que le code source ne change
+  pas). Déployé et vérifié (adminAuth via génération de lien
+  d'invitation superadmin, nextIntervenante via Home Assistant).
+  firebase-admin / firebase-functions non mis à jour (reporté).
+Prochaine étape : mise à jour firebase-admin / firebase-functions vers
+  leurs dernières versions (nécessite de réécrire les imports en
+  version modulaire — firebase-admin v14 supprime le namespace legacy) ;
   puis v4.10.1 — Sécurité (verrou rôle serveur sur CF adminAuth,
   durcissement règles RTDB /inviteTokens, suppression fallback SHA-256
   login)
