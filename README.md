@@ -90,6 +90,10 @@ planning-menage/
 ├── check-accounts.js    → Audit console : cohérence /accounts vs legacy par org (outil d'audit/migration ponctuel)
 ├── patch-legacy-accounts.js → One-shot : réaligne adminConfig.accounts[] depuis /accounts (outil d'audit/migration ponctuel)
 ├── migrate.js           → Script one-shot : copie racine → /orgs/tesson/ (manuel)
+├── functions/
+│   ├── index.js         → Cloud Functions v2 (us-central1) : `adminAuth` (onCall, gestion comptes Firebase Auth), `inviteToken` (onCall, validate/consume — inscription par token), `nextIntervenante` (onRequest GET, ajoutée Septembre 2026 — voir § dédiée ci-dessous)
+│   ├── package.json     → Dépendances (firebase-admin, firebase-functions), engine node 20
+│   └── .env             → Secrets des Cloud Functions (NEXT_INTERVENANTE_KEY…), non commité (functions/.gitignore dédié)
 ├── .gitignore           → Ignore les JSON Firebase/ (local) + init-accounts-migration.js (fichier supprimé du dépôt)
 ├── .github/workflows/
 │   ├── sync-ical.yml
@@ -351,6 +355,18 @@ Sous **`/orgs/{orgId}/procedureSuggestions/{suggestionId}`** :
 - Supprime les entrées **`…/unavailability/{prenom}/dates/{YYYY-MM-DD}`** dont la date est **strictement &lt;** (aujourd’hui **UTC** − 3 ans). Secret **`FIREBASE_SERVICE_ACCOUNT`** uniquement.
 - Workflow : **`.github/workflows/purge-unavailability.yml`** — planification **1er de chaque mois à 3h00 UTC**, Node **20**, **`workflow_dispatch`** possible.
 
+### functions/index.js — Cloud Functions
+
+- **`adminAuth`** (`onCall`, région `us-central1`, CORS restreint aux origines de l'app) : création / suppression / changement de mot de passe des comptes Firebase Auth, appelée par **`superadmin.html`**. ⚠️ pas encore de contrôle de rôle côté serveur (tout utilisateur Firebase Auth authentifié peut l'appeler) — TODO **v4.10.0** (voir historique v4.9.1).
+- **`inviteToken`** (`onCall`) : `validate` (public, pré-auth, vérifie statut + expiration d'un token) et `consume` (création atomique compte Firebase Auth + org + studios + iCal + marquage token `used`) pour le parcours **`invitation.html`**.
+- **`nextIntervenante`** (`onRequest`, GET — **ajoutée en Septembre 2026, hors cycle de version de l'app**, aucune modification des 4 pages HTML) : endpoint **public mais sécurisé par clé partagée** (`?key=...`), **lecture seule**, sans aucun impact sur l'app ni sur les autres Cloud Functions. Pour un studio donné de l'org "tesson", cherche directement dans `/orgs/{orgId}/reservations` le **prochain départ à venir** (`end >= aujourd'hui`, le plus proche) et renvoie la date de ce départ ainsi que les intervenantes assignées (`assignments/{uid}.c1`/`c2`).
+  - **Requête** : `GET /nextIntervenante?studio=1&org=tesson&key=...` (`org` optionnel, défaut `tesson`).
+  - **Réponse** : `{ studio, date: "YYYY-MM-DD" | null, intervenantes: [...] }`.
+  - **Secret** : `NEXT_INTERVENANTE_KEY` dans `functions/.env` (non commité — `functions/.gitignore` dédié), chargé automatiquement par Firebase Functions v2 au déploiement.
+  - **Déploiement isolé** : `firebase deploy --only functions:nextIntervenante` (n'affecte pas `adminAuth` / `inviteToken`).
+  - **Bug corrigé après mise en prod** : la version initiale cherchait le départ juste avant la *prochaine arrivée*, ce qui retombait sur un départ déjà passé quand un studio restait vide un moment (mauvaise assignation renvoyée). Corrigé en cherchant simplement le **prochain départ** (`end >= aujourd'hui`), indépendamment de la prochaine arrivée.
+  - **Consommateurs externes** (hors dépôt, domotique personnelle) : sensor REST Home Assistant (polling horaire) formulant en français « X intervient aujourd'hui / demain / dans N jours » (futur) ou « X est intervenue aujourd'hui » (passé, après 16h — horaire habituel de ménage 10h-16h) ; republié en MQTT vers Jeedom (topics `ha_to_jeedom/studio_x/intervenante` et `ha_to_jeedom/studio_y/intervenante` — convention `studio_x` = Studio 1, `studio_y` = Studio 2, héritée du pont MQTT existant).
+
 ---
 
 ## Infrastructure technique
@@ -361,6 +377,10 @@ Les workflows (`.github/workflows/*.yml`) lisent les valeurs sensibles **uniquem
 
 - `FIREBASE_SERVICE_ACCOUNT` : JSON complet du compte de service Firebase (utilisé par `sync-ical.js`, `notify-departs.js`, `purge-unavailability.js`, `init-superadmin.js`, `init-ical-feeds.js`, `init-accounts.js`, `check-accounts.js`, `patch-legacy-accounts.js`, `migrate.js`)
 - `TELEGRAM_BOT_TOKEN` : token du bot @TessonLocationbot (utilisé par `sync-ical.js` et `notify-departs.js`)
+
+### Secrets des Cloud Functions (déploiement direct, hors CI)
+
+Depuis l'ajout de **`nextIntervenante`** (Septembre 2026), certaines Cloud Functions ont besoin d'un secret **au moment du déploiement**, indépendamment des Actions GitHub : fichier **`functions/.env`** (non commité, **`functions/.gitignore`** dédié — `node_modules/`, `.env`, `.env.*`), chargé **automatiquement** par Firebase Functions v2 lors de `firebase deploy`. Exemple : `NEXT_INTERVENANTE_KEY=...`. Ce mécanisme est **distinct** des secrets GitHub Actions ci-dessus (qui servent aux scripts Node exécutés en CI, pas aux Cloud Functions elles-mêmes).
 
 ### Telegram
 
@@ -496,6 +516,11 @@ Dernière version stable : v4.9.10
 Dernière étape complétée : v4.9.10 — Indicateurs voyageurs (admin menu +
   index pastille titre), tableau Résa (halo Arrivée mois courant), planning
   (cadre rouge jour départ ∩ indispo même date)
+Ajout hors cycle de version (Septembre 2026, sans impact sur les 4 HTML) :
+  Cloud Function nextIntervenante (functions/index.js) — lecture seule,
+  sécurisée par clé partagée (functions/.env), consommée par Home Assistant
+  / Jeedom pour afficher la prochaine intervenante par studio (voir §
+  functions/index.js — Cloud Functions ci-dessus).
 Prochaine étape : v4.10.0 — Sécurité (verrou rôle serveur sur CF
   adminAuth, durcissement règles RTDB /inviteTokens, suppression
   fallback SHA-256 login)
@@ -508,7 +533,7 @@ Invitation : https://jonathantesson.github.io/planning-menage/invitation.html
 Fichiers : index.html (v4.9.10), admin.html (v4.9.10), compte.html (v4.9.6),
   superadmin.html (v4.9.6), invitation.html (v4.9.6),
   fonctions.js, styles.css, functions/index.js (CF inviteToken
-  validate+consume + adminAuth)
+  validate+consume + adminAuth + nextIntervenante)
 README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ```
 
