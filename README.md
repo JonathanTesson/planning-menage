@@ -1,6 +1,6 @@
 # Planning Ménage — Studios Airbnb
 
-**Version : 4.10.0** — Septembre 2026
+**Version : 4.11.0** — Septembre 2026
 
 Application web de planning des interventions ménage pour plusieurs organisations (studios Airbnb), avec authentification par rôle, données isolées par organisation sous Firebase, synchronisation iCal, notifications Telegram, **comptes rendus terrain** (heures, commentaire et commande partagés), **export Excel** enrichi, **procédures & préparation studio** (étapes par studio avec photos légères), **consultation procédure côté calendrier** pour les intervenantes assignées (onglet dédié, coches par départ, notes persistantes, suggestions) et **validation des suggestions** dans l’admin. **v4.6.0** : **Super Administration** (`superadmin.html`) — page autonome, login **SHA-256** contre **`/superAdmin/credentials`** (`username`, `pwdHash`), menu **Comptes** / **Organisations** / **Paramètres** / **Sécurité** ; liste des organisations chargée depuis **`/organizations`** dans **`index.html`**, **`admin.html`**, **`compte.html`** (fallback tesson/nade si besoin) ; flux iCal lus depuis **`/orgs/{orgId}/icalFeeds`** (`[{ url, studio, locked? }]`) par **`sync-ical.js`** ; **`notify-departs.js`** et **`purge-unavailability.js`** parcourent les orgs via **`/organizations`** (fallback tesson/nade si erreur ou liste vide) ; scripts d’init **`init-superadmin.js`**, **`init-ical-feeds.js`**. **v4.6.1 (Phase 2 complète)** : suppression d’**organisation** (cascade RTDB ciblée + **Storage** `orgs/{orgId}/`, re-auth Super Admin) ; **N studios** — création / renommage / suppression (**Super Admin**), renommage seul (**admin.html** vue Organisation, champs **`#studios-fields`**) ; **URLs iCal** par studio depuis **Super Admin** (re-auth) ; **`index.html`** — calendrier **N** studios, palette **`STUDIO_COLORS`** (couleurs cycliques) ; **`admin.html`** — procédures et exports alignés sur **`A.studioNames`**. **v4.6.2** : refonte **Super Admin** vue **Organisations** (accordéon **studios** / **comptes**, toggles **🔐💬** et badge **👤** sur la ligne org, badge **étapes** par studio) ; entrées menu **Comptes** / **Paramètres** **masquées** (code conservé) ; **`admin.html`** — retrait des réglages **auth** / **Telegram** / **org. par défaut** (gérés côté Super Admin / Firebase). **v4.6.3** : demandes de **suppression de studio** (admin → Super Admin, nœud **`/pendingDeletionRequests`**), **pastilles orange** (accueil hors app, planning si suggestions procédure, halo menu **Procédure** admin), **iCal** côté **admin** + verrouillage **`locked`** côté **Super Admin**, **+ Ajouter un studio** (admin), correctifs **liste orgs** (hydratation accordéon, sablier ⏳), **`telegramEnabled: false`** par défaut à la création d’org, UX **Super Admin** (login smartphone, topbar, **✏️** libellé, slug retiré de la ligne) — détail § **Historique des versions — v4.6.3**. **v4.7.0** : registre global **`/accounts/{id}`** (identité **`name`** / **`prenom`**, **`pwdHash`** SHA-256, **`orgs.{orgId}.roles`**, **`defaultOrg`**, champs optionnels **`pseudo`**, **`tel`**) en complément du legacy **`/orgs/{orgId}/adminConfig/accounts`** ; connexion **`index.html`** : **`<select id="login-name">`** rempli dans **`showLogin()`** depuis **`get(ref(db,'accounts'))`** (libellés distincts **`name`** ou **`prenom`**, tri **`fr`**) puis **`doLogin`** : essai **global** (**SHA-256**) puis **legacy** (**`hashSimple`**) — tant que le select n’énumère que **`/accounts`**, un compte **uniquement** legacy sans homonyme global reste **non sélectionnable** (voir **`patch-legacy-accounts.js`** ou évolution UI) ; cold start **sans** écran org obligatoire (**`menage_org_v1`** = première org **`/organizations`** ou **`tesson`**) ; sélecteur **Organisation** sur l’écran connexion ; scripts **`init-accounts.js`**, **`check-accounts.js`**, **`patch-legacy-accounts.js`** ; **`init-accounts-migration.js`** retiré du dépôt (nom dans **`.gitignore`** pour éviter un re-commit) ; suppression **`login-test.html`** ; **Super Admin** : panneau comptes **`/accounts`**. **v4.5.5** : calendriers **indisponibilités** sur **`compte.html`** et **`admin.html`** — la grille peut **s’élargir** pour afficher **« par … »** lisiblement (**`minmax(min-content, 1fr)`**) ; la vue utilise **`.section.section--unavail`** (**fond et bordure retirés**, sans barre de défilement) pour éviter tout décalage visuel ; case à cocher **« Afficher le détail (par qui) »** (défaut décochée), préférence **`localStorage`** **`menage_unavail_showby_v1`** (partagée entre les deux pages). **v4.5.4** : traçabilité des **étapes** de procédure (admin + calendrier), **copie** d’étape avec report des métadonnées, **indicateur** des suggestions en attente dans la modale ménage (onglet Procédure), **animation** des pastilles **Indispo**. **Note d’assignation** côté calendrier (**`note`** + traçage **`noteBy`**, indicateur **point bleu pulsant** sur les départs, lecture seule pour les ménagères) — détail § **`/assignments`** et § **index.html** ci-dessous. **v4.5.x** : **indisponibilités** — saisie sur **`compte.html`**, pastilles + filtre **Indispo** sur **`index.html`**, **vue admin** **`#indisponibilites`** (édition par intervenante **v4.5.1**, résumé global **v4.5.2**, traçabilité **`by` v4.5.3**), clés **`YYYY-MM-DD` en date locale** ; la **purge automatique** compare les mêmes clés au **seuil UTC** (voir § **`/unavailability`**).
 
@@ -140,6 +140,7 @@ Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. La **liste d
     /procedures      → procédures ménage par studio (détail § v4.2 + v4.3 ci-dessous)
     /procedureSuggestions → suggestions d’étapes en attente de validation (v4.3)
     /unavailability     → indisponibilités par prénom (v4.5.0 — UI calendrier + compte)
+    /cancelledAssignments → assignations archivées suite à une annulation voyageur (v4.11.0, par studio)
   /nade
     (même structure, dont **icalFeeds** ; remplie selon sync iCal et utilisation)
 ```
@@ -159,6 +160,25 @@ Toutes les données « métier » vivent sous **`/orgs/{orgId}/`**. La **liste d
 - **Purge (`purge-unavailability.js`)** : supprime le **nœud date** entier ; compatible **`true`** et **`{ by }`** ; parcourt les orgs depuis **`/organizations`** (**v4.6.x**, avec fallback tesson/nade).
 - **Purge (détail)** : compare chaque clé **`YYYY-MM-DD`** au seuil **aujourd’hui UTC − 3 ans** (chaînes **`YYYY-MM-DD`** comparées lexicographiquement). C’est **volontairement UTC** côté cron, alors que la **saisie** est **locale** : en pratique les écarts de fuseau n’affectent que les entrées proches de la frontière des 3 ans ; documenté ici pour éviter toute confusion.
 - Si le nœud **`unavailability`** est **absent** pour une org, le script de purge **ignore** silencieusement cette org ; l’UI fonctionne avec un objet vide.
+
+### `/cancelledAssignments` — archive d'assignation suite à annulation voyageur (**v4.11.0**)
+
+```
+/orgs/{orgId}/cancelledAssignments/{studioIndex}/{ancienUid} → { start, end, c1, c2, cancelledAt }
+```
+
+- **Problème traité** : quand un voyageur annule sa réservation, `sync-ical.js` supprime l'entrée sous `/reservations` (comme avant) — mais si une intervenante était assignée et qu'une **nouvelle** réservation retombe ensuite sur (à peu près) les mêmes dates, elle arrive avec un nouvel `uid` et donc **aucune** assignation ; l'admin n'avait jusqu'ici aucun moyen de savoir qui était prévue.
+- **Écriture** : uniquement par **`sync-ical.js`**, au moment où il détecte l'annulation (`existing[uid]` disparu du flux iCal, `r.end >= today`), et **seulement si** l'assignation annulée avait `c1` et/ou `c2` renseigné (formats legacy `cleaner` / chaîne simple normalisés). `start`/`end` sont les dates **d'origine** de la réservation annulée (nécessaires puisque `/reservations/{uid}` est supprimé et ne les porte plus). Écriture **ciblée sur cette seule clé** — `sync-ical.js` ne réécrit jamais le nœud `/cancelledAssignments` en entier, ni le nœud `/assignments` en entier (voir point suivant), pour ne jamais entrer en conflit avec `saveAssignments()` côté navigateur (qui réécrit tout `/assignments` à chaque enregistrement d'assignation admin).
+- **Nettoyage de l'orpheline** : au même moment, `sync-ical.js` supprime **`/assignments/{ancienUid}`** (suppression ciblée sur cette seule clé) — jusqu'ici cette entrée restait orpheline indéfiniment en base (bug préexistant, corrigé au passage).
+- **Purge automatique** : à **chaque exécution** de `sync-ical.js` (cron horaire), toute archive dont `end` est déjà passée est supprimée (`purgeExpiredCancelledAssignments`), qu'elle ait servi ou non — pas besoin d'ouvrir l'app pour que ça se nettoie.
+- **Lecture / affichage (`index.html`)** : listener sur `/orgs/{orgId}/cancelledAssignments` → `S.cancelledAssignments`. À l'ouverture de la modale **Assigner les intervenantes** pour une réservation **sans** assignation actuelle, `findCancelledAssignmentMatch(r)` cherche une archive sur le **même studio** :
+  - arrivée **et** départ identiques → badge vert **« Dates identiques »** ;
+  - une seule des deux dates en commun → badge orange **« Dates légèrement différentes »**, avec les deux plages affichées ;
+  - aucune date en commun → rien n'est affiché.
+  - En cas de chevauchement de plusieurs archives valides (rare), seule la plus récente (`cancelledAt`) est retenue — cas jugé trop rare pour être arbitré plus finement.
+  - Bouton **« Réaffecter … »** : pré-remplit `Intervenante 1` / `Intervenante 2` avec les noms archivés (uniquement s'ils existent encore dans la liste des intervenantes actives) ; l'admin valide ensuite normalement via **Enregistrer**.
+- **Suppression de l'archive** : dès que **n'importe quelle** assignation est enregistrée sur ce départ (l'intervenante suggérée ou une autre), l'archive correspondante est supprimée côté client (écriture ciblée sur sa seule clé) — elle ne sert qu'une fois.
+- **Si aucune intervenante n'était assignée** au moment de l'annulation : rien n'est archivé, comportement inchangé.
 
 ### `/assignments` — note d’assignation (**v4.3.4**), ménage décalé (**v4.10.0**)
 
@@ -522,9 +542,23 @@ Ne pas supprimer `keepalive.yml` sous peine de perdre la synchronisation iCal.
 
 ```
 Projet : Planning Ménage Airbnb
-Version : 4.10.0
-Dernière version stable : v4.10.0
-Dernière étape complétée : v4.10.0 — Ménage décalé (menageDate/menageDateBy
+Version : 4.11.0
+Dernière version stable : v4.11.0
+Dernière étape complétée : v4.11.0 — Archive d'assignation suite à annulation
+  voyageur (/orgs/{orgId}/cancelledAssignments/{studioIndex}/{ancienUid}) :
+  sync-ical.js archive c1/c2 (formats legacy normalisés) au moment où il
+  détecte une annulation avec assignation, uniquement par écriture ciblée
+  sur cette clé (jamais de réécriture du nœud /assignments ou
+  /cancelledAssignments entier, pour ne pas entrer en collision avec
+  saveAssignments() côté navigateur) ; supprime au passage l'assignation
+  orpheline correspondante (bug préexistant corrigé) ; purge automatique
+  des archives expirées à chaque sync horaire. Côté index.html, la modale
+  Assigner les intervenantes propose l'intervenante archivée avec un badge
+  vert (dates identiques) ou orange (au moins une date en commun) si le
+  départ n'a personne d'assigné ; bouton Réaffecter pré-remplissant les
+  champs ; l'archive est supprimée dès qu'une assignation est enregistrée
+  sur ce départ (voir § /cancelledAssignments ci-dessus).
+Précédente étape complétée : v4.10.0 — Ménage décalé (menageDate/menageDateBy
   sous /assignments) : décalage depuis index.html avec sélecteur de date
   borné (max = veille prochaine arrivée, grisage natif + garde-fou à
   l'enregistrement) ; date effective répercutée sur les KPIs et l'historique
@@ -565,9 +599,10 @@ Admin : https://jonathantesson.github.io/planning-menage/admin.html
 Compte : https://jonathantesson.github.io/planning-menage/compte.html
 Super Admin : https://jonathantesson.github.io/planning-menage/superadmin.html
 Invitation : https://jonathantesson.github.io/planning-menage/invitation.html
-Fichiers : index.html (v4.10.0), admin.html (v4.10.0), compte.html (v4.10.0),
+Fichiers : index.html (v4.11.0), admin.html (v4.10.0), compte.html (v4.10.0),
   superadmin.html (v4.10.0), invitation.html (v4.9.6),
-  fonctions.js, styles.css, functions/index.js (CF inviteToken
+  fonctions.js, styles.css, sync-ical.js (archive cancelledAssignments,
+  non versionné par APP_VERSION), functions/index.js (CF inviteToken
   validate+consume + adminAuth + nextIntervenante)
 README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ```
@@ -575,6 +610,15 @@ README : https://github.com/JonathanTesson/planning-menage/blob/main/README.md
 ---
 
 ## Historique des versions
+
+### v4.11.0 — Septembre 2026
+
+**Archive d'assignation suite à annulation voyageur** — quand un voyageur annule sa réservation, l'intervenante qui y était assignée n'était jusqu'ici plus retrouvable si une nouvelle réservation retombait sur les mêmes dates (nouvel `uid` iCal, donc aucune assignation). Voir § **`/cancelledAssignments`** ci-dessus pour le détail complet du schéma et de la logique.
+
+- **`sync-ical.js`** : au moment où il détecte une annulation avec assignation, archive `c1`/`c2` (formats legacy normalisés) sous `/orgs/{orgId}/cancelledAssignments/{studioIndex}/{ancienUid}` (écriture ciblée sur cette seule clé) et supprime l'assignation orpheline correspondante sous `/assignments/{ancienUid}` (suppression ciblée, jamais de réécriture du nœud entier — correctif d'un bug préexistant où ces orphelines s'accumulaient indéfiniment). Purge automatique des archives expirées à chaque exécution (cron horaire), qu'elles aient servi ou non.
+- **`index.html`** — modale **Assigner les intervenantes** : si le départ n'a personne d'assigné et qu'une archive existe pour ce studio avec au moins une date en commun, bloc d'info orange (`findCancelledAssignmentMatch`) — badge vert **« Dates identiques »** si arrivée et départ correspondent exactement, badge orange **« Dates légèrement différentes »** sinon (les deux plages sont affichées) ; bouton **Réaffecter** pré-remplissant Intervenante 1 / 2 (uniquement avec des noms encore actifs) ; l'admin valide ensuite via **Enregistrer** comme d'habitude. L'archive est supprimée dès qu'une assignation (celle suggérée ou une autre) est enregistrée sur ce départ.
+- **Cas non traité volontairement** : chevauchement de plusieurs annulations archivées sur le même studio — seule la plus récente (`cancelledAt`) est proposée, jugé trop rare pour être arbitré plus finement.
+- **`APP_VERSION`** : **4.11.0** dans `index.html` (seul fichier HTML touché sur cette livraison ; `admin.html`, `compte.html`, `superadmin.html` inchangés, restent en 4.10.0).
 
 ### v4.10.0 — Septembre 2026
 

@@ -145,6 +145,13 @@ button.user-badge.user-badge-account:hover{background:#f0f0eb;text-decoration:no
 .assign-note-readonly .depart-note-pip{position:absolute;top:10px;right:10px;margin:0;vertical-align:initial}
 .assign-note-readonly-by{font-size:11px;color:#92400e;font-weight:600;margin-bottom:6px}
 .assign-note-readonly-text{color:#555;white-space:pre-wrap;word-break:break-word}
+.cancelled-match-box{background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 12px;margin:0 0 1rem;font-size:12px;color:#555;line-height:1.45}
+.cancelled-match-badge{display:inline-block;font-size:11px;font-weight:600;border-radius:12px;padding:2px 8px;margin-bottom:6px}
+.cancelled-match-badge--ok{background:#dcfce7;color:#166534}
+.cancelled-match-badge--warn{background:#fef3c7;color:#92400e}
+.cancelled-match-text{margin-bottom:6px}
+.cancelled-match-dates{color:#92400e;margin-bottom:8px;font-size:11px}
+.cancelled-match-box .btn-secondary{font-size:12px;padding:6px 10px}
 .menage-procedure-panel{margin-top:0.25rem}
 .menage-procedure-top{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:8px}
 .menage-procedure-suggest-indicator{width:36px;height:36px;position:relative;flex-shrink:0;box-sizing:border-box}
@@ -533,7 +540,7 @@ const ORG_STORAGE_KEY = 'menage_org_v1';
 const ORG_CHANGE_GATE_KEY = 'menage_org_change_gate';
 let ORGANIZATIONS = [];
 /** Aligner avec README.md lors d’une release. */
-const APP_VERSION = '4.10.0';
+const APP_VERSION = '4.11.0';
 
 let __lastLoginUid = null;
 let __lastLoginTs = 0;
@@ -597,6 +604,8 @@ let S = {
   /** @type {Record<string, Record<string, { by: string|null }>>} prénom → date locale → { by } (cf. normalizeUnavailability) */
   unavailability: {},
   procedureSuggestions: {},
+  /** @type {Record<string, Record<string, {start:string,end:string,c1:string|null,c2:string|null,cancelledAt:string}>>} studioIndex → ancien uid → assignation archivée (résa annulée). */
+  cancelledAssignments: {},
   /** Après un scan réussi de /accounts : null = pas de ligne globale, sinon { id, ...champs }. */
   globalAccount: null,
   globalAccountLoaded: false
@@ -1507,6 +1516,10 @@ function initFirebaseAndApp(){
     afterFbListener();
   });
 
+  onValue(ref(db,ob('cancelledAssignments')), snap=>{
+    S.cancelledAssignments=snap.val()||{};
+  });
+
   onValue(ref(db,ob('reservations')), snap=>{
     const data=snap.val()||{};
     S.reservations=Object.values(data).map(r=>({...r,start:new Date(r.start),end:new Date(r.end)}));
@@ -1752,6 +1765,32 @@ function getMenageDecalsForDay(d,si){
     if(menageDate===dk) out.push(r);
   }
   return out;
+}
+
+/**
+ * Cherche, pour une réservation SANS assignation, une archive d'assignation annulée sur le
+ * même studio dont au moins une date (arrivée ou départ) correspond. Retourne :
+ *  - null si aucune date en commun avec aucune archive (rien à signaler) ;
+ *  - { studio, uid, entry, quality:'match' } si arrivée ET départ identiques ;
+ *  - { studio, uid, entry, quality:'vigilance' } si une seule des deux dates correspond.
+ * S'il y a plusieurs candidates (chevauchement rare), on ne garde que la plus récente
+ * (cancelledAt le plus proche) — cas jugé trop rare pour être arbitré plus finement.
+ */
+function findCancelledAssignmentMatch(r){
+  const byStudio=S.cancelledAssignments[String(r.studio)];
+  if(!byStudio||typeof byStudio!=='object') return null;
+  const rStart=localDateKey(r.start), rEnd=localDateKey(r.end);
+  let best=null;
+  for(const [uid,entry] of Object.entries(byStudio)){
+    if(!entry||(!entry.c1&&!entry.c2)) continue;
+    const sameStart=entry.start===rStart, sameEnd=entry.end===rEnd;
+    if(!sameStart&&!sameEnd) continue;
+    const quality=(sameStart&&sameEnd)?'match':'vigilance';
+    if(!best||String(entry.cancelledAt||'')>String(best.entry.cancelledAt||'')){
+      best={studio:r.studio,uid,entry,quality};
+    }
+  }
+  return best;
 }
 
 function fmtShortDate(dateStr){
@@ -2542,6 +2581,34 @@ window._oa = function(key){
   let cleaners=cleanerListOrLegacy().filter(a=>a.menage).map(a=>a.name);
   if(!cleaners.length&&!S.adminConfig.accounts) cleaners=S.cleaners||[];
   const opts=sel=>`<option value="">— Aucune —</option>`+cleaners.map(x=>`<option value="${x}"${sel===x?' selected':''}>${x}</option>`).join('');
+
+  // Résa annulée avec assignation récupérable : uniquement si ce départ n'a personne
+  // d'assigné pour l'instant (sinon rien à proposer). Voir findCancelledAssignmentMatch().
+  const cancelledMatch=(!c1&&!c2)?findCancelledAssignmentMatch(r):null;
+  let cancelledMatchHtml='';
+  window._assignModalCancelledMatch=null;
+  if(cancelledMatch){
+    const en=cancelledMatch.entry;
+    const names=[en.c1,en.c2].filter(Boolean).filter(nm=>cleaners.includes(nm));
+    if(names.length){
+      window._assignModalCancelledMatch={...cancelledMatch,forKey:key};
+      const isMatch=cancelledMatch.quality==='match';
+      const badge=isMatch
+        ? `<span class="cancelled-match-badge cancelled-match-badge--ok">✅ Dates identiques</span>`
+        : `<span class="cancelled-match-badge cancelled-match-badge--warn">⚠️ Dates légèrement différentes</span>`;
+      const oldDates=`${fmtShortDate(en.start)} → ${fmtShortDate(en.end)}`;
+      const newDates=`${fmtShortDate(localDateKey(r.start))} → ${fmtShortDate(localDateKey(r.end))}`;
+      const compareLine=isMatch?'':`<div class="cancelled-match-dates">Ancienne résa : ${oldDates}<br>Nouvelle résa : ${newDates}</div>`;
+      cancelledMatchHtml=`
+        <div class="cancelled-match-box">
+          ${badge}
+          <div class="cancelled-match-text">Pour info : une réservation annulée sur ce studio avait <strong>${escHtml(names.join(' + '))}</strong> assignée (${oldDates}).</div>
+          ${compareLine}
+          <button type="button" class="btn-secondary" onclick="window._reaffecterCancelled()">Réaffecter ${escHtml(names.join(' + '))}</button>
+        </div>`;
+    }
+  }
+
   document.getElementById('modal-container').innerHTML=`
     <div class="modal-overlay" onclick="if(event.target===this)window._cm()">
       <div class="modal">
@@ -2553,6 +2620,7 @@ window._oa = function(key){
           Départ : ${fmt(r.end)} (${n} nuit${n>1?'s':''})<br>
           ${r.summary&&r.summary!=='Réservation'?'Voyageur : '+r.summary:''}${menageDateInfoHtml}
         </div>
+        ${cancelledMatchHtml}
         <div class="modal-section-title">Intervenante 1</div>
         <div class="modal-field"><select id="mc1">${opts(c1)}</select></div>
         <div class="modal-section-title">Intervenante 2 (optionnel)</div>
@@ -2707,10 +2775,27 @@ window._sa = function(key){
     }
 
     S.assignments[key]=admAsg;
+
+    // Une assignation vient d'être posée sur ce départ (Emmy ou une autre personne) :
+    // l'archive "résa annulée" proposée pour ce départ n'a plus lieu d'être affichée.
+    const m=window._assignModalCancelledMatch;
+    if(m&&m.forKey===key){
+      const oid=getStoredOrgId();
+      if(oid) fbSet(`orgs/${oid}/cancelledAssignments/${m.studio}/${m.uid}`,null);
+      window._assignModalCancelledMatch=null;
+    }
   }else delete S.assignments[key];
   saveAssignments();
   showToast([c1,c2].filter(Boolean).join(' + ')||'Assignation supprimée');
   window._cm(); render();
+};
+
+window._reaffecterCancelled=function(){
+  const m=window._assignModalCancelledMatch; if(!m) return;
+  const mc1=document.getElementById('mc1'), mc2=document.getElementById('mc2');
+  if(mc1&&m.entry.c1) mc1.value=m.entry.c1;
+  if(mc2&&m.entry.c2) mc2.value=m.entry.c2;
+  showToast('Pré-rempli — vérifiez puis Enregistrer');
 };
 
 window._toggleMenageDecal=function(key){
@@ -2728,6 +2813,7 @@ window._cm=function(){
   clearMenageModalUnsubs();
   window._menageModalCtx=null;
   window._menageProcedureStepIdsForModal=null;
+  window._assignModalCancelledMatch=null;
   menageSuggestSubmitting=false;
   menageSuggestRevokePreview();
   document.getElementById('menage-suggest-root')?.remove();

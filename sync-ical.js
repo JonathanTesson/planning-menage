@@ -154,6 +154,46 @@ function formatDate(dateStr) {
   return `${d}/${m}/${y}`;
 }
 
+/** Normalise une assignation (formats legacy inclus : chaîne simple, champ `cleaner`) en { c1, c2 }. */
+function normalizeAssignmentForArchive(a) {
+  if (!a) return { c1: null, c2: null };
+  if (typeof a === 'string') return { c1: a, c2: null };
+  return { c1: a.cleaner || a.c1 || null, c2: a.c2 || null };
+}
+
+/** Supprime UNIQUEMENT le nœud à ce chemin précis (jamais une réécriture du parent). */
+async function firebaseDeletePath(path, token) {
+  await firebasePut(path, null, token);
+}
+
+/**
+ * Supprime les archives /cancelledAssignments dont la date de départ d'origine est déjà
+ * passée (nettoyage borné, suppressions ciblées par clé — jamais de réécriture du nœud
+ * /cancelledAssignments entier).
+ */
+async function purgeExpiredCancelledAssignments(base, today, token, orgId) {
+  let byStudio = {};
+  try {
+    byStudio = (await firebaseGet(`${base}/cancelledAssignments`, token)) || {};
+  } catch (e) {
+    console.warn(`⚠️ [${orgId}] lecture cancelledAssignments:`, e.message);
+    return;
+  }
+  for (const [studioIndex, entries] of Object.entries(byStudio)) {
+    if (!entries || typeof entries !== 'object') continue;
+    for (const [uid, entry] of Object.entries(entries)) {
+      if (entry && entry.end < today) {
+        try {
+          await firebaseDeletePath(`${base}/cancelledAssignments/${studioIndex}/${uid}`, token);
+          console.log(`🧹 [${orgId}] Archive annulation expirée supprimée : studio ${studioIndex} / ${uid}`);
+        } catch (e) {
+          console.warn(`⚠️ [${orgId}] purge archive ${studioIndex}/${uid}:`, e.message);
+        }
+      }
+    }
+  }
+}
+
 function buildNewResaMessage(r, studioNames, orgLabel) {
   const nights = Math.round((new Date(r.end) - new Date(r.start)) / 86400000);
   const sn = studioNames[r.studio] || STUDIO_NAMES_FALLBACK[r.studio] || `S${r.studio + 1}`;
@@ -238,6 +278,8 @@ async function syncOneOrg(org, token) {
   const today = new Date().toISOString().split('T')[0];
   const notifications = [];
 
+  await purgeExpiredCancelledAssignments(base, today, token, org.id);
+
   for (const uid of freshUids) {
     if (!existing[uid] && merged[uid].end >= today) {
       console.log(`🆕 [${org.id}] Nouvelle réservation : ${uid}`);
@@ -251,6 +293,35 @@ async function syncOneOrg(org, token) {
       const assignment = assignments[uid] || null;
       notifications.push(buildCancelMessage(r, assignment, studioNames, org.label));
       delete merged[uid];
+
+      // Archive l'assignation annulée (si une intervenante était prévue) pour que l'admin
+      // puisse la retrouver si une nouvelle réservation tombe sur ces dates avant que la
+      // date de départ d'origine ne soit passée. Écritures ciblées uniquement sur cette
+      // clé : /assignments (nœud entier) n'est JAMAIS réécrit ici, pour ne pas entrer en
+      // conflit avec saveAssignments() côté navigateur (qui réécrit tout le nœud à chaque
+      // enregistrement d'assignation).
+      const norm = normalizeAssignmentForArchive(assignment);
+      if (norm.c1 || norm.c2) {
+        try {
+          await firebasePut(`${base}/cancelledAssignments/${r.studio}/${uid}`, {
+            start: r.start,
+            end: r.end,
+            c1: norm.c1,
+            c2: norm.c2,
+            cancelledAt: new Date().toISOString()
+          }, token);
+          console.log(`🗃️ [${org.id}] Assignation archivée (annulation) : studio ${r.studio} / ${uid}`);
+        } catch (e) {
+          console.warn(`⚠️ [${org.id}] écriture archive annulation ${uid}:`, e.message);
+        }
+      }
+      if (assignment != null) {
+        try {
+          await firebaseDeletePath(`${base}/assignments/${uid}`, token);
+        } catch (e) {
+          console.warn(`⚠️ [${org.id}] suppression assignation orpheline ${uid}:`, e.message);
+        }
+      }
     }
   }
 
