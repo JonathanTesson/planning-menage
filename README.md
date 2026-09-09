@@ -405,6 +405,13 @@ Les workflows (`.github/workflows/*.yml`) lisent les valeurs sensibles **uniquem
 - `FIREBASE_SERVICE_ACCOUNT` : JSON complet du compte de service Firebase (utilisé par `sync-ical.js`, `notify-departs.js`, `purge-unavailability.js`, `init-superadmin.js`, `init-ical-feeds.js`, `init-accounts.js`, `check-accounts.js`, `patch-legacy-accounts.js`, `migrate.js`)
 - `TELEGRAM_BOT_TOKEN` : token du bot @TessonLocationbot (utilisé par `sync-ical.js` et `notify-departs.js`)
 
+### GitHub Actions — Node runtime (à surveiller, rien d'urgent — Septembre 2026)
+
+Deux sujets Node distincts repérés sur les workflows (`.github/workflows/*.yml`), aucun des deux ne casse quoi que ce soit aujourd'hui (run `sync-ical.yml` #1742 vérifié en production sans erreur) :
+
+- **Moteur d'exécution des actions** (`actions/checkout@v4`, `actions/setup-node@v4`) : GitHub déprécie Node 20 comme runtime interne de ses actions et bascule automatiquement sur Node 24 en attendant (warning visible dans les logs de run, sans impact fonctionnel). Correctif définitif le jour où on veut faire le ménage : monter ces actions vers une version plus récente (`@v5`) dans les fichiers `.yml`.
+- **Node qui exécute nos scripts** (`node-version: '20'` dans les workflows, ex. `sync-ical.yml`) : sujet séparé, sans lien avec le point ci-dessus. Node 20 est décommissionné le 30/10/2026 (même échéance que pour les Cloud Functions, voir § **Runtime des Cloud Functions**). À bumper vers `'22'` avant cette date, sans urgence particulière (plus d'un an de marge au moment de la rédaction).
+
 ### Secrets des Cloud Functions (déploiement direct, hors CI)
 
 Depuis l'ajout de **`nextIntervenante`** (Septembre 2026), certaines Cloud Functions ont besoin d'un secret **au moment du déploiement**, indépendamment des Actions GitHub : fichier **`functions/.env`** (non commité, **`functions/.gitignore`** dédié — `node_modules/`, `.env`, `.env.*`), chargé **automatiquement** par Firebase Functions v2 lors de `firebase deploy`. Exemple : `NEXT_INTERVENANTE_KEY=...`. Ce mécanisme est **distinct** des secrets GitHub Actions ci-dessus (qui servent aux scripts Node exécutés en CI, pas aux Cloud Functions elles-mêmes).
